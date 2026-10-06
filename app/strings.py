@@ -38,8 +38,16 @@ TEXTS = {
     "ui_discard": {"de": "Verwerfen", "en": "Discard"},
     "ui_discard_title": {"de": "Aufnahme verwerfen?", "en": "Discard this recording?"},
     "ui_discard_text": {
-        "de": "Zusammenfassung, Transkript und Titel werden hier endgültig gelöscht. Der Eintrag bei Plaud bleibt unverändert und wird nicht erneut importiert.",
-        "en": "Summary, transcript and title are deleted here for good. The entry at Plaud stays as it is and is not imported again.",
+        "de": "Zusammenfassung, Transkript und Titel werden hier endgültig gelöscht. Das lässt sich nicht rückgängig machen.",
+        "en": "Summary, transcript and title are deleted here for good. This cannot be undone.",
+    },
+    "ui_discard_plaud_on": {
+        "de": "Bei Plaud wird die Aufnahme ebenfalls gelöscht: zuerst in den Papierkorb (frühestens {min_age_hours} Stunden nach der Aufnahme), nach {wait_hours} Stunden endgültig.",
+        "en": "The recording is deleted at Plaud as well: first into the trash (no earlier than {min_age_hours} hours after the recording), permanently after {wait_hours} hours.",
+    },
+    "ui_discard_plaud_off": {
+        "de": "Das Löschen bei Plaud ist derzeit ausgeschaltet. Die Aufnahme bleibt dort liegen, wird hier aber nicht erneut importiert.",
+        "en": "Deleting at Plaud is currently switched off. The recording stays there but is not imported again here.",
     },
     "ui_discard_confirm": {"de": "Ja, endgültig verwerfen", "en": "Yes, discard for good"},
     "ui_cancel": {"de": "Abbrechen", "en": "Cancel"},

@@ -68,8 +68,11 @@ Requirements: `requirements/`. Decisions: `DECISIONS.md` (D-001 to D-004).
   login (SSH tunnel is the access control). It lists recordings (newest first,
   50 per page), searches title, summary and transcript, shows summary and
   transcript, and discards recordings one by one or everything older than N
-  days. Discarding removes the content here for good; the entry at Plaud is
-  left alone and never imported again. `web` has no Plaud credentials.
+  days. Discarding removes the content here for good and never imports the
+  recording again. At Plaud it is deleted by the normal cycle (trash after the
+  minimum age, permanent after the wait), without the verification and
+  stability conditions; with `PLAUD_DELETE_ENABLED=false` that is only logged.
+  `web` has no Plaud credentials.
 - `STORE_AUDIO` is reserved; audio is not downloaded or stored.
 - While Plaud keeps a recording (shadow mode, or waiting for stability) every
   cycle re-reads its detail, transcript and summary to detect changes.

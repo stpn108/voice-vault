@@ -11,6 +11,7 @@
 <p>{{ t("ui_cleanup_count", count=count, days=days) }}</p>
 {% if count > 0 %}
 <p>{{ t("ui_discard_text") }}</p>
+<p>{{ plaud_note }}</p>
 <form method="post" action="/cleanup">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <input type="hidden" name="days" value="{{ days }}">

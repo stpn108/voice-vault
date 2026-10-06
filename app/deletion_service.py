@@ -35,13 +35,17 @@ def _is_verified(rec: Recording) -> bool:
 def unmet_trash_conditions(rec: Recording, now: dt.datetime, cfg: Config) -> list[str]:
     """Reasons a recording may not go to the Plaud trash yet; empty means it may."""
     reasons = []
-    if not rec.is_plaud_processed:
-        reasons.append("plaud_not_processed")
     if rec.duration_ms <= 0:
         # Plaud may list a recording before its length is known; the age is then meaningless.
         reasons.append("duration_unknown")
     if now - as_utc(rec.ended_at) < dt.timedelta(minutes=cfg.min_age_minutes):
         reasons.append("too_young")
+    if rec.discarded_at is not None:
+        # The owner discarded it in the UI (D-009): the content is gone on purpose, so the
+        # processing, verification and stability gates make no sense. Age and duration stay.
+        return reasons
+    if not rec.is_plaud_processed:
+        reasons.append("plaud_not_processed")
     if not _is_verified(rec):
         reasons.append("import_not_verified")
     if now - as_utc(rec.last_changed_at) < dt.timedelta(minutes=cfg.stability_minutes):
@@ -50,7 +54,9 @@ def unmet_trash_conditions(rec: Recording, now: dt.datetime, cfg: Config) -> lis
 
 
 def may_delete_permanently(rec: Recording, now: dt.datetime, cfg: Config) -> bool:
-    if rec.trashed_at is None or rec.deleted_at is not None or not _is_verified(rec):
+    if rec.trashed_at is None or rec.deleted_at is not None:
+        return False
+    if rec.discarded_at is None and not _is_verified(rec):
         return False
     return now - as_utc(rec.trashed_at) >= dt.timedelta(hours=cfg.permanent_delete_after_hours)
 
@@ -61,7 +67,7 @@ def run_deletion(session_factory: Callable[[], Session], client: PlaudClient, cf
     with session_factory() as session:
         now = now_fn()
         pending = session.scalars(
-            select(Recording).where(Recording.trashed_at.is_(None), Recording.discarded_at.is_(None))
+            select(Recording).where(Recording.trashed_at.is_(None))
         ).all()
         for rec in pending:
             reasons = unmet_trash_conditions(rec, now, cfg)

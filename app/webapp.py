@@ -96,7 +96,11 @@ async def security_headers(request: Request, call_next):
 def render(request: Request, cfg: Config, name: str, status_code: int = 200, **context) -> HTMLResponse:
     def t(key: str, **kwargs) -> str:
         return get_text(key, cfg.ui_lang, **kwargs)
-    context.update(t=t, lang=cfg.ui_lang, csrf=csrf_token())
+    plaud_note = t(
+        "ui_discard_plaud_on" if cfg.delete_enabled else "ui_discard_plaud_off",
+        min_age_hours=cfg.min_age_minutes // 60, wait_hours=cfg.permanent_delete_after_hours,
+    )
+    context.update(t=t, lang=cfg.ui_lang, csrf=csrf_token(), plaud_note=plaud_note)
     return templates.TemplateResponse(request, name, context, status_code=status_code)
 
 

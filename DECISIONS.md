@@ -131,3 +131,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Rejected alternatives** | (A) UI inside the `app` process: shares credentials and restarts with the cycle; (B) login with a password: the SSH tunnel already authenticates, a second secret adds nothing now; (C) hard delete of the row: re-import; (D) JavaScript confirm dialogs: blocked by the CSP and not needed with a confirmation page; (E) offset paging: skips and duplicates while the import adds rows. |
 | **Status** | **FINAL** |
 
+### D-009: A discarded recording is also deleted at Plaud, under age and duration gates only (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-06 |
+| **Decision** | Amends D-008 on the Plaud side. A recording discarded in the UI stays in the deletion pipeline. Its trash conditions are reduced to the minimum age (`MIN_AGE_MINUTES`) and a known duration; the processing, verification and stability conditions are skipped, because the content was removed on purpose. The permanent delete follows after `PERMANENT_DELETE_AFTER_HOURS` and no longer needs a verified import for a discarded recording. `PLAUD_DELETE_ENABLED=false` still only logs. The UI's confirmation pages say whether Plaud deletion is on (with the age and wait hours) or off. `web` therefore reads `MIN_AGE_MINUTES`, `PERMANENT_DELETE_AFTER_HOURS` and `PLAUD_DELETE_ENABLED`. |
+| **In plain words** | When you throw a recording away in the page, it is also removed at Plaud on the normal schedule, so nothing of it is left anywhere. |
+| **Reasoning** | Owner decision. Leaving it at Plaud would keep conversation content there for good, against the purpose of the tool (D-004). The verification gate protects the only copy; after a deliberate discard there is no copy to protect. |
+| **Rejected alternatives** | (A) leave discarded recordings at Plaud: contradicts data minimisation, was the safe default only until the owner decided; (B) delete at Plaud immediately on discard: skips the age and duration protection against unfinished recordings and the Plaud trash step. |
+| **Status** | **FINAL** |
+
