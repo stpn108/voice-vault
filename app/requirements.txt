@@ -1,0 +1,22 @@
+# --- Core ---
+SQLAlchemy>=2.0
+psycopg[binary]>=3.1
+python-dateutil>=2.9
+
+# --- Web (uncomment if needed) ---
+# fastapi
+# uvicorn
+# jinja2
+# aiofiles
+
+# --- Linting ---
+ruff
+pytest-ruff
+
+# --- Testing ---
+pytest
+pytest-asyncio
+pytest-watcher
+pytest-testmon
+pytest-cov
+freezegun

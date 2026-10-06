@@ -1,0 +1,12 @@
+tests/
+conftest.py
+test_*.py
+pytest.ini
+pyproject.toml
+__pycache__/
+*.pyc
+.testmondata*
+.pytest_cache/
+.coverage*
+htmlcov/
+.requirements_hash

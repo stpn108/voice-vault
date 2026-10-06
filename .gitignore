@@ -1,0 +1,17 @@
+._*
+*volumes*
+__pycache__
+.env
+*.swp
+ignored*
+.DS_Store
+app/.DS_Store
+.vscode
+*.zip
+*.patch
+*.db
+app/.test*
+app/.requirements_hash
+.coverage
+.coverage*
+htmlcov/

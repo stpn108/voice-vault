@@ -1,0 +1,104 @@
+name: ${COMPOSE_PROJECT_NAME:-zenplate}
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  db:
+    image: postgres:16
+    logging: *default-logging
+    mem_limit: 256m
+    memswap_limit: 256m
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - default
+      - shared
+    volumes:
+      - ./volumes/postgres:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # Periodic pg_dump into ./volumes/backups (see .claude/operations.md for restore).
+  db-backup:
+    image: postgres:16
+    logging: *default-logging
+    mem_limit: 64m
+    memswap_limit: 64m
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGHOST: db
+      BACKUP_INTERVAL: ${BACKUP_INTERVAL:-4h}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
+      TZ: ${TZ:-Europe/Berlin}
+    volumes:
+      - ./volumes/backups:/backups
+      - ./scripts/db-backup.sh:/db-backup.sh:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["while true; do /db-backup.sh; sleep \"$$BACKUP_INTERVAL\"; done"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  app:
+    build:
+      context: ./app
+      args:
+        APP_VERSION: ${APP_VERSION:-0.0}
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+    logging: *default-logging
+    mem_limit: 512m
+    memswap_limit: 512m
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      TZ: ${TZ:-Europe/Berlin}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "127.0.0.1:${PORTS_PREFIX}010:8000"
+    healthcheck:
+      test: ["CMD", "python", "healthcheck.py"]
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+      retries: 3
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  app-tests:
+    build:
+      context: ./app
+    logging: *default-logging
+    mem_limit: 512m
+    memswap_limit: 512m
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    volumes:
+      - ./app:/app
+    environment:
+      DATABASE_URL: "sqlite:///:memory:"
+      TZ: ${TZ:-Europe/Berlin}
+    command: /bin/sh -c "rm -fr .testmondata .pytest_cache; pytest --testmon --cov=. --cov-report=term || true; ptw . --delay 2 --testmon -v"
+    restart: unless-stopped
+    tty: true
+    stdin_open: true
+
+networks:
+  shared:
+    name: shared_net
+    external: true

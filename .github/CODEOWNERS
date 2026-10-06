@@ -1,0 +1,11 @@
+# Code Owners for Zenplate
+# See: https://docs.github.com/en/repositories/managing-your-repositories-settings-and-customizations/customizing-your-repository/about-code-owners
+#
+# The last matching pattern takes precedence.
+# Code owners are automatically requested for review on matching PRs.
+
+# Default owner for everything in the repository
+*       @stpn108
+
+# Auto-managed by the version-bump workflow; no code owner required
+/VERSION

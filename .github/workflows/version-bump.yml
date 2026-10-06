@@ -1,0 +1,59 @@
+name: Auto-bump version
+
+# Bumps MINOR in VERSION on every merge to main (CLAUDE.md Rule 7), unless
+# the merge already changed VERSION (manual major bump). The Deploy workflow
+# starts when this run completes, whatever its outcome: a rejected push
+# (branch rules) only means no new version number this time, never a
+# blocked deploy.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  bump-version:
+    if: github.event.repository.name != 'Zenplate'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check if VERSION was already changed
+        id: check
+        run: |
+          if git diff HEAD^1 HEAD --quiet -- VERSION; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Bump minor version
+        if: steps.check.outputs.changed == 'false'
+        run: |
+          CURRENT=$(cat VERSION)
+          MAJOR=${CURRENT%%.*}
+          MINOR=${CURRENT##*.}
+          NEW="${MAJOR}.$((MINOR + 1))"
+          echo "$NEW" > VERSION
+          echo "Bumped version: ${CURRENT} -> ${NEW}"
+
+      - name: Commit and push
+        if: steps.check.outputs.changed == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          NEW=$(cat VERSION)
+          git add VERSION
+          git commit -m "bump version to v${NEW}"
+          # Never fail the pipeline over a version number: a rejected push
+          # (required checks / PR rule on main) is reported and the Deploy
+          # workflow still runs on the merged commit.
+          if ! git push; then
+            echo "::warning::Could not push the version bump to main (branch rules?). VERSION stays at $(git show HEAD^1:VERSION). See SETUP.md §1.4."
+          fi
