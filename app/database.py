@@ -13,7 +13,7 @@ import datetime as dt
 from typing import Optional
 from sqlalchemy import (
     create_engine, Column, Integer, String, Float, DateTime,
-    Text, Boolean, func, text as sqltext,
+    Text, Boolean, ForeignKey, func, text as sqltext,
 )
 from sqlalchemy.orm import DeclarativeBase, mapped_column, Mapped, Session
 
@@ -28,13 +28,43 @@ class Base(DeclarativeBase):
 
 
 # ---------------------------------------------------------------------------
-# EXAMPLE MODEL — replace with your own
+# MODELS (names: .claude/glossary.md)
 # ---------------------------------------------------------------------------
-class ExampleItem(Base):
-    __tablename__ = "example_items"
+class Recording(Base):
+    """One Plaud recording (Aufnahme) with its imported content (Import)."""
+    __tablename__ = "recordings"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String(255))
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    plaud_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    title: Mapped[str] = mapped_column(String(512), default="")
+    started_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
+    ended_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
+    duration_ms: Mapped[int] = mapped_column(Integer, default=0)
+    summary: Mapped[str] = mapped_column(Text, default="")
+    segment_count: Mapped[int] = mapped_column(Integer, default=0)
+    content_hash: Mapped[str] = mapped_column(String(64))
+    is_plaud_processed: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_changed_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
+    verified_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    verified_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    trashed_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    deleted_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class Segment(Base):
+    """One utterance of a recording's transcript."""
+    __tablename__ = "segments"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    recording_id: Mapped[int] = mapped_column(
+        ForeignKey("recordings.id", ondelete="CASCADE"), index=True
+    )
+    idx: Mapped[int] = mapped_column(Integer)
+    speaker: Mapped[str] = mapped_column(String(255), default="")
+    start_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    end_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    text: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -68,7 +98,7 @@ MIGRATIONS: list = [
 
 # Advisory lock key: serialises schema setup when several replicas start at
 # once (concurrent create_all() on a fresh Postgres collides on pg_type).
-_SCHEMA_LOCK_KEY = 0x5A454E31  # "ZEN1"
+_SCHEMA_LOCK_KEY = 0x56564C54  # "VVLT"
 
 
 def migrate_schema(db_engine=None):

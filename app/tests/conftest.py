@@ -30,3 +30,15 @@ def db_session():
     database.Base.metadata.create_all(test_engine)
     with Session(test_engine) as session:
         yield session
+
+
+@pytest.fixture
+def session_factory():
+    """Factory for sessions on one shared in-memory database (all tables)."""
+    test_engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    database.Base.metadata.create_all(test_engine)
+    return lambda: Session(test_engine)

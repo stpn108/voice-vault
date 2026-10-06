@@ -27,7 +27,7 @@ def test_migrate_schema_creates_tables_and_tracking_table(memory_engine, monkeyp
     database.migrate_schema(memory_engine)
 
     with memory_engine.connect() as conn:
-        conn.execute(text("SELECT id FROM example_items"))
+        conn.execute(text("SELECT id FROM recordings"))
     assert _applied_versions(memory_engine) == set()
 
 
@@ -36,7 +36,7 @@ def test_migrate_schema_applies_each_migration_once(memory_engine, monkeypatch):
 
     def _migrate_001(conn):
         calls.append("001")
-        conn.execute(text("ALTER TABLE example_items ADD COLUMN priority INTEGER DEFAULT 0"))
+        conn.execute(text("ALTER TABLE recordings ADD COLUMN priority INTEGER DEFAULT 0"))
 
     def _migrate_002(conn):
         calls.append("002")
@@ -52,7 +52,7 @@ def test_migrate_schema_applies_each_migration_once(memory_engine, monkeypatch):
     assert calls == ["001", "002"]
     assert _applied_versions(memory_engine) == {"001_priority", "002_noop"}
     with memory_engine.connect() as conn:
-        conn.execute(text("SELECT priority FROM example_items"))
+        conn.execute(text("SELECT priority FROM recordings"))
 
 
 def test_migrate_schema_skips_already_applied_and_runs_new_ones(memory_engine, monkeypatch):

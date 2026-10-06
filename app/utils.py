@@ -68,3 +68,15 @@ def today_str(user_tz: Optional[str] = None) -> str:
 def yesterday_str(user_tz: Optional[str] = None) -> str:
     """Yesterday's date as ISO string."""
     return (local_today(user_tz) - dt.timedelta(days=1)).isoformat()
+
+
+def as_utc(value: dt.datetime) -> dt.datetime:
+    """Return value as timezone-aware UTC. Naive values (SQLite) are taken as UTC."""
+    if value.tzinfo is None:
+        return value.replace(tzinfo=dt.timezone.utc)
+    return value.astimezone(dt.timezone.utc)
+
+
+def from_epoch_ms(ms: int) -> dt.datetime:
+    """Plaud timestamps are epoch milliseconds (UTC)."""
+    return dt.datetime.fromtimestamp(ms / 1000, tz=dt.timezone.utc)

@@ -1,4 +1,4 @@
-name: ${COMPOSE_PROJECT_NAME:-zenplate}
+name: ${COMPOSE_PROJECT_NAME:-voice-vault}
 
 x-logging: &default-logging
   driver: "json-file"
@@ -68,6 +68,21 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       TZ: ${TZ:-Europe/Berlin}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      PLAUD_TOKEN: ${PLAUD_TOKEN}
+      PLAUD_API_BASE: ${PLAUD_API_BASE:-https://api-euc1.plaud.ai}
+      IMPORT_INTERVAL_MINUTES: ${IMPORT_INTERVAL_MINUTES:-10}
+      MIN_AGE_MINUTES: ${MIN_AGE_MINUTES:-15}
+      STABILITY_MINUTES: ${STABILITY_MINUTES:-10}
+      PERMANENT_DELETE_AFTER_HOURS: ${PERMANENT_DELETE_AFTER_HOURS:-24}
+      PLAUD_DELETE_ENABLED: ${PLAUD_DELETE_ENABLED:-false}
+      STORE_AUDIO: ${STORE_AUDIO:-false}
+      TOKEN_WARN_DAYS: ${TOKEN_WARN_DAYS:-5}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      MAIL_TO: ${MAIL_TO:-}
     ports:
       - "127.0.0.1:${PORTS_PREFIX}010:8000"
     healthcheck:

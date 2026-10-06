@@ -1,28 +1,5 @@
-"""
-Example tests — replace with your own.
-"""
-import database
+"""Strings tests."""
 from strings import get_text
-
-
-class TestDatabase:
-    def test_create_item(self, db_session):
-        item = database.ExampleItem(name="Test", description="A test item")
-        db_session.add(item)
-        db_session.commit()
-
-        result = db_session.query(database.ExampleItem).first()
-        assert result.name == "Test"
-        assert result.description == "A test item"
-
-    def test_item_without_description(self, db_session):
-        item = database.ExampleItem(name="Minimal")
-        db_session.add(item)
-        db_session.commit()
-
-        result = db_session.query(database.ExampleItem).first()
-        assert result.name == "Minimal"
-        assert result.description is None
 
 
 class TestStrings:

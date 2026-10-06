@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | DRAFT |
+| **Status** | APPROVED |
 | **Date** | 2026-10-06 |
 | **Requested by** | Dennis Winter |
 | **Implemented in** | — |
@@ -63,4 +63,18 @@ Table `recordings`: share of recordings with `verified_at` set before `trashed_a
 
 ## Tests
 
-Filled in at IMPLEMENTED.
+Written, status stays APPROVED until merged and deployed.
+
+| Criterion | Tests |
+|---|---|
+| 1 Stored content | `test_import_service.py::test_req_001_import_stores_recording_and_all_segments` |
+| 2 Audio off | `test_config.py::test_req_001_defaults` (no audio code path exists; flag reserved) |
+| 3 Trash conditions | `test_deletion_service.py::test_req_001_each_unmet_condition_blocks_trashing`, `test_recording_with_unmet_condition_is_not_trashed` |
+| 4 Permanent delete | `test_req_001_permanent_delete_after_wait_for_verified_import`, `test_req_001_permanent_delete_never_without_verified_import` |
+| 5 Changed summary | `test_import_service.py::test_req_001_changed_summary_is_reimported_and_unverified_until_checked` |
+| 6 Shadow mode | `test_deletion_service.py::test_req_001_shadow_mode_only_logs` |
+| 7 Token expiry | `test_sync_job.py::test_req_001_token_with_less_than_5_days_warns_and_mails_once_per_day`, `test_req_001_auth_error_during_import_skips_deletion` |
+| 8 No overlap | `test_sync_job.py::test_req_001_scheduler_does_not_overlap_runs` |
+| Client rules (D-001) | `test_plaud_client.py` |
+
+Mail sending itself (`notify.py`) is not unit-tested against a real SMTP server.
