@@ -89,6 +89,25 @@ def describe_token(token: str) -> str:
     return f"typ={typ!r} expires={expiry} claims={sorted(claims)}{hint}"
 
 
+def probe_bearer(http: httpx.Client, base_url: str, token: str) -> str:
+    """One read-only call that tells whether a token works as a bearer. Never returns the token."""
+    try:
+        resp = http.get(
+            f"{base_url}/file/simple/web",
+            params={"skip": 0, "limit": 1, "is_trash": 0},
+            headers={"Authorization": f"Bearer {token}", "User-Agent": USER_AGENT,
+                     "app-platform": "web", "edit-from": "web"},
+        )
+    except httpx.HTTPError as exc:
+        return f"probe failed ({type(exc).__name__})"
+    if resp.status_code in (401, 403):
+        return "rejected as bearer"
+    if resp.status_code >= 400:
+        return f"probe returned HTTP {resp.status_code}"
+    status = _payload(resp).get("status")
+    return "ACCEPTED as bearer" if status == 0 else f"bearer probe returned status {status}"
+
+
 def redirect_host(payload: dict) -> Optional[str]:
     """Host from an in-body `status == -302` region redirect, or None if there is none."""
     if payload.get("status") != -302:
@@ -162,6 +181,7 @@ class PlaudAuth:
         self._seed_refresh = seed_refresh.strip()
         self._now_fn = now_fn
         self._tokens: Optional[StoredTokens] = None
+        self._probed = False  # the bearer probe on a rejected refresh token runs once per process
 
     @property
     def tokens(self) -> StoredTokens:
@@ -261,11 +281,22 @@ class PlaudAuth:
         if resp.status_code in (401, 403):
             raise PlaudAuthError(
                 f"refresh token rejected (HTTP {resp.status_code}, plaud msg={_payload(resp).get('msg')!r}, "
-                f"token {describe_token(refresh)})"
+                f"token {describe_token(refresh)}{self._bearer_probe(base_url, refresh)})"
             )
         if resp.status_code >= 400:
             raise PlaudError(f"token refresh returned HTTP {resp.status_code}")
         return resp
+
+
+    def _bearer_probe(self, base_url: str, refresh: str) -> str:
+        """Once per process: does the rejected 'refresh token' work as an access token?"""
+        if self._probed:
+            return ""
+        self._probed = True
+        result = probe_bearer(self._http, base_url, refresh)
+        hint = (" - this is an ACCESS token (cookie pld_ut / tokenstr): put it into PLAUD_TOKEN, "
+                "the refresh token is the cookie pld_urt") if result.startswith("ACCEPTED") else ""
+        return f"; used as bearer: {result}{hint}"
 
 
 def _payload(resp: httpx.Response) -> dict:

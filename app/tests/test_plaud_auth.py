@@ -113,6 +113,45 @@ def test_rejected_refresh_explains_itself_without_leaking_the_token():
     assert token not in message and token.split(".")[1] not in message
 
 
+def probing_handler(calls, bearer_ok):
+    def handler(request):
+        calls.append((request.method, request.url.path))
+        if request.url.path == "/auth/refresh-user-token":
+            return httpx.Response(401, json={"status": -1, "msg": "token invalid or expired"})
+        return httpx.Response(200, json={"status": 0}) if bearer_ok else httpx.Response(401)
+    return handler
+
+
+def test_rejected_refresh_token_that_works_as_bearer_is_reported_as_access_token():
+    # The owner pasted the access token (tokenstr) into the refresh slot.
+    calls = []
+    token = make_jwt(int(NOW_EPOCH + 30 * 86400), header_typ="UT")
+    auth, _ = make_auth(probing_handler(calls, bearer_ok=True), access="", refresh=token)
+    with pytest.raises(PlaudAuthError) as exc:
+        auth.refresh(BASE)
+    message = str(exc.value)
+    assert "ACCEPTED as bearer" in message and "put it into PLAUD_TOKEN" in message
+    assert token not in message
+    assert ("GET", "/file/simple/web") in calls
+
+
+def test_rejected_refresh_token_that_is_no_bearer_either_says_so():
+    calls = []
+    auth, _ = make_auth(probing_handler(calls, bearer_ok=False), access="", refresh="R1")
+    with pytest.raises(PlaudAuthError, match="rejected as bearer"):
+        auth.refresh(BASE)
+
+
+def test_bearer_probe_runs_only_once_per_process():
+    calls = []
+    auth, _ = make_auth(probing_handler(calls, bearer_ok=False), access="", refresh="R1")
+    for _ in range(3):
+        with pytest.raises(PlaudAuthError):
+            auth.refresh(BASE)
+    assert [c for c in calls if c[0] == "GET"] == [("GET", "/file/simple/web")]
+    assert len([c for c in calls if c[0] == "POST"]) == 3
+
+
 def test_rejected_workspace_refresh_token_gets_a_hint():
     token = make_jwt(int(NOW_EPOCH + 86400), header_typ="WRT")
     auth, _ = make_auth(lambda r: httpx.Response(401), access="A1", refresh=token)
