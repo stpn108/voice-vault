@@ -87,8 +87,12 @@ def verify_import(session: Session, plaud_id: str, expected_hash: str, expected_
 
 def import_recording(session: Session, client: PlaudClient, item: PlaudRecording,
                      now: dt.datetime, stats: ImportStats) -> None:
-    detail = client.get_detail(item.plaud_id)
     existing = session.scalar(select(Recording).where(Recording.plaud_id == item.plaud_id))
+    if existing is not None and existing.discarded_at is not None:
+        # Discarded in the UI (REQ-002): never fetch or store it again.
+        stats.skipped += 1
+        return
+    detail = client.get_detail(item.plaud_id)
     if not detail.is_processed:
         if existing is not None and existing.is_plaud_processed:
             existing.is_plaud_processed = False
@@ -135,7 +139,10 @@ def import_recording(session: Session, client: PlaudClient, item: PlaudRecording
         stats.updated += 1
         log.info("Recording changed at Plaud, re-imported plaud_id=%s", item.plaud_id)
     else:
+        # Same content: metadata may still be corrected (e.g. a duration that was 0 while
+        # the recording was uploading). This does not restart the stability window.
         existing.title, existing.is_plaud_processed = title, True
+        existing.started_at, existing.ended_at, existing.duration_ms = started, ended, duration
         stats.unchanged += 1
 
     session.commit()

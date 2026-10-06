@@ -19,7 +19,7 @@ Requirements: `requirements/`. Decisions: `DECISIONS.md` (D-001 to D-004).
    compared by content hash and segment count (verified import). A changed
    summary or transcript is re-imported.
 3. Move to the Plaud trash only if: Plaud reports both tasks done, the
-   recording ended at least `MIN_AGE_MINUTES` ago, the import is verified
+   recording ended at least `MIN_AGE_MINUTES` ago (default one day) and has a known duration, the import is verified
    and the content was unchanged for `STABILITY_MINUTES`. Otherwise it is
    checked again next cycle.
 4. Delete permanently `PERMANENT_DELETE_AFTER_HOURS` after trashing, only
@@ -30,28 +30,46 @@ Requirements: `requirements/`. Decisions: `DECISIONS.md` (D-001 to D-004).
 
 ## Before switching deletion on
 
-1. Put `PLAUD_TOKEN` into `.env` on the server (Local Storage key `tokenstr`
-   at web.plaud.ai). Never commit it or paste it into a chat.
+1. Put the refresh token into `.env` on the server: `PLAUD_REFRESH_TOKEN`
+   (cookie `pld_urt`), from Firefox dev tools on web.plaud.ai under Storage,
+   Cookies. `PLAUD_TOKEN` (cookie `pld_ut`) is optional and short-lived; the app
+   fetches its own access token. Never commit them or paste them into a
+   chat. Then `docker compose up -d app`. From then on the app renews the
+   access token itself and stores the current pair in the database
+   (table `plaud_sessions`); `.env` is only the seed.
 2. Run the live check with a throwaway test recording:
    `docker compose run --rm app python plaud_live_check.py` (read-only), then
    `--trash <id>` and `--delete <id>`. This settles whether `DELETE /file/`
    only works on trashed recordings and which `task_status` values occur
    (open questions in REQ-001).
 3. Decide the backup. After permanent deletion the database holds the only
-   copy. The built-in `pg_dump` runs every `BACKUP_INTERVAL` (default 4h,
-   7 days kept) into `volumes/backups/`. Decide whether an off-server copy is
+   copy. Ofelia (callisto-services) runs `pg_dump` on `BACKUP_SCHEDULE`
+   (default every 4 hours, 7 days kept) into `volumes/backups/`. The job is
+   named `backup-<COMPOSE_PROJECT_NAME>`; check that a dump file appears. Decide whether an off-server copy is
    needed (D-004).
 4. Set `PLAUD_DELETE_ENABLED=true` and redeploy.
 
 ## Notes
 
-- Plaud tokens may live only about 30 days (not 300). The expiry is read from
-  the JWT. There is no refresh: sign in again at web.plaud.ai and update
-  `PLAUD_TOKEN`.
+- Token renewal (REQ-004, D-005): the access token is renewed before it
+  expires and again after any HTTP 401, with `POST /auth/refresh-user-token`.
+  Plaud may rotate the refresh token on every renewal, so the pair is kept in
+  the database. Do not log out of web.plaud.ai in the browser session you took
+  the tokens from; that probably invalidates the refresh token. If the
+  refresh token dies (log: "token refresh" error, mail if SMTP is set), paste
+  a new refresh token into `.env`: a changed value replaces the stored pair.
+- The database dump (`volumes/backups/`) contains the token pair. Protect the
+  backup directory like `.env`.
 - `DATABASE_URL` needs the driver prefix `postgresql+psycopg://`.
-- Web UI (REQ-002): loopback-bound port `127.0.0.1:${PORTS_PREFIX}010`; the
-  host's `webinterfaces` / `ssh-tunnels` scripts pick it up. Pick a
-  `PORTS_PREFIX` that is unique on the server and on the client.
+- Web UI (REQ-002, D-008): service `web`, loopback-bound port
+  `127.0.0.1:${PORTS_PREFIX}010`; the host's `webinterfaces` / `ssh-tunnels`
+  scripts pick it up, open `http://localhost:${PORTS_PREFIX}010`. Pick a
+  `PORTS_PREFIX` that is unique on the server and on the client. The UI has no
+  login (SSH tunnel is the access control). It lists recordings (newest first,
+  50 per page), searches title, summary and transcript, shows summary and
+  transcript, and discards recordings one by one or everything older than N
+  days. Discarding removes the content here for good; the entry at Plaud is
+  left alone and never imported again. `web` has no Plaud credentials.
 - `STORE_AUDIO` is reserved; audio is not downloaded or stored.
 - While Plaud keeps a recording (shadow mode, or waiting for stability) every
   cycle re-reads its detail, transcript and summary to detect changes.

@@ -10,14 +10,20 @@ one recording id, so use a throwaway test recording:
     docker compose run --rm app python plaud_live_check.py --trash <id>
     docker compose run --rm app python plaud_live_check.py --delete <id>
 
+It also exercises the automatic token renewal (REQ-004) and stores the
+rotated tokens in the database, exactly as the app does.
+
 The check answers REQ-001 open questions: does DELETE /file/ work on a
 trashed recording only, and which task_status values occur.
 """
 import argparse
 import sys
 
+from sqlalchemy.orm import Session
+
 from config import load_config
-from plaud_client import PlaudClient, PlaudError
+from database import engine
+from plaud_client import PlaudError, build_client
 from utils import now_utc
 
 
@@ -28,10 +34,11 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
 
     cfg = load_config()
-    client = PlaudClient(cfg.plaud_token, cfg.plaud_api_base)
-    left = client.token_seconds_left(now_utc().timestamp())
-    print("token days left:", "unknown" if left is None else f"{left / 86400:.1f}")
+    client = build_client(cfg, lambda: Session(engine))
     try:
+        client.ensure_fresh_token(now_utc().timestamp())
+        left = client.credential_seconds_left(now_utc().timestamp())
+        print("credential days left:", "unknown" if left is None else f"{left / 86400:.1f}")
         if args.trash:
             client.trash([args.trash])
             print("trashed", args.trash)

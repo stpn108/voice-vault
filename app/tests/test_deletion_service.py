@@ -59,9 +59,26 @@ def test_all_conditions_met_means_no_reasons():
     (dict(verified_at=None, verified_hash=None), "import_not_verified"),
     (dict(verified_hash="old"), "import_not_verified"),
     (dict(last_changed_at=NOW - dt.timedelta(minutes=9)), "content_not_stable"),
+    (dict(duration_ms=0), "duration_unknown"),
+    (dict(duration_ms=-5), "duration_unknown"),
 ])
 def test_req_001_each_unmet_condition_blocks_trashing(overrides, reason):
     assert reason in unmet_trash_conditions(make_recording(**overrides), NOW, CFG)
+
+
+def test_zero_duration_recording_is_never_trashed_even_if_everything_else_holds(session_factory):
+    # D-006: a recording whose length Plaud has not reported must not be deleted.
+    store(session_factory, duration_ms=0, ended_at=NOW - dt.timedelta(days=30))
+    plaud = FakePlaud()
+    stats = run_deletion(session_factory, plaud, CFG, lambda: NOW)
+    assert plaud.trashed == [] and stats.held_back == 1
+
+
+def test_default_minimum_age_is_one_day():
+    rec = make_recording(ended_at=NOW - dt.timedelta(hours=23))
+    assert "too_young" in unmet_trash_conditions(rec, NOW, load_config())
+    rec = make_recording(ended_at=NOW - dt.timedelta(hours=24))
+    assert "too_young" not in unmet_trash_conditions(rec, NOW, load_config())
 
 
 def test_age_boundary_is_inclusive_at_exactly_min_age():
@@ -166,3 +183,21 @@ def test_auth_error_during_deletion_propagates(session_factory):
 
 def test_may_delete_permanently_requires_trashed_state():
     assert may_delete_permanently(make_recording(), NOW, CFG) is False
+
+
+def test_req_002_discarded_recording_is_not_trashed_at_plaud_by_default(session_factory):
+    # Criterion 7 stays open: until the owner decides, a discard never triggers a Plaud deletion.
+    store(session_factory, discarded_at=NOW - dt.timedelta(hours=1))
+    plaud = FakePlaud()
+    stats = run_deletion(session_factory, plaud, CFG, lambda: NOW)
+    assert plaud.trashed == [] and stats.held_back == 0
+    with session_factory() as s:
+        assert s.scalar(select(Recording)).trashed_at is None
+
+
+def test_req_002_already_trashed_recording_is_still_deleted_permanently_after_a_discard(session_factory):
+    # It was verified before the discard; the pipeline's guarantee stands.
+    store(session_factory, trashed_at=NOW - dt.timedelta(hours=24), discarded_at=NOW - dt.timedelta(hours=1))
+    plaud = FakePlaud()
+    run_deletion(session_factory, plaud, CFG, lambda: NOW)
+    assert plaud.deleted == ["r1"]

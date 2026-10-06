@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="{{ lang }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{{ t("ui_title") }}{% endblock %}</title>
+<style>
+  :root { color-scheme: light dark; --muted: #6b7280; --line: #d1d5db; --accent: #2563eb; --danger: #b91c1c; }
+  body { font: 16px/1.5 system-ui, sans-serif; margin: 0 auto; max-width: 62rem; padding: 1rem; }
+  header { display: flex; gap: 1rem; align-items: baseline; flex-wrap: wrap; margin-bottom: 1rem; }
+  header a.brand { font-weight: 700; text-decoration: none; color: inherit; }
+  a { color: var(--accent); }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: .85rem; }
+  .muted { color: var(--muted); }
+  .state { font-size: .85rem; border: 1px solid var(--line); border-radius: 1rem; padding: .05rem .6rem; white-space: nowrap; }
+  .state-verified { border-color: #16a34a; } .state-waiting { border-color: #d97706; }
+  .state-trashed, .state-deleted { border-color: var(--muted); color: var(--muted); }
+  form.inline { display: inline; }
+  input[type=text], input[type=number] { font: inherit; padding: .35rem .5rem; border: 1px solid var(--line); border-radius: .35rem; background: transparent; color: inherit; }
+  button { font: inherit; padding: .35rem .8rem; border-radius: .35rem; border: 1px solid var(--line); background: transparent; color: inherit; cursor: pointer; }
+  button.danger { border-color: var(--danger); color: var(--danger); }
+  pre.text { white-space: pre-wrap; word-wrap: break-word; font: inherit; margin: 0; }
+  .segment { display: grid; grid-template-columns: 4.5rem 9rem 1fr; gap: .5rem; padding: .3rem 0; border-bottom: 1px solid var(--line); }
+  .notice { border: 1px solid #d97706; padding: .5rem .8rem; border-radius: .35rem; margin-bottom: 1rem; }
+  @media (max-width: 40rem) { .segment { grid-template-columns: 1fr; } .hide-small { display: none; } }
+</style>
+</head>
+<body>
+<header>
+  <a class="brand" href="/">voice-vault</a>
+  <a href="/cleanup">{{ t("ui_cleanup") }}</a>
+</header>
+<main>
+{% block content %}{% endblock %}
+</main>
+</body>
+</html>

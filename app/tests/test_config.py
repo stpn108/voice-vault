@@ -16,7 +16,7 @@ def clean_env(monkeypatch):
 @pytest.mark.parametrize("field,expected", [
     ("delete_enabled", False),   # shadow mode until switched on
     ("store_audio", False),      # REQ-001 criterion 2
-    ("min_age_minutes", 15),
+    ("min_age_minutes", 1440),  # D-006: one day
     ("import_interval_minutes", 10),
     ("token_warn_days", 5),
 ])
@@ -28,3 +28,8 @@ def test_req_001_defaults(field, expected):
 def test_delete_flag_parsing(monkeypatch, value, expected):
     monkeypatch.setenv("PLAUD_DELETE_ENABLED", value)
     assert load_config().delete_enabled is expected
+
+
+def test_refresh_token_is_read_and_stripped(monkeypatch):
+    monkeypatch.setenv("PLAUD_REFRESH_TOKEN", "  abc  ")
+    assert load_config().plaud_refresh_token == "abc"

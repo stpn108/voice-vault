@@ -4,8 +4,7 @@
 
 ```
 docker-compose.yml
-├── db          Postgres 16, healthcheck pg_isready
-├── db-backup   pg_dump every BACKUP_INTERVAL into ./volumes/backups (scripts/db-backup.sh)
+├── db          Postgres 16, healthcheck pg_isready; Ofelia labels run scripts/db-backup.sh into ./volumes/backups
 ├── app         Production app (own image, no volume mount), healthcheck via healthcheck.py
 └── app-tests   Test runner (same image, ./app mounted, pytest --testmon in watch mode)
 ```
@@ -79,7 +78,7 @@ GitHub Actions:  comment on the merged PR: ✅ Deployed vX.Y / ❌ failed + log 
 | `redeploy.sh` | Tests → build → deploy → verify. Aborts on first failure. |
 | `merge-to-main.sh` | Terminal alternative to the Merge button (`developer` mode) |
 | `version.sh` | Repo version vs. running container |
-| `scripts/db-backup.sh` | pg_dump + retention, run by the `db-backup` service |
+| `scripts/db-backup.sh` | pg_dump + retention, run by the Ofelia job defined by labels on `db` |
 
 ## Network & security posture
 

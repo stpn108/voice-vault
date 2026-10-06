@@ -85,3 +85,49 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner wants raw data only on his own system, a UI to view and clean up, and later Claude access via his own API. Removes the Google dependency and OAuth token handling. |
 | **Rejected alternatives** | (A) Drive as primary — owner decided against it; (B) Drive and database in parallel — double the code and a second place for sensitive content; (C) files on disk only — no search or cleanup UI without more code. |
 | **Status** | **FINAL** |
+
+### D-005: Automatic token renewal with the Plaud refresh token, pair kept in the database (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-06 |
+| **Decision** | `plaud_auth.py` renews the access token with `POST /auth/refresh-user-token` (header `Cookie: pld_urt=<refresh token>`, browser-like `Origin`/`Referer`, `app-platform: web`). The answer sets the new access token as cookie `pld_ut` (a clearing `pld_ut=""` may come first, the last non-empty value counts) and may rotate `pld_urt`. The current pair is stored in `plaud_sessions` (one row). `PLAUD_TOKEN` and `PLAUD_REFRESH_TOKEN` in `.env` only seed it; a changed seed (fingerprint) replaces the stored pair, an unchanged one does not. Renewal happens ahead of expiry (when less than 25 percent of the token's lifetime, at least 15 minutes, is left) at the start of every cycle and once after any HTTP 401, after which the call is sent again once. A rejected refresh token stops the cycle, nothing is deleted, the owner is warned (log, mail if SMTP is set). The refresh token is read fresh from the database before each renewal, in case another process rotated it. Expiry warnings use the refresh token's `exp` when readable. The region redirect applies to the refresh call too, only to `*.plaud.ai`. |
+| **In plain words** | The background process keeps its Plaud login alive by itself. You paste the two tokens once and only again if Plaud ever invalidates them. |
+| **Reasoning** | The owner wants no manual token handling and Plaud's access token is short-lived. The endpoint and cookie names were taken from the source of Plaud-Sync (`src-tauri/src/plaud/auth.rs`); they are not documented by Plaud and not yet confirmed against the live service. Rotation means a persisted pair; the environment cannot be rewritten by a container. |
+| **Rejected alternatives** | (A) E-mail and password login (`POST /auth/access-token`): stores the account password, and a password login creates a new session that evicts older ones, such as the phone app (noted in plaud-toolkit); (B) renewal by hand every few days: rejected by the owner; (C) official Plaud OAuth API: early beta with a waitlist, documented endpoints cover list and detail only; (D) keep the pair only in `.env`: lost on rotation. |
+| **Correction to D-001** | D-001 rejected the official API with "does not cover trash and delete". That was not verified. The hosted Plaud MCP has `delete_recording`, which moves a recording to the trash. A permanent delete was not found there. The decision for an own client on the web API stands because only the web API offers the permanent delete; the stated reason was too strong. |
+| **Status** | **FINAL** |
+
+### D-006: Minimum age before trashing is one day; unknown duration blocks deletion (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-06 |
+| **Decision** | `MIN_AGE_MINUTES` defaults to 1440 (one day), measured from the end of the recording (start plus duration). A recording whose duration is 0 or negative is never trashed (`duration_unknown`). A re-import with unchanged content still updates start, end and duration, without restarting the stability window. The wait before the permanent delete stays at `PERMANENT_DELETE_AFTER_HOURS=24`, so a recording stays at Plaud for at least about two days. This changes the default of 15 minutes named in the first request; the variable stays configurable. |
+| **In plain words** | Nothing is deleted at Plaud before it is a day old, and never when Plaud has not reported how long the recording is. |
+| **Reasoning** | Owner decision. A longer wait leaves room for Plaud to finish or change summaries and for the owner to notice problems. Plaud may list a recording before its length is known, and then the age calculation would be wrong. |
+| **Rejected alternatives** | (A) keep 15 minutes: owner chose one day; (B) one day for the permanent delete only: the trash step is already reversible, the age gate protects against premature deletion of unfinished recordings; (C) block on duration only inside the import: the guard belongs where the decision is made. |
+| **Status** | **FINAL** |
+
+### D-007: Database backups via Ofelia labels on the db service, no db-backup container (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-06 |
+| **Decision** | Same as template decision T-010 (`.claude/template-decisions.md`): the `db-backup` service is removed; labels on `db` define an Ofelia job `backup-<COMPOSE_PROJECT_NAME>` that runs `scripts/db-backup.sh` inside `db` on `BACKUP_SCHEDULE`. voice-vault's default project name is `voice-vault`; the job name is therefore `backup-voice-vault` unless `.env` sets another `COMPOSE_PROJECT_NAME`. |
+| **In plain words** | The host's shared scheduler makes the database backups, so there is no backup container in this project. |
+| **Reasoning** | Owner decision; callisto-services already runs Ofelia. Matters here more than in a plain template because the database holds the only copy of the recordings after the permanent delete at Plaud (D-004). |
+| **Rejected alternatives** | See T-010. |
+| **Status** | **FINAL** |
+
+### D-008: Web UI as its own service with loopback access, host and CSRF checks, tombstones for discards (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-06 |
+| **Decision** | The UI (`webapp.py`, FastAPI, Jinja2 templates, `recording_service.py` for the queries) runs as its own Compose service `web` from the same image as `app` (`image: <project>-app`, `pull_policy: never`, command `uvicorn webapp:app`). It gets database settings only, no Plaud credentials. The port is `127.0.0.1:${PORTS_PREFIX}010`; access control is the SSH tunnel, there is no login. Against a hostile web page in the owner's browser it checks the `Host` header (`localhost`, `127.0.0.1`, `[::1]` plus `UI_ALLOWED_HOSTS`), requires a CSRF token (HMAC of a per-process secret, or `UI_SECRET`) plus a matching `Origin` on every POST, escapes all stored text, shows the summary as plain text and sets a Content-Security-Policy that forbids scripts. API docs are off. Discarding is two steps: a GET confirmation page, then a POST. Discarding removes title, summary and segments, keeps a tombstone row (`plaud_id`, hashes, `discarded_at`) and the import skips it before any API call. The bulk discard ("older than N days") POSTs the count the owner saw; if the count changed, nothing is discarded. List paging is keyset-based. Discarded rows are excluded from the trash step; a discarded row that was already trashed still reaches the permanent delete, because its import was verified. Whether a discard should also remove a still-listed recording at Plaud is open (REQ-002 criterion 7). `redeploy.sh` stops, removes, starts and health-checks `web` together with `app`. Migration 001 adds `recordings.discarded_at`. |
+| **In plain words** | You open a small page on your server through your tunnel, look at everything that was imported and throw away what you do not need. Nothing on that page can be triggered from another website. |
+| **Reasoning** | Owner wants to see and clean up the stored recordings. The page shows private conversations and can delete, so it is built defensively even though it is only reachable on loopback: a website open in the same browser can otherwise send requests to a localhost port. A separate service keeps Plaud tokens out of the web process and lets the UI restart without interrupting the import cycle. The tombstone is needed because a plain delete would be re-imported on the next cycle while the recording is still at Plaud. |
+| **Rejected alternatives** | (A) UI inside the `app` process: shares credentials and restarts with the cycle; (B) login with a password: the SSH tunnel already authenticates, a second secret adds nothing now; (C) hard delete of the row: re-import; (D) JavaScript confirm dialogs: blocked by the CSP and not needed with a confirmation page; (E) offset paging: skips and duplicates while the import adds rows. |
+| **Status** | **FINAL** |
+

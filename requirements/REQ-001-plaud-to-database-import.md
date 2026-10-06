@@ -28,7 +28,7 @@ Every 10 minutes the tool fetches new Plaud recordings and stores transcript (sp
 2. **Audio is off by default.**
    Given `STORE_AUDIO` unset, when an import runs, then no audio is downloaded or stored.
 3. **Trash only if all conditions hold.**
-   Given a recording, when any of these is false: transcript and summary completed at Plaud, age at least `MIN_AGE_MINUTES` (default 15, from end of recording), import verified (row read back from the database, not empty, hash and segment count match the API response), then it is not trashed and is checked again in the next run.
+   Given a recording, when any of these is false: transcript and summary completed at Plaud, age at least `MIN_AGE_MINUTES` (default 1440 = one day since 2026-10-06, D-006; from end of recording), duration known (greater than 0), import verified (row read back from the database, not empty, hash and segment count match the API response), then it is not trashed and is checked again in the next run.
 4. **Permanent delete only after the wait and only if verified.**
    Given a trashed recording with a verified import, when `PERMANENT_DELETE_AFTER_HOURS` have passed, then it is deleted permanently. Without a verified import it is never deleted.
 5. **Changed summary is re-imported.**
@@ -59,7 +59,8 @@ Table `recordings`: share of recordings with `verified_at` set before `trashed_a
 | 2026-10-06 | Does `DELETE /file/` only work on trashed recordings? | open, check live with one test recording |
 | 2026-10-06 | What other `task_status` values exist besides 1? | open, treated as not done |
 | 2026-10-06 | Mail for token expiry via SMTP: which server? | open, log only until configured |
-| 2026-10-06 | Backup of the only copy: is the existing pg_dump every 4 hours enough, or off-server copy needed? | open, decide before `PLAUD_DELETE_ENABLED=true` |
+| 2026-10-06 | Token handling | superseded by REQ-004: tokens are renewed automatically, the manual-token note no longer applies |
+| 2026-10-06 | Backup of the only copy: is the Ofelia pg_dump every 4 hours enough, or off-server copy needed? | open, decide before `PLAUD_DELETE_ENABLED=true` |
 
 ## Tests
 

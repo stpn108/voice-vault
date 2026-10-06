@@ -1,24 +1,22 @@
 """Plaud client: endpoints, processing status, auth, retry and redirect rules (D-001)."""
-import base64
 import json
 
 import httpx
 import pytest
 
+from plaud_auth import PlaudAuth
 from plaud_client import (
     PlaudAuthError, PlaudClient, PlaudError, is_plaud_host, token_expiry,
 )
+from tests.helpers import MemoryStore, make_jwt, refresh_response
+
+NOW_EPOCH = 1_800_000_000
 
 
-def make_jwt(exp):
-    def b64(d):
-        return base64.urlsafe_b64encode(json.dumps(d).encode()).rstrip(b"=").decode()
-    return f"{b64({'alg': 'HS256'})}.{b64({'exp': exp})}.sig"
-
-
-def make_client(handler, token="t"):
+def make_client(handler, token="t", refresh=""):
     http = httpx.Client(transport=httpx.MockTransport(handler))
-    return PlaudClient(token, "https://api-euc1.plaud.ai", http=http, sleep=lambda s: None)
+    auth = PlaudAuth(MemoryStore(), http, token, refresh)
+    return PlaudClient(auth, "https://api-euc1.plaud.ai", http=http, sleep=lambda s: None)
 
 
 def ok(data=None, **extra):
@@ -261,3 +259,130 @@ def test_fetch_summary_prefers_inline_content():
     ]
     client = make_client(lambda r: ok(raw))
     assert client.fetch_summary(client.get_detail("r1")) == "inline"
+
+
+# --- automatic renewal (REQ-004) -------------------------------------------
+def refreshing_handler(log, new_access="NEW", fail_files_first=1):
+    """Plaud stub: /file/* answers 401 until the token was refreshed once."""
+    state = {"refreshed": False, "rejections": 0}
+
+    def handler(request):
+        if request.url.path == "/auth/refresh-user-token":
+            state["refreshed"] = True
+            log.append("refresh")
+            return refresh_response(new_access, "R2")
+        log.append(request.headers["authorization"])
+        if not state["refreshed"] and state["rejections"] < fail_files_first:
+            state["rejections"] += 1
+            return httpx.Response(401)
+        return ok(data_file_list=[])
+    return handler
+
+
+def test_req_004_401_triggers_one_refresh_and_the_call_is_retried_with_the_new_token():
+    log = []
+    client = make_client(refreshing_handler(log), token="OLD", refresh="R1")
+    assert client.list_recordings() == []
+    assert log == ["Bearer OLD", "refresh", "Bearer NEW"]
+
+
+def test_req_004_mutation_is_resent_once_after_a_401_refresh():
+    seen = []
+
+    def handler(request):
+        if request.url.path == "/auth/refresh-user-token":
+            return refresh_response("NEW", "R2")
+        seen.append((request.method, request.headers["authorization"]))
+        return httpx.Response(401) if len(seen) == 1 else ok()
+
+    make_client(handler, token="OLD", refresh="R1").trash(["a"])
+    assert seen == [("POST", "Bearer OLD"), ("POST", "Bearer NEW")]
+
+
+def test_second_401_after_refresh_raises_instead_of_looping():
+    calls = []
+
+    def handler(request):
+        calls.append(request.url.path)
+        if request.url.path == "/auth/refresh-user-token":
+            return refresh_response("NEW")
+        return httpx.Response(401)
+
+    with pytest.raises(PlaudAuthError):
+        make_client(handler, token="OLD", refresh="R1").list_recordings()
+    assert calls.count("/auth/refresh-user-token") == 1
+
+
+def test_401_without_refresh_token_raises_auth_error_without_refresh_call():
+    calls = []
+
+    def handler(request):
+        calls.append(request.url.path)
+        return httpx.Response(401)
+
+    with pytest.raises(PlaudAuthError):
+        make_client(handler, token="OLD").list_recordings()
+    assert calls == ["/file/simple/web"]
+
+
+def test_ensure_fresh_token_refreshes_when_due():
+    log = []
+    near_expiry = make_jwt(NOW_EPOCH + 600, iat=NOW_EPOCH - 86400 + 600)
+    client = make_client(refreshing_handler(log, new_access=make_jwt(NOW_EPOCH + 86400)),
+                         token=near_expiry, refresh="R1")
+    client.ensure_fresh_token(NOW_EPOCH)
+    assert log == ["refresh"]
+
+
+def test_req_004_refresh_token_alone_is_enough_the_access_token_is_fetched_on_the_first_cycle():
+    log = []
+    new_access = make_jwt(NOW_EPOCH + 86400, iat=NOW_EPOCH)
+    client = make_client(refreshing_handler(log, new_access=new_access), token="", refresh="R1")
+    client.ensure_fresh_token(NOW_EPOCH)
+    assert client.list_recordings() == []
+    assert log == ["refresh", f"Bearer {new_access}"]
+
+
+def test_ensure_fresh_token_does_nothing_when_not_due():
+    fresh = make_jwt(NOW_EPOCH + 86400, iat=NOW_EPOCH)
+    client = make_client(lambda r: (_ for _ in ()).throw(AssertionError("no call")), token=fresh, refresh="R1")
+    client.ensure_fresh_token(NOW_EPOCH)
+
+
+def test_ensure_fresh_token_keeps_using_valid_token_when_refresh_has_a_transient_error():
+    due = make_jwt(NOW_EPOCH + 600, iat=NOW_EPOCH - 86400 + 600)
+    client = make_client(lambda r: httpx.Response(503), token=due, refresh="R1")
+    client.ensure_fresh_token(NOW_EPOCH)  # no exception: the token is still valid for 10 minutes
+
+
+def test_ensure_fresh_token_raises_when_refresh_fails_and_token_is_expired():
+    expired = make_jwt(NOW_EPOCH - 10, iat=NOW_EPOCH - 86400)
+    client = make_client(lambda r: httpx.Response(503), token=expired, refresh="R1")
+    with pytest.raises(PlaudAuthError):
+        client.ensure_fresh_token(NOW_EPOCH)
+
+
+def test_ensure_fresh_token_raises_when_refresh_token_is_rejected():
+    due = make_jwt(NOW_EPOCH + 600, iat=NOW_EPOCH - 86400 + 600)
+    client = make_client(lambda r: httpx.Response(401), token=due, refresh="R1")
+    with pytest.raises(PlaudAuthError):
+        client.ensure_fresh_token(NOW_EPOCH)
+
+
+def test_ensure_fresh_token_raises_without_any_token():
+    with pytest.raises(PlaudAuthError, match="no Plaud token"):
+        make_client(lambda r: ok(), token="").ensure_fresh_token(NOW_EPOCH)
+
+
+def test_credential_seconds_left_prefers_the_refresh_token():
+    client = make_client(never_called, token=make_jwt(NOW_EPOCH + 100), refresh=make_jwt(NOW_EPOCH + 9000))
+    assert client.credential_seconds_left(NOW_EPOCH) == 9000
+
+
+def test_credential_seconds_left_falls_back_to_the_access_token():
+    client = make_client(never_called, token=make_jwt(NOW_EPOCH + 100))
+    assert client.credential_seconds_left(NOW_EPOCH) == 100
+
+
+def never_called(request):
+    raise AssertionError("no request expected")

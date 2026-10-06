@@ -29,6 +29,10 @@ def setup_logging():
         level=getattr(logging, level, logging.INFO),
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
+    # httpx logs every request URL at INFO. Plaud's presigned S3 links carry a
+    # security token and signature in the query string and must not reach the logs.
+    for noisy in ("httpx", "httpcore"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
 
 
 # ---------------------------------------------------------

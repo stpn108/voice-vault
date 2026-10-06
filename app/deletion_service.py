@@ -37,6 +37,9 @@ def unmet_trash_conditions(rec: Recording, now: dt.datetime, cfg: Config) -> lis
     reasons = []
     if not rec.is_plaud_processed:
         reasons.append("plaud_not_processed")
+    if rec.duration_ms <= 0:
+        # Plaud may list a recording before its length is known; the age is then meaningless.
+        reasons.append("duration_unknown")
     if now - as_utc(rec.ended_at) < dt.timedelta(minutes=cfg.min_age_minutes):
         reasons.append("too_young")
     if not _is_verified(rec):
@@ -58,7 +61,7 @@ def run_deletion(session_factory: Callable[[], Session], client: PlaudClient, cf
     with session_factory() as session:
         now = now_fn()
         pending = session.scalars(
-            select(Recording).where(Recording.trashed_at.is_(None))
+            select(Recording).where(Recording.trashed_at.is_(None), Recording.discarded_at.is_(None))
         ).all()
         for rec in pending:
             reasons = unmet_trash_conditions(rec, now, cfg)

@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from config import load_config
 from database import engine, migrate_schema
-from plaud_client import PlaudClient
+from plaud_client import build_client
 from sync_job import SyncJob
 from utils import LOCAL_TZ, now_utc, setup_logging
 
@@ -28,6 +28,10 @@ def build_scheduler(job: SyncJob, interval_minutes: int) -> BlockingScheduler:
     return scheduler
 
 
+def session_factory() -> Session:
+    return Session(engine)
+
+
 def main():
     migrate_schema()
     cfg = load_config()
@@ -38,8 +42,8 @@ def main():
     )
     if not cfg.delete_enabled:
         log.warning("Shadow mode: nothing is deleted at Plaud (PLAUD_DELETE_ENABLED=false)")
-    client = PlaudClient(cfg.plaud_token, cfg.plaud_api_base)
-    job = SyncJob(cfg, client, lambda: Session(engine))
+    client = build_client(cfg, session_factory)
+    job = SyncJob(cfg, client, session_factory)
     build_scheduler(job, cfg.import_interval_minutes).start()
 
 

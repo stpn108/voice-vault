@@ -185,7 +185,7 @@ for weeks).
 ## What does not change
 
 - Tests, the `app-tests` service, the deploy pipeline and the PR comment.
-- `db`, `db-backup`, `.env` keys except the added `REDIS_URL`.
+- `db` (with its Ofelia backup labels), `.env` keys except the added `REDIS_URL`.
 - `migrate_schema()`: every instance calls it; the advisory lock makes all
   but one wait.
 - Memory limits on every service, including the new ones (ZenTallyBot

@@ -19,6 +19,8 @@ warn "--- Redeploy Script ---"
 # Ensure containers run as current user
 export HOST_UID=$(id -u)
 export HOST_GID=$(id -g)
+# Keep the build as it is; setting the variable silences Compose's "delegate builds to bake" hint.
+export COMPOSE_BAKE=false
 
 # --- STEP 0: PRE-FLIGHT TESTS ---
 TIMESTAMP=$(date +%s)
@@ -74,12 +76,12 @@ if [ $BUILD_EXIT_CODE -ne 0 ]; then
 fi
 
 # 2. Stop the service (image is already built -> short downtime)
-log "2. Stopping service 'app'..."
-docker compose stop app
+log "2. Stopping services 'app' and 'web'..."
+docker compose stop app web
 
 # 3. Remove the container
-log "3. Removing container 'app'..."
-docker compose rm -f app
+log "3. Removing containers 'app' and 'web'..."
+docker compose rm -f app web
 
 # 4. Check for orphaned containers
 log "4. Checking for orphaned containers..."
@@ -97,9 +99,9 @@ else
     echo "No orphaned containers found. All clean."
 fi
 
-# 5. Start container with new image (db-backup is started alongside if missing)
+# 5. Start container with new image (--remove-orphans drops the retired db-backup service)
 log "5. Starting container with new image..."
-docker compose up -d app db-backup
+docker compose up -d --remove-orphans app web
 
 # 6. Verify: the running container must be healthy AND run the commit just built.
 #    A container that came up from a stale image is a hard failure, not a warning.
@@ -122,7 +124,21 @@ if [ "$RUNNING_COMMIT" != "$GIT_COMMIT" ]; then
     err "App runs '${RUNNING_COMMIT:-<none>}', expected '${GIT_COMMIT}'. Image was NOT rebuilt."
     exit 1
 fi
-log "Deployed v${APP_VERSION} (${GIT_COMMIT}), app is healthy."
+# The UI shares the image, so it must come up healthy as well.
+elapsed=0
+status="unknown"
+while [ $elapsed -lt $HEALTH_TIMEOUT ]; do
+    status=$(docker compose ps --format '{{.Health}}' web 2>/dev/null || echo "unknown")
+    [ "$status" = "healthy" ] && break
+    sleep $HEALTH_INTERVAL
+    elapsed=$((elapsed + HEALTH_INTERVAL))
+done
+if [ "$status" != "healthy" ]; then
+    err "Web UI did NOT become healthy within ${HEALTH_TIMEOUT}s (status: ${status})."
+    docker compose logs --tail=50 web
+    exit 1
+fi
+log "Deployed v${APP_VERSION} (${GIT_COMMIT}), app and web UI are healthy."
 
 # 7. Follow logs only when attached to a terminal (the deploy pipeline is not)
 if [ -t 1 ]; then

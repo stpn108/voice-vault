@@ -48,6 +48,7 @@ class Recording(Base):
     verified_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     trashed_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     deleted_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    discarded_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -65,6 +66,19 @@ class Segment(Base):
     start_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     end_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     text: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class PlaudSession(Base):
+    """The one current Plaud token pair (single row, id=1). Secret: never log or export."""
+    __tablename__ = "plaud_sessions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    access_token: Mapped[str] = mapped_column(Text, default="")
+    refresh_token: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    seed_fingerprint: Mapped[str] = mapped_column(String(16), default="")
+    refreshed_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -92,8 +106,17 @@ class Segment(Base):
 #         ("001_example_priority", _migrate_001_example_priority),
 #     ]
 
+def _migrate_001_recordings_discarded_at(conn):
+    # Fresh databases get the column from create_all(); only Postgres needs the ALTER.
+    if conn.dialect.name == "postgresql":
+        conn.execute(sqltext(
+            "ALTER TABLE IF EXISTS recordings "
+            "ADD COLUMN IF NOT EXISTS discarded_at TIMESTAMP WITH TIME ZONE;"
+        ))
+
+
 MIGRATIONS: list = [
-    # ("001_<name>", _migrate_001_<name>),
+    ("001_recordings_discarded_at", _migrate_001_recordings_discarded_at),
 ]
 
 # Advisory lock key: serialises schema setup when several replicas start at
