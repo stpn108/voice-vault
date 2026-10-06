@@ -97,9 +97,9 @@ else
     echo "No orphaned containers found. All clean."
 fi
 
-# 5. Start container with new image (db-backup is started alongside if missing)
+# 5. Start container with new image (--remove-orphans drops the retired db-backup service)
 log "5. Starting container with new image..."
-docker compose up -d app db-backup
+docker compose up -d --remove-orphans app
 
 # 6. Verify: the running container must be healthy AND run the commit just built.
 #    A container that came up from a stale image is a hard failure, not a warning.

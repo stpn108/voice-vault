@@ -60,7 +60,7 @@ Table `recordings`: share of recordings with `verified_at` set before `trashed_a
 | 2026-10-06 | What other `task_status` values exist besides 1? | open, treated as not done |
 | 2026-10-06 | Mail for token expiry via SMTP: which server? | open, log only until configured |
 | 2026-10-06 | Token handling | superseded by REQ-004: tokens are renewed automatically, the manual-token note no longer applies |
-| 2026-10-06 | Backup of the only copy: is the existing pg_dump every 4 hours enough, or off-server copy needed? | open, decide before `PLAUD_DELETE_ENABLED=true` |
+| 2026-10-06 | Backup of the only copy: is the Ofelia pg_dump every 4 hours enough, or off-server copy needed? | open, decide before `PLAUD_DELETE_ENABLED=true` |
 
 ## Tests
 

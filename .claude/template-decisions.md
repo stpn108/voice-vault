@@ -24,7 +24,7 @@ that supersedes it and involve the mentor.
 | **Reasoning** | ZenTallyBot D-031 and D-110. Forbidding `commit()` inside migrations removes the need for a non-committing connection proxy. |
 | **Rejected alternatives** | (A) Alembic — autogenerate drift, a second CLI and config surface; (B) inline `ALTER … IF NOT EXISTS` without tracking — no record, no rollback |
 
-### T-003: Database backups as a Compose service running `pg_dump` in a loop
+### T-003: Database backups as a Compose service running `pg_dump` in a loop (superseded by T-010)
 
 | | |
 |---|---|
@@ -77,3 +77,13 @@ that supersedes it and involve the mentor.
 | **In plain words** | One file lists, in everyday language, what changed for users in each version. |
 | **Reasoning** | The checklist demanded release notes but no file existed. Markdown is readable on GitHub without tooling. |
 | **Rejected alternatives** | (A) JSON like ZenTallyBot — needs an in-app renderer; (B) git releases — outside the repo, not bilingual. Switch to JSON if the project renders notes in-app. |
+
+### T-010: Database backups run as an Ofelia job from callisto-services
+
+| | |
+|---|---|
+| **Decision** | The `db-backup` service is removed. The `db` service carries Ofelia labels (`ofelia.enabled=true` and `ofelia.job-exec.backup-<COMPOSE_PROJECT_NAME>.{schedule,command,user}`); Ofelia, run by callisto-services on the host, executes `scripts/db-backup.sh` inside the running `db` container as `HOST_UID:HOST_GID`. Dumps go to `./volumes/backups` (mounted into `db`), pruned after `BACKUP_RETENTION_DAYS` (default 7). `BACKUP_SCHEDULE` (Ofelia cron with seconds, default `0 0 */4 * * *`) replaces `BACKUP_INTERVAL`. The job name carries the Compose project name as suffix, because Ofelia job names are global on the host; the label default is the template's own project name, and every project needs a unique `COMPOSE_PROJECT_NAME`. The script writes to a temporary file first so a failing `pg_dump` cannot leave a truncated backup that looks valid. `redeploy.sh` starts with `--remove-orphans`, which removes the old `db-backup` container. |
+| **In plain words** | The server's shared scheduler (Ofelia) now makes the database backups, instead of an extra container in every project. |
+| **Reasoning** | The host already runs Ofelia; one scheduler for all projects replaces one idle container per project. Owner decision. |
+| **Rejected alternatives** | (A) keep the loop container: one more container per project, duplicate of the host scheduler; (B) host cron: invisible in the repo. T-003 rejected Ofelia labels because the daemon lived outside the repo; it is now part of the host's standard setup (callisto-services). |
+

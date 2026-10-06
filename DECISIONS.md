@@ -109,3 +109,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Rejected alternatives** | (A) keep 15 minutes: owner chose one day; (B) one day for the permanent delete only: the trash step is already reversible, the age gate protects against premature deletion of unfinished recordings; (C) block on duration only inside the import: the guard belongs where the decision is made. |
 | **Status** | **FINAL** |
 
+### D-007: Database backups via Ofelia labels on the db service, no db-backup container (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-06 |
+| **Decision** | Same as template decision T-010 (`.claude/template-decisions.md`): the `db-backup` service is removed; labels on `db` define an Ofelia job `backup-<COMPOSE_PROJECT_NAME>` that runs `scripts/db-backup.sh` inside `db` on `BACKUP_SCHEDULE`. voice-vault's default project name is `voice-vault`; the job name is therefore `backup-voice-vault` unless `.env` sets another `COMPOSE_PROJECT_NAME`. |
+| **In plain words** | The host's shared scheduler makes the database backups, so there is no backup container in this project. |
+| **Reasoning** | Owner decision; callisto-services already runs Ofelia. Matters here more than in a plain template because the database holds the only copy of the recordings after the permanent delete at Plaud (D-004). |
+| **Rejected alternatives** | See T-010. |
+| **Status** | **FINAL** |
+

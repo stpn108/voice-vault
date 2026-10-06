@@ -63,7 +63,7 @@ app/                    # Main code
 ├── tests/             # pytest tests
 ├── templates/         # Jinja2 templates (if needed)
 └── Dockerfile         # Container definition (COPY *.py, no per-file lines)
-scripts/db-backup.sh    # pg_dump loop, run by the db-backup service
+scripts/db-backup.sh    # pg_dump + retention, started by an Ofelia job (labels on db)
 ```
 
 ## Where to read what

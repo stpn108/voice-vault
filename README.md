@@ -43,8 +43,9 @@ Requirements: `requirements/`. Decisions: `DECISIONS.md` (D-001 to D-004).
    only works on trashed recordings and which `task_status` values occur
    (open questions in REQ-001).
 3. Decide the backup. After permanent deletion the database holds the only
-   copy. The built-in `pg_dump` runs every `BACKUP_INTERVAL` (default 4h,
-   7 days kept) into `volumes/backups/`. Decide whether an off-server copy is
+   copy. Ofelia (callisto-services) runs `pg_dump` on `BACKUP_SCHEDULE`
+   (default every 4 hours, 7 days kept) into `volumes/backups/`. The job is
+   named `backup-<COMPOSE_PROJECT_NAME>`; check that a dump file appears. Decide whether an off-server copy is
    needed (D-004).
 4. Set `PLAUD_DELETE_ENABLED=true` and redeploy.
 

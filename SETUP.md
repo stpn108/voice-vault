@@ -111,7 +111,7 @@ the server share that user.
 5. First start:
    ```bash
    ./redeploy.sh
-   docker compose ps     # db, db-backup, app: running/healthy
+   docker compose ps     # db, app: running/healthy
    ```
 
 ## 3. Runner (one per project, on the same server)
@@ -195,7 +195,8 @@ old version is still running.
 
 Shared and fine to share: the deploy user, the docker group, the
 `shared_net` network, the Docker daemon. Backups land in each project's
-own `volumes/backups/`. A deploy in project A never touches project B:
+own `volumes/backups/`, written by an Ofelia job named after the project
+(`COMPOSE_PROJECT_NAME` must be unique per project). A deploy in project A never touches project B:
 different runner, different directory, different Compose project.
 
 ## 7. Troubleshooting

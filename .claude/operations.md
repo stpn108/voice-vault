@@ -86,14 +86,21 @@ docker compose restart app
 
 ### Backups
 
-The `db-backup` service dumps the database every `BACKUP_INTERVAL`
-(default 4h) into `volumes/backups/` and keeps `BACKUP_RETENTION_DAYS`
-(default 7) days.
+Ofelia, run by callisto-services on the host, dumps the database inside the
+`db` container on `BACKUP_SCHEDULE` (default every 4 hours; Ofelia cron with
+seconds) into `volumes/backups/` and keeps `BACKUP_RETENTION_DAYS` (default 7)
+days. The job is defined by labels on the `db` service. Its name is
+`backup-<COMPOSE_PROJECT_NAME>`, so every project on the host needs a unique
+`COMPOSE_PROJECT_NAME`, or the jobs collide.
 
 ```bash
 ls -lh volumes/backups/
-docker compose logs db-backup
+docker compose exec db sh /db-backup.sh        # run a backup now
+docker compose logs ofelia                     # in callisto-services: job log
 ```
+
+Without a running Ofelia no backup is made. After the first deploy check that
+a file appears in `volumes/backups/` within one schedule period.
 
 #### Restore
 
@@ -106,7 +113,7 @@ gunzip -c volumes/backups/backup_YYYY-MM-DD-HH-MM-SS.sql.gz \
 docker compose start app
 ```
 
-Copy `volumes/backups/` off the server regularly; the service protects
+Copy `volumes/backups/` off the server regularly; the job protects
 against mistakes, not against losing the server.
 
 ### Runner and pipeline
