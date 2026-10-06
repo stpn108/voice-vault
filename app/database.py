@@ -48,6 +48,7 @@ class Recording(Base):
     verified_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     trashed_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     deleted_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    discarded_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -105,8 +106,17 @@ class PlaudSession(Base):
 #         ("001_example_priority", _migrate_001_example_priority),
 #     ]
 
+def _migrate_001_recordings_discarded_at(conn):
+    # Fresh databases get the column from create_all(); only Postgres needs the ALTER.
+    if conn.dialect.name == "postgresql":
+        conn.execute(sqltext(
+            "ALTER TABLE IF EXISTS recordings "
+            "ADD COLUMN IF NOT EXISTS discarded_at TIMESTAMP WITH TIME ZONE;"
+        ))
+
+
 MIGRATIONS: list = [
-    # ("001_<name>", _migrate_001_<name>),
+    ("001_recordings_discarded_at", _migrate_001_recordings_discarded_at),
 ]
 
 # Advisory lock key: serialises schema setup when several replicas start at

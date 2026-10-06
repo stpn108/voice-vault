@@ -223,3 +223,22 @@ def test_corrected_duration_is_picked_up_without_restarting_the_stability_window
         assert rec.duration_ms == 60_000
         assert rec.ended_at.replace(tzinfo=dt.timezone.utc) - rec.started_at.replace(tzinfo=dt.timezone.utc) == dt.timedelta(minutes=1)
         assert rec.last_changed_at.replace(tzinfo=dt.timezone.utc) == NOW
+
+
+def test_req_002_discarded_recording_is_never_fetched_or_stored_again(session_factory):
+    from database import Recording as Rec
+    client = FakeClient()
+    client.add("p1")
+    run_import(session_factory, client, lambda: NOW)
+    with session_factory() as s:
+        row = s.scalar(select(Rec))
+        row.title, row.summary, row.segment_count, row.discarded_at = "", "", 0, NOW
+        s.query(Segment).delete()
+        s.commit()
+    client.fail_on["p1"] = AssertionError("a discarded recording must not be fetched")
+    client.recordings["p1"]["summary"] = "changed at Plaud afterwards"
+    stats = run_import(session_factory, client, lambda: NOW + dt.timedelta(minutes=10))
+    with session_factory() as s:
+        row = s.scalar(select(Rec))
+        assert row.summary == "" and s.query(Segment).count() == 0
+    assert stats.skipped == 1 and stats.imported == 0

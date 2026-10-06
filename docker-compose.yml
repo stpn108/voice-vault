@@ -39,6 +39,7 @@ services:
     restart: unless-stopped
 
   app:
+    image: ${COMPOSE_PROJECT_NAME:-voice-vault}-app
     build:
       context: ./app
       args:
@@ -69,10 +70,39 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       MAIL_FROM: ${MAIL_FROM:-}
       MAIL_TO: ${MAIL_TO:-}
+    healthcheck:
+      test: ["CMD", "python", "healthcheck.py"]
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+      retries: 3
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Web UI (REQ-002): same image as app, database access only, no Plaud credentials.
+  # Bound to loopback; reach it through the SSH tunnel of callisto-services.
+  web:
+    image: ${COMPOSE_PROJECT_NAME:-voice-vault}-app
+    pull_policy: never
+    command: ["uvicorn", "webapp:app", "--host", "0.0.0.0", "--port", "8000"]
+    logging: *default-logging
+    mem_limit: 256m
+    memswap_limit: 256m
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      TZ: ${TZ:-Europe/Berlin}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      STABILITY_MINUTES: ${STABILITY_MINUTES:-10}
+      UI_LANG: ${UI_LANG:-de}
+      UI_ALLOWED_HOSTS: ${UI_ALLOWED_HOSTS:-}
+      UI_SECRET: ${UI_SECRET:-}
     ports:
       - "127.0.0.1:${PORTS_PREFIX}010:8000"
     healthcheck:
-      test: ["CMD", "python", "healthcheck.py"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=5)"]
       interval: 30s
       timeout: 10s
       start_period: 20s

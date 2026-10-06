@@ -38,7 +38,7 @@ of built:
 - **Language**: Python 3.12
 - **Database**: PostgreSQL 16 (SQLAlchemy 2.x, numbered migrations)
 - **Scheduling**: APScheduler (as in google-contacts-sync), every 10 minutes
-- **Web**: FastAPI + Jinja2 for a simple viewing and cleanup UI (REQ-002)
+- **Web**: FastAPI + Jinja2 + uvicorn, service `web`, viewing and cleanup UI (REQ-002, D-008)
 - **Claude access**: MCP server on the owner's server (REQ-003)
 - **External**: Plaud web API (unofficial, EU region)
 - **LLM** (optional): see `.claude/llm.md`

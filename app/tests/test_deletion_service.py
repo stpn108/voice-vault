@@ -183,3 +183,21 @@ def test_auth_error_during_deletion_propagates(session_factory):
 
 def test_may_delete_permanently_requires_trashed_state():
     assert may_delete_permanently(make_recording(), NOW, CFG) is False
+
+
+def test_req_002_discarded_recording_is_not_trashed_at_plaud_by_default(session_factory):
+    # Criterion 7 stays open: until the owner decides, a discard never triggers a Plaud deletion.
+    store(session_factory, discarded_at=NOW - dt.timedelta(hours=1))
+    plaud = FakePlaud()
+    stats = run_deletion(session_factory, plaud, CFG, lambda: NOW)
+    assert plaud.trashed == [] and stats.held_back == 0
+    with session_factory() as s:
+        assert s.scalar(select(Recording)).trashed_at is None
+
+
+def test_req_002_already_trashed_recording_is_still_deleted_permanently_after_a_discard(session_factory):
+    # It was verified before the discard; the pipeline's guarantee stands.
+    store(session_factory, trashed_at=NOW - dt.timedelta(hours=24), discarded_at=NOW - dt.timedelta(hours=1))
+    plaud = FakePlaud()
+    run_deletion(session_factory, plaud, CFG, lambda: NOW)
+    assert plaud.deleted == ["r1"]

@@ -25,6 +25,8 @@ class Config:
     smtp_password: str
     mail_from: str
     mail_to: str
+    ui_lang: str
+    ui_allowed_hosts: tuple
 
 
 def load_config() -> Config:
@@ -45,4 +47,6 @@ def load_config() -> Config:
         smtp_password=os.getenv("SMTP_PASSWORD", ""),
         mail_from=os.getenv("MAIL_FROM", ""),
         mail_to=os.getenv("MAIL_TO", ""),
+        ui_lang=os.getenv("UI_LANG", "de").strip() or "de",
+        ui_allowed_hosts=tuple(h.strip() for h in os.getenv("UI_ALLOWED_HOSTS", "").split(",") if h.strip()),
     )

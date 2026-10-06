@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ t("ui_discard_title") }}</h1>
+<p><strong>{{ rec.title or t("ui_untitled") }}</strong><br><span class="muted">{{ rec.started_at | localtime }}</span></p>
+<p>{{ t("ui_discard_text") }}</p>
+<form method="post" action="/recordings/{{ rec.id }}/discard">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <button class="danger" type="submit">{{ t("ui_discard_confirm") }}</button>
+  <a href="/recordings/{{ rec.id }}">{{ t("ui_cancel") }}</a>
+</form>
+{% endblock %}

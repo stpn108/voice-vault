@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<form method="get" action="/">
+  <input type="text" name="q" value="{{ q }}" placeholder="{{ t('ui_search_placeholder') }}" size="40" maxlength="200">
+  <button type="submit">{{ t("ui_search") }}</button>
+</form>
+{% if page.rows %}
+<table>
+  <thead><tr>
+    <th>{{ t("ui_col_date") }}</th><th>{{ t("ui_col_title") }}</th>
+    <th class="hide-small">{{ t("ui_col_duration") }}</th><th>{{ t("ui_col_state") }}</th>
+  </tr></thead>
+  <tbody>
+  {% for row in page.rows %}
+  <tr>
+    <td>{{ row.started_at | localtime }}</td>
+    <td><a href="/recordings/{{ row.id }}">{{ row.title or t("ui_untitled") }}</a></td>
+    <td class="hide-small">{{ row.duration_ms | hms }}</td>
+    <td><span class="state state-{{ row.state }}">{{ t("state_" ~ row.state) }}</span></td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% if page.next_cursor %}
+<p><a href="/?cursor={{ page.next_cursor | urlencode }}{% if q %}&amp;q={{ q | urlencode }}{% endif %}">{{ t("ui_next") }}</a></p>
+{% endif %}
+{% else %}
+<p class="muted">{{ t("ui_empty") }}</p>
+{% endif %}
+{% endblock %}

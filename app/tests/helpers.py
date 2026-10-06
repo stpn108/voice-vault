@@ -43,3 +43,27 @@ def refresh_response(access, refresh=None, clearing=True):
     if refresh:
         headers.append(("set-cookie", f"pld_urt={refresh}; Domain=.plaud.ai; Path=/"))
     return httpx.Response(200, headers=headers, json={"status": 0})
+
+
+def add_recording(session, index=0, started=None, segments=3, **overrides):
+    """Insert one stored recording with segments; returns the Recording."""
+    import datetime as dt
+    from database import Recording, Segment
+    started = started or dt.datetime(2026, 10, 1, 8, 0, tzinfo=dt.timezone.utc) + dt.timedelta(minutes=index)
+    values = dict(
+        plaud_id=f"p{index}", title=f"Title {index}", started_at=started,
+        ended_at=started + dt.timedelta(minutes=5), duration_ms=300_000, summary=f"Summary {index}",
+        segment_count=segments, content_hash=f"h{index}", is_plaud_processed=True,
+        last_changed_at=started, verified_hash=f"h{index}", verified_at=started,
+    )
+    values.update(overrides)
+    rec = Recording(**values)
+    session.add(rec)
+    session.flush()
+    session.add_all(
+        Segment(recording_id=rec.id, idx=i, speaker=f"Speaker {i % 2}", start_ms=i * 61_000,
+                end_ms=i * 61_000 + 900, text=f"text {index}-{i}")
+        for i in range(segments)
+    )
+    session.commit()
+    return rec

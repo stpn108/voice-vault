@@ -61,7 +61,7 @@ def run_deletion(session_factory: Callable[[], Session], client: PlaudClient, cf
     with session_factory() as session:
         now = now_fn()
         pending = session.scalars(
-            select(Recording).where(Recording.trashed_at.is_(None))
+            select(Recording).where(Recording.trashed_at.is_(None), Recording.discarded_at.is_(None))
         ).all()
         for rec in pending:
             reasons = unmet_trash_conditions(rec, now, cfg)

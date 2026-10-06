@@ -61,9 +61,15 @@ Requirements: `requirements/`. Decisions: `DECISIONS.md` (D-001 to D-004).
 - The database dump (`volumes/backups/`) contains the token pair. Protect the
   backup directory like `.env`.
 - `DATABASE_URL` needs the driver prefix `postgresql+psycopg://`.
-- Web UI (REQ-002): loopback-bound port `127.0.0.1:${PORTS_PREFIX}010`; the
-  host's `webinterfaces` / `ssh-tunnels` scripts pick it up. Pick a
-  `PORTS_PREFIX` that is unique on the server and on the client.
+- Web UI (REQ-002, D-008): service `web`, loopback-bound port
+  `127.0.0.1:${PORTS_PREFIX}010`; the host's `webinterfaces` / `ssh-tunnels`
+  scripts pick it up, open `http://localhost:${PORTS_PREFIX}010`. Pick a
+  `PORTS_PREFIX` that is unique on the server and on the client. The UI has no
+  login (SSH tunnel is the access control). It lists recordings (newest first,
+  50 per page), searches title, summary and transcript, shows summary and
+  transcript, and discards recordings one by one or everything older than N
+  days. Discarding removes the content here for good; the entry at Plaud is
+  left alone and never imported again. `web` has no Plaud credentials.
 - `STORE_AUDIO` is reserved; audio is not downloaded or stored.
 - While Plaud keeps a recording (shadow mode, or waiting for stability) every
   cycle re-reads its detail, transcript and summary to detect changes.
