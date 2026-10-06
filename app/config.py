@@ -33,7 +33,7 @@ def load_config() -> Config:
         plaud_refresh_token=os.getenv("PLAUD_REFRESH_TOKEN", "").strip(),
         plaud_api_base=os.getenv("PLAUD_API_BASE", "https://api-euc1.plaud.ai").rstrip("/"),
         import_interval_minutes=int(os.getenv("IMPORT_INTERVAL_MINUTES", "10")),
-        min_age_minutes=int(os.getenv("MIN_AGE_MINUTES", "15")),
+        min_age_minutes=int(os.getenv("MIN_AGE_MINUTES", "1440")),
         stability_minutes=int(os.getenv("STABILITY_MINUTES", "10")),
         permanent_delete_after_hours=int(os.getenv("PERMANENT_DELETE_AFTER_HOURS", "24")),
         delete_enabled=_bool("PLAUD_DELETE_ENABLED", False),

@@ -23,6 +23,7 @@ class FakeClient:
     def __init__(self):
         self.recordings = {}  # id -> dict(processed, segments, summary, title)
         self.fail_on = {}
+        self.duration_ms = 60_000
 
     def add(self, plaud_id="r1", processed=True, segments=None, summary="## Summary", title="Team Sync"):
         if segments is None:
@@ -30,13 +31,13 @@ class FakeClient:
         self.recordings[plaud_id] = dict(processed=processed, segments=segments, summary=summary, title=title)
 
     def list_recordings(self):
-        return [PlaudRecording(i, r["title"], START_MS, 60_000) for i, r in self.recordings.items()]
+        return [PlaudRecording(i, r["title"], START_MS, self.duration_ms) for i, r in self.recordings.items()]
 
     def get_detail(self, plaud_id):
         if plaud_id in self.fail_on:
             raise self.fail_on[plaud_id]
         r = self.recordings[plaud_id]
-        return PlaudDetail(plaud_id, r["title"], START_MS, 60_000, r["processed"])
+        return PlaudDetail(plaud_id, r["title"], START_MS, self.duration_ms, r["processed"])
 
     def fetch_segments(self, detail):
         return self.recordings[detail.plaud_id]["segments"]
@@ -207,3 +208,18 @@ def test_hash_depends_on_summary_and_segments_only():
 def test_normalize_segments_falls_back_to_original_speaker_and_tolerates_missing_times():
     out = normalize_segments([{"original_speaker": "Speaker 1", "content": "hi"}])
     assert out == [{"speaker": "Speaker 1", "start_ms": None, "end_ms": None, "text": "hi"}]
+
+
+def test_corrected_duration_is_picked_up_without_restarting_the_stability_window(session_factory):
+    # D-006: a recording listed with duration 0 gets its real length later, content unchanged.
+    client = FakeClient()
+    client.add()
+    client.duration_ms = 0
+    run_import(session_factory, client, lambda: NOW)
+    client.duration_ms = 60_000
+    run_import(session_factory, client, lambda: NOW + dt.timedelta(minutes=10))
+    with session_factory() as s:
+        rec = s.scalar(select(Recording))
+        assert rec.duration_ms == 60_000
+        assert rec.ended_at.replace(tzinfo=dt.timezone.utc) - rec.started_at.replace(tzinfo=dt.timezone.utc) == dt.timedelta(minutes=1)
+        assert rec.last_changed_at.replace(tzinfo=dt.timezone.utc) == NOW

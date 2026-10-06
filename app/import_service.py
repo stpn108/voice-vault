@@ -135,7 +135,10 @@ def import_recording(session: Session, client: PlaudClient, item: PlaudRecording
         stats.updated += 1
         log.info("Recording changed at Plaud, re-imported plaud_id=%s", item.plaud_id)
     else:
+        # Same content: metadata may still be corrected (e.g. a duration that was 0 while
+        # the recording was uploading). This does not restart the stability window.
         existing.title, existing.is_plaud_processed = title, True
+        existing.started_at, existing.ended_at, existing.duration_ms = started, ended, duration
         stats.unchanged += 1
 
     session.commit()

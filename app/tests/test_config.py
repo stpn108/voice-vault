@@ -16,7 +16,7 @@ def clean_env(monkeypatch):
 @pytest.mark.parametrize("field,expected", [
     ("delete_enabled", False),   # shadow mode until switched on
     ("store_audio", False),      # REQ-001 criterion 2
-    ("min_age_minutes", 15),
+    ("min_age_minutes", 1440),  # D-006: one day
     ("import_interval_minutes", 10),
     ("token_warn_days", 5),
 ])

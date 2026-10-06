@@ -98,3 +98,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Correction to D-001** | D-001 rejected the official API with "does not cover trash and delete". That was not verified. The hosted Plaud MCP has `delete_recording`, which moves a recording to the trash. A permanent delete was not found there. The decision for an own client on the web API stands because only the web API offers the permanent delete; the stated reason was too strong. |
 | **Status** | **FINAL** |
 
+### D-006: Minimum age before trashing is one day; unknown duration blocks deletion (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-06 |
+| **Decision** | `MIN_AGE_MINUTES` defaults to 1440 (one day), measured from the end of the recording (start plus duration). A recording whose duration is 0 or negative is never trashed (`duration_unknown`). A re-import with unchanged content still updates start, end and duration, without restarting the stability window. The wait before the permanent delete stays at `PERMANENT_DELETE_AFTER_HOURS=24`, so a recording stays at Plaud for at least about two days. This changes the default of 15 minutes named in the first request; the variable stays configurable. |
+| **In plain words** | Nothing is deleted at Plaud before it is a day old, and never when Plaud has not reported how long the recording is. |
+| **Reasoning** | Owner decision. A longer wait leaves room for Plaud to finish or change summaries and for the owner to notice problems. Plaud may list a recording before its length is known, and then the age calculation would be wrong. |
+| **Rejected alternatives** | (A) keep 15 minutes: owner chose one day; (B) one day for the permanent delete only: the trash step is already reversible, the age gate protects against premature deletion of unfinished recordings; (C) block on duration only inside the import: the guard belongs where the decision is made. |
+| **Status** | **FINAL** |
+
