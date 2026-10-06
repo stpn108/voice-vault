@@ -19,6 +19,8 @@ warn "--- Redeploy Script ---"
 # Ensure containers run as current user
 export HOST_UID=$(id -u)
 export HOST_GID=$(id -g)
+# Keep the build as it is; setting the variable silences Compose's "delegate builds to bake" hint.
+export COMPOSE_BAKE=false
 
 # --- STEP 0: PRE-FLIGHT TESTS ---
 TIMESTAMP=$(date +%s)
