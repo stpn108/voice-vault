@@ -43,17 +43,21 @@ class PlaudAuthError(PlaudError):
     """Token missing, malformed, expired or rejected."""
 
 
-def token_claims(token: str) -> Optional[dict]:
-    """Decode the JWT payload without verifying it; None if undecodable."""
+def _jwt_part(token: str, index: int) -> Optional[dict]:
     parts = token.split(".")
     if len(parts) != 3:
         return None
     try:
-        padded = parts[1] + "=" * (-len(parts[1]) % 4)
-        claims = json.loads(base64.urlsafe_b64decode(padded))
+        padded = parts[index] + "=" * (-len(parts[index]) % 4)
+        part = json.loads(base64.urlsafe_b64decode(padded))
     except (ValueError, TypeError):
         return None
-    return claims if isinstance(claims, dict) else None
+    return part if isinstance(part, dict) else None
+
+
+def token_claims(token: str) -> Optional[dict]:
+    """Decode the JWT payload without verifying it; None if undecodable."""
+    return _jwt_part(token, 1)
 
 
 def token_expiry(token: str) -> Optional[int]:
@@ -70,17 +74,19 @@ def is_plaud_host(host: str) -> bool:
 
 
 def describe_token(token: str) -> str:
-    """Non-secret facts about a token for diagnostics: type claim, expiry, length. Never the value."""
+    """Non-secret facts about a token for diagnostics: type, expiry, claim names. Never the value."""
     claims = token_claims(token)
     if claims is None:
         return f"is not a readable JWT (length {len(token)})"
+    header = _jwt_part(token, 0) or {}
+    typ = header.get("typ") or claims.get("typ")
     exp = claims.get("exp")
     expiry = (
         dt.datetime.fromtimestamp(exp, tz=dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
         if isinstance(exp, (int, float)) else "n/a"
     )
-    hint = " (a workspace refresh token, the cookie pld_urt is needed)" if claims.get("typ") == "WRT" else ""
-    return f"typ={claims.get('typ')!r} expires={expiry}{hint}"
+    hint = " (a workspace refresh token, the cookie pld_urt is needed)" if typ == "WRT" else ""
+    return f"typ={typ!r} expires={expiry} claims={sorted(claims)}{hint}"
 
 
 def redirect_host(payload: dict) -> Optional[str]:

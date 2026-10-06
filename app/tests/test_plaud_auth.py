@@ -101,17 +101,26 @@ def test_refresh_rejected_raises_auth_error(code):
 
 
 def test_rejected_refresh_explains_itself_without_leaking_the_token():
-    token = make_jwt(int(NOW_EPOCH + 86400), typ="URT")
+    token = make_jwt(int(NOW_EPOCH + 86400), header_typ="URT", sid="secret-session-id")
     auth, _ = make_auth(lambda r: httpx.Response(401, json={"status": -1, "msg": "invalid token"}),
                         access="A1", refresh=token)
     with pytest.raises(PlaudAuthError) as exc:
         auth.refresh(BASE)
     message = str(exc.value)
     assert "invalid token" in message and "typ='URT'" in message and "expires=" in message
+    assert "'sid'" in message  # claim names help diagnosis
+    assert "secret-session-id" not in message  # claim values never do
     assert token not in message and token.split(".")[1] not in message
 
 
 def test_rejected_workspace_refresh_token_gets_a_hint():
+    token = make_jwt(int(NOW_EPOCH + 86400), header_typ="WRT")
+    auth, _ = make_auth(lambda r: httpx.Response(401), access="A1", refresh=token)
+    with pytest.raises(PlaudAuthError, match="pld_urt is needed"):
+        auth.refresh(BASE)
+
+
+def test_type_claim_in_the_payload_is_used_when_the_header_has_none():
     token = make_jwt(int(NOW_EPOCH + 86400), typ="WRT")
     auth, _ = make_auth(lambda r: httpx.Response(401), access="A1", refresh=token)
     with pytest.raises(PlaudAuthError, match="pld_urt is needed"):

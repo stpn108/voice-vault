@@ -7,13 +7,16 @@ import httpx
 from plaud_auth import StoredTokens
 
 
-def make_jwt(exp, iat=None, **claims):
+def make_jwt(exp, iat=None, header_typ=None, **claims):
     def b64(d):
         return base64.urlsafe_b64encode(json.dumps(d).encode()).rstrip(b"=").decode()
     payload = {"exp": exp, **claims}
     if iat is not None:
         payload["iat"] = iat
-    return f"{b64({'alg': 'HS256'})}.{b64(payload)}.sig"
+    header = {"alg": "HS256"}
+    if header_typ is not None:
+        header["typ"] = header_typ
+    return f"{b64(header)}.{b64(payload)}.sig"
 
 
 class MemoryStore:
