@@ -30,8 +30,12 @@ Requirements: `requirements/`. Decisions: `DECISIONS.md` (D-001 to D-004).
 
 ## Before switching deletion on
 
-1. Put `PLAUD_TOKEN` into `.env` on the server (Local Storage key `tokenstr`
-   at web.plaud.ai). Never commit it or paste it into a chat.
+1. Put both tokens into `.env` on the server: `PLAUD_TOKEN` (cookie `pld_ut`)
+   and `PLAUD_REFRESH_TOKEN` (cookie `pld_urt`), from Firefox dev tools on
+   web.plaud.ai under Storage, Cookies. Never commit them or paste them into a
+   chat. Then `docker compose up -d app`. From then on the app renews the
+   access token itself and stores the current pair in the database
+   (table `plaud_sessions`); `.env` is only the seed.
 2. Run the live check with a throwaway test recording:
    `docker compose run --rm app python plaud_live_check.py` (read-only), then
    `--trash <id>` and `--delete <id>`. This settles whether `DELETE /file/`
@@ -45,9 +49,15 @@ Requirements: `requirements/`. Decisions: `DECISIONS.md` (D-001 to D-004).
 
 ## Notes
 
-- Plaud tokens may live only about 30 days (not 300). The expiry is read from
-  the JWT. There is no refresh: sign in again at web.plaud.ai and update
-  `PLAUD_TOKEN`.
+- Token renewal (REQ-004, D-005): the access token is renewed before it
+  expires and again after any HTTP 401, with `POST /auth/refresh-user-token`.
+  Plaud may rotate the refresh token on every renewal, so the pair is kept in
+  the database. Do not log out of web.plaud.ai in the browser session you took
+  the tokens from; that probably invalidates the refresh token. If the
+  refresh token dies (log: "token refresh" error, mail if SMTP is set), paste
+  a new pair into `.env`: a changed value replaces the stored pair.
+- The database dump (`volumes/backups/`) contains the token pair. Protect the
+  backup directory like `.env`.
 - `DATABASE_URL` needs the driver prefix `postgresql+psycopg://`.
 - Web UI (REQ-002): loopback-bound port `127.0.0.1:${PORTS_PREFIX}010`; the
   host's `webinterfaces` / `ssh-tunnels` scripts pick it up. Pick a

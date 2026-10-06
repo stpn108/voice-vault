@@ -28,3 +28,8 @@ def test_req_001_defaults(field, expected):
 def test_delete_flag_parsing(monkeypatch, value, expected):
     monkeypatch.setenv("PLAUD_DELETE_ENABLED", value)
     assert load_config().delete_enabled is expected
+
+
+def test_refresh_token_is_read_and_stripped(monkeypatch):
+    monkeypatch.setenv("PLAUD_REFRESH_TOKEN", "  abc  ")
+    assert load_config().plaud_refresh_token == "abc"

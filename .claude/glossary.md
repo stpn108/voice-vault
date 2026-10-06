@@ -25,6 +25,8 @@ contract that keeps conversation and code from drifting apart.
 | Papierkorb | Plaud's first deletion step; the recording is hidden from the list but restorable. | `recordings.trashed_at`, `plaud_client.trash()` | Not the same as permanent deletion. |
 | Endgültig löschen | Plaud's second deletion step; removes the recording from the Plaud trash. | `recordings.deleted_at`, `plaud_client.delete_permanently()` | Happens after a configurable wait, only for verified imports. |
 | Fertig verarbeitet | Plaud reports transcript and AI summary as completed. | `plaud_client.is_processed()` | Both `content_list` items `transaction` and `auto_sum_note` have `task_status == 1` and a data link. Anything else means not done. |
+| Zugangstoken | Short-lived Plaud user token (cookie `pld_ut`), sent as bearer on every API call. | `plaud_sessions.access_token`, `PlaudAuth.access_token()` | Roughly 24 hours (observed in other clients, to be confirmed live). Secret. |
+| Refresh-Token | Long-lived Plaud token (cookie `pld_urt`) that mints a new Zugangstoken without a login. | `plaud_sessions.refresh_token`, `PlaudAuth.refresh()` | About 30 days, may rotate on use. Secret. |
 | Mindestalter | Minimum age of a recording before it may be trashed, default 15 minutes. | `MIN_AGE_MINUTES` | Measured from the end of the recording (`start_time + duration`). |
 
 ## Units and formats

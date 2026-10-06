@@ -5,23 +5,23 @@ Only what voice-vault needs: list, detail (transcript + summary), trash and
 permanent delete. Endpoints and payload shapes were taken from reading the
 plaud-tools and plaud-api sources; they are not documented by Plaud.
 """
-import base64
 import gzip
 import json
 import logging
 import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
-from urllib.parse import urlparse
 
 import httpx
+from sqlalchemy.orm import Session
+
+from plaud_auth import (
+    DbTokenStore, PlaudAuth, PlaudAuthError, PlaudError, USER_AGENT, is_plaud_host,
+    redirect_host, token_expiry,
+)
 
 log = logging.getLogger(__name__)
 
-USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
-)
 TRANSCRIPT_TYPE = "transaction"
 SUMMARY_TYPE = "auto_sum_note"
 TASK_DONE = 1
@@ -30,14 +30,6 @@ MAX_PAGES = 100
 MAX_ATTEMPTS = 3
 BACKOFF_SECONDS = 1.0
 TIMEOUT_SECONDS = 30.0
-
-
-class PlaudError(Exception):
-    """Any failure talking to Plaud."""
-
-
-class PlaudAuthError(PlaudError):
-    """Token missing, malformed, expired or rejected (HTTP 401)."""
 
 
 @dataclass
@@ -57,26 +49,6 @@ class PlaudDetail:
     duration_ms: int
     is_processed: bool
     raw: dict = field(default_factory=dict, repr=False)
-
-
-def token_expiry(token: str) -> Optional[int]:
-    """Return the JWT `exp` claim (epoch seconds) or None if undecodable."""
-    parts = token.split(".")
-    if len(parts) != 3:
-        return None
-    try:
-        padded = parts[1] + "=" * (-len(parts[1]) % 4)
-        exp = json.loads(base64.urlsafe_b64decode(padded)).get("exp")
-    except (ValueError, TypeError):
-        return None
-    return int(exp) if isinstance(exp, (int, float)) else None
-
-
-def is_plaud_host(host: str) -> bool:
-    """True for an ASCII hostname under plaud.ai (guards the region redirect)."""
-    if not host.isascii() or not host.endswith(".plaud.ai"):
-        return False
-    return all(l and all(c.isalnum() or c == "-" for c in l) for l in host.split("."))
 
 
 def _content_item(raw: dict, data_type: str) -> Optional[dict]:
@@ -108,26 +80,51 @@ def _summary_from_obj(obj: Any) -> Optional[str]:
 class PlaudClient:
     def __init__(
         self,
-        token: str,
+        auth: PlaudAuth,
         base_url: str = "https://api-euc1.plaud.ai",
         http: Optional[httpx.Client] = None,
         sleep: Callable[[float], None] = time.sleep,
     ):
-        self._token = token
+        self._auth = auth
         self.base_url = base_url.rstrip("/")
         self._http = http or httpx.Client(timeout=TIMEOUT_SECONDS)
         self._sleep = sleep
 
     # -- auth ---------------------------------------------------------
-    def token_seconds_left(self, now_epoch: float) -> Optional[float]:
-        exp = token_expiry(self._token)
-        return None if exp is None else exp - now_epoch
+    def ensure_fresh_token(self, now_epoch: float) -> None:
+        """Renew the access token ahead of its expiry. Raises PlaudAuthError if none is usable."""
+        if not self._auth.needs_refresh(now_epoch):
+            return
+        if not self._auth.can_refresh():
+            if not self._auth.access_token():
+                raise PlaudAuthError("no Plaud token configured")
+            return
+        try:
+            self.base_url = self._auth.refresh(self.base_url)
+        except PlaudAuthError:
+            raise
+        except PlaudError as exc:
+            left = self._auth.access_seconds_left(now_epoch)
+            if left is not None and left > 0:
+                log.warning("Token refresh failed, using the current token reason=%s", exc)
+                return
+            raise PlaudAuthError(f"token refresh failed and the access token is unusable: {exc}") from exc
+
+    def credential_seconds_left(self, now_epoch: float) -> Optional[float]:
+        """Seconds until the credential that keeps the job running dies.
+
+        With a refresh token that is the refresh token; without one the access token.
+        """
+        if self._auth.can_refresh():
+            return self._auth.refresh_seconds_left(now_epoch)
+        return self._auth.access_seconds_left(now_epoch)
 
     def _headers(self) -> dict:
-        if not self._token:
-            raise PlaudAuthError("PLAUD_TOKEN is not set")
+        token = self._auth.access_token()
+        if not token:
+            raise PlaudAuthError("no Plaud token configured")
         return {
-            "Authorization": f"Bearer {self._token}",
+            "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
             "User-Agent": USER_AGENT,
             "app-platform": "web",
@@ -135,11 +132,14 @@ class PlaudClient:
         }
 
     # -- transport ----------------------------------------------------
-    def _request(self, method: str, path: str, *, params=None, body=None, _redirected=False) -> dict:
+    def _request(self, method: str, path: str, *, params=None, body=None,
+                 _redirected=False, _refreshed=False) -> dict:
         """Send one API call and return the parsed envelope (status == 0).
 
         Only GET is retried (429, 5xx, network errors); a mutating call gets one
-        attempt so a transient error cannot repeat a side effect.
+        attempt so a transient error cannot repeat a side effect. A 401 means
+        the call was rejected before it ran, so after one token refresh every
+        method is sent once more.
         """
         attempts = MAX_ATTEMPTS if method == "GET" else 1
         last: Optional[Exception] = None
@@ -155,6 +155,11 @@ class PlaudClient:
                 last = PlaudError(f"{method} {path} failed: {type(exc).__name__}: {exc}")
                 continue
             if resp.status_code == 401:
+                if not _refreshed and self._auth.can_refresh():
+                    log.info("Plaud rejected the token, refreshing path=%s", path)
+                    self.base_url = self._auth.refresh(self.base_url)
+                    return self._request(method, path, params=params, body=body,
+                                         _redirected=_redirected, _refreshed=True)
                 raise PlaudAuthError(f"{method} {path} rejected the token (HTTP 401)")
             if resp.status_code == 429 or resp.status_code >= 500:
                 last = PlaudError(f"{method} {path} returned HTTP {resp.status_code}")
@@ -167,26 +172,19 @@ class PlaudClient:
                 raise PlaudError(f"{method} {path} returned a non-JSON body") from exc
             if not isinstance(payload, dict):
                 raise PlaudError(f"{method} {path} returned a non-object payload")
-            if payload.get("status") == -302:
-                return self._follow_redirect(method, path, payload, params, body, _redirected)
+            host = redirect_host(payload)
+            if host:
+                if _redirected:
+                    raise PlaudError("region redirect loop")
+                log.warning("Plaud region redirect old=%s new=%s", self.base_url, host)
+                self.base_url = f"https://{host}"
+                return self._request(method, path, params=params, body=body,
+                                     _redirected=True, _refreshed=_refreshed)
             if payload.get("status") != 0:
                 raise PlaudError(f"{method} {path} failed: {payload.get('msg') or payload.get('status')}")
             return payload
         assert last is not None
         raise last
-
-    def _follow_redirect(self, method, path, payload, params, body, already) -> dict:
-        data = payload.get("data")
-        domains = data.get("domains") if isinstance(data, dict) else None
-        host = (domains or {}).get("api") if isinstance(domains, dict) else None
-        host = urlparse(host if isinstance(host, str) and "//" in host else f"//{host}").netloc.lower()
-        if already:
-            raise PlaudError("region redirect loop")
-        if not is_plaud_host(host):
-            raise PlaudError("region redirect to a non-Plaud host refused")
-        log.warning("Plaud region redirect old=%s new=%s", self.base_url, host)
-        self.base_url = f"https://{host}"
-        return self._request(method, path, params=params, body=body, _redirected=True)
 
     def _download(self, url: str) -> Any:
         """Fetch a presigned link (no auth header) and parse it as JSON or text."""
@@ -290,3 +288,10 @@ class PlaudClient:
         if not plaud_ids:
             raise ValueError("plaud_ids must not be empty")
         self._request("DELETE", "/file/", body=plaud_ids)
+
+
+def build_client(cfg, session_factory: Callable[[], Session]) -> PlaudClient:
+    """Wire the client with database-backed tokens seeded from the environment."""
+    http = httpx.Client(timeout=TIMEOUT_SECONDS)
+    auth = PlaudAuth(DbTokenStore(session_factory), http, cfg.plaud_token, cfg.plaud_refresh_token)
+    return PlaudClient(auth, cfg.plaud_api_base, http=http)

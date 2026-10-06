@@ -36,20 +36,25 @@ class SyncJob:
             self._notifier(self._cfg, subject, body)
 
     def check_token(self) -> None:
-        """Warn when the token runs out soon; raise PlaudAuthError when it is expired."""
-        left = self._client.token_seconds_left(self._now_fn().timestamp())
+        """Renew the token if due, warn when the credential runs out soon, raise when it is dead."""
+        now_epoch = self._now_fn().timestamp()
+        self._client.ensure_fresh_token(now_epoch)
+        left = self._client.credential_seconds_left(now_epoch)
         if left is None:
             log.warning("Plaud token expiry cannot be read; relying on the API to reject it")
             return
         days = left / 86400
         if days <= 0:
-            self._notify_once_a_day("voice-vault: Plaud token expired", "Sign in at web.plaud.ai and update PLAUD_TOKEN.")
+            self._notify_once_a_day(
+                "voice-vault: Plaud token expired",
+                "Get a new token and refresh token from web.plaud.ai and update .env (PLAUD_TOKEN, PLAUD_REFRESH_TOKEN).",
+            )
             raise PlaudAuthError("Plaud token expired")
         if days < self._cfg.token_warn_days:
             log.warning("Plaud token expires soon days_left=%.1f", days)
             self._notify_once_a_day(
                 "voice-vault: Plaud token expires soon",
-                f"About {days:.1f} days left. Sign in at web.plaud.ai and update PLAUD_TOKEN.",
+                f"About {days:.1f} days left. Update PLAUD_TOKEN and PLAUD_REFRESH_TOKEN in .env from web.plaud.ai.",
             )
 
     def run(self) -> None:

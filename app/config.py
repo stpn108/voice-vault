@@ -10,6 +10,7 @@ def _bool(name: str, default: bool) -> bool:
 @dataclass(frozen=True)
 class Config:
     plaud_token: str
+    plaud_refresh_token: str
     plaud_api_base: str
     import_interval_minutes: int
     min_age_minutes: int
@@ -29,6 +30,7 @@ class Config:
 def load_config() -> Config:
     return Config(
         plaud_token=os.getenv("PLAUD_TOKEN", "").strip(),
+        plaud_refresh_token=os.getenv("PLAUD_REFRESH_TOKEN", "").strip(),
         plaud_api_base=os.getenv("PLAUD_API_BASE", "https://api-euc1.plaud.ai").rstrip("/"),
         import_interval_minutes=int(os.getenv("IMPORT_INTERVAL_MINUTES", "10")),
         min_age_minutes=int(os.getenv("MIN_AGE_MINUTES", "15")),

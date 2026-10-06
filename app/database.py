@@ -70,6 +70,19 @@ class Segment(Base):
     )
 
 
+class PlaudSession(Base):
+    """The one current Plaud token pair (single row, id=1). Secret: never log or export."""
+    __tablename__ = "plaud_sessions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    access_token: Mapped[str] = mapped_column(Text, default="")
+    refresh_token: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    seed_fingerprint: Mapped[str] = mapped_column(String(16), default="")
+    refreshed_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 # ---------------------------------------------------------------------------
 # SCHEMA MIGRATIONS
 # ---------------------------------------------------------------------------

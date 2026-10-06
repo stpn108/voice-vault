@@ -85,3 +85,16 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner wants raw data only on his own system, a UI to view and clean up, and later Claude access via his own API. Removes the Google dependency and OAuth token handling. |
 | **Rejected alternatives** | (A) Drive as primary — owner decided against it; (B) Drive and database in parallel — double the code and a second place for sensitive content; (C) files on disk only — no search or cleanup UI without more code. |
 | **Status** | **FINAL** |
+
+### D-005: Automatic token renewal with the Plaud refresh token, pair kept in the database (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-06 |
+| **Decision** | `plaud_auth.py` renews the access token with `POST /auth/refresh-user-token` (header `Cookie: pld_urt=<refresh token>`, browser-like `Origin`/`Referer`, `app-platform: web`). The answer sets the new access token as cookie `pld_ut` (a clearing `pld_ut=""` may come first, the last non-empty value counts) and may rotate `pld_urt`. The current pair is stored in `plaud_sessions` (one row). `PLAUD_TOKEN` and `PLAUD_REFRESH_TOKEN` in `.env` only seed it; a changed seed (fingerprint) replaces the stored pair, an unchanged one does not. Renewal happens ahead of expiry (when less than 25 percent of the token's lifetime, at least 15 minutes, is left) at the start of every cycle and once after any HTTP 401, after which the call is sent again once. A rejected refresh token stops the cycle, nothing is deleted, the owner is warned (log, mail if SMTP is set). The refresh token is read fresh from the database before each renewal, in case another process rotated it. Expiry warnings use the refresh token's `exp` when readable. The region redirect applies to the refresh call too, only to `*.plaud.ai`. |
+| **In plain words** | The background process keeps its Plaud login alive by itself. You paste the two tokens once and only again if Plaud ever invalidates them. |
+| **Reasoning** | The owner wants no manual token handling and Plaud's access token is short-lived. The endpoint and cookie names were taken from the source of Plaud-Sync (`src-tauri/src/plaud/auth.rs`); they are not documented by Plaud and not yet confirmed against the live service. Rotation means a persisted pair; the environment cannot be rewritten by a container. |
+| **Rejected alternatives** | (A) E-mail and password login (`POST /auth/access-token`): stores the account password, and a password login creates a new session that evicts older ones, such as the phone app (noted in plaud-toolkit); (B) renewal by hand every few days: rejected by the owner; (C) official Plaud OAuth API: early beta with a waitlist, documented endpoints cover list and detail only; (D) keep the pair only in `.env`: lost on rotation. |
+| **Correction to D-001** | D-001 rejected the official API with "does not cover trash and delete". That was not verified. The hosted Plaud MCP has `delete_recording`, which moves a recording to the trash. A permanent delete was not found there. The decision for an own client on the web API stands because only the web API offers the permanent delete; the stated reason was too strong. |
+| **Status** | **FINAL** |
+
