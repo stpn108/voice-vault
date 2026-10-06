@@ -100,6 +100,30 @@ def test_refresh_rejected_raises_auth_error(code):
         auth.refresh(BASE)
 
 
+def test_rejected_refresh_explains_itself_without_leaking_the_token():
+    token = make_jwt(int(NOW_EPOCH + 86400), typ="URT")
+    auth, _ = make_auth(lambda r: httpx.Response(401, json={"status": -1, "msg": "invalid token"}),
+                        access="A1", refresh=token)
+    with pytest.raises(PlaudAuthError) as exc:
+        auth.refresh(BASE)
+    message = str(exc.value)
+    assert "invalid token" in message and "typ='URT'" in message and "expires=" in message
+    assert token not in message and token.split(".")[1] not in message
+
+
+def test_rejected_workspace_refresh_token_gets_a_hint():
+    token = make_jwt(int(NOW_EPOCH + 86400), typ="WRT")
+    auth, _ = make_auth(lambda r: httpx.Response(401), access="A1", refresh=token)
+    with pytest.raises(PlaudAuthError, match="pld_urt is needed"):
+        auth.refresh(BASE)
+
+
+def test_rejected_opaque_refresh_token_reports_length_only():
+    auth, _ = make_auth(lambda r: httpx.Response(401), access="A1", refresh="not-a-jwt")
+    with pytest.raises(PlaudAuthError, match=r"not a readable JWT \(length 9\)"):
+        auth.refresh(BASE)
+
+
 def test_refresh_without_cookie_raises_auth_error_with_plaud_message():
     auth, store = make_auth(
         lambda r: httpx.Response(200, json={"status": -2, "msg": "token invalid"}),

@@ -69,6 +69,20 @@ def is_plaud_host(host: str) -> bool:
     return all(label and all(c.isalnum() or c == "-" for c in label) for label in host.split("."))
 
 
+def describe_token(token: str) -> str:
+    """Non-secret facts about a token for diagnostics: type claim, expiry, length. Never the value."""
+    claims = token_claims(token)
+    if claims is None:
+        return f"is not a readable JWT (length {len(token)})"
+    exp = claims.get("exp")
+    expiry = (
+        dt.datetime.fromtimestamp(exp, tz=dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        if isinstance(exp, (int, float)) else "n/a"
+    )
+    hint = " (a workspace refresh token, the cookie pld_urt is needed)" if claims.get("typ") == "WRT" else ""
+    return f"typ={claims.get('typ')!r} expires={expiry}{hint}"
+
+
 def redirect_host(payload: dict) -> Optional[str]:
     """Host from an in-body `status == -302` region redirect, or None if there is none."""
     if payload.get("status") != -302:
@@ -239,7 +253,10 @@ class PlaudAuth:
         except httpx.HTTPError as exc:
             raise PlaudError(f"token refresh failed: {type(exc).__name__}: {exc}") from exc
         if resp.status_code in (401, 403):
-            raise PlaudAuthError(f"refresh token rejected (HTTP {resp.status_code})")
+            raise PlaudAuthError(
+                f"refresh token rejected (HTTP {resp.status_code}, plaud msg={_payload(resp).get('msg')!r}, "
+                f"token {describe_token(refresh)})"
+            )
         if resp.status_code >= 400:
             raise PlaudError(f"token refresh returned HTTP {resp.status_code}")
         return resp
