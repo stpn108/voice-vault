@@ -334,6 +334,15 @@ def test_ensure_fresh_token_refreshes_when_due():
     assert log == ["refresh"]
 
 
+def test_req_004_refresh_token_alone_is_enough_the_access_token_is_fetched_on_the_first_cycle():
+    log = []
+    new_access = make_jwt(NOW_EPOCH + 86400, iat=NOW_EPOCH)
+    client = make_client(refreshing_handler(log, new_access=new_access), token="", refresh="R1")
+    client.ensure_fresh_token(NOW_EPOCH)
+    assert client.list_recordings() == []
+    assert log == ["refresh", f"Bearer {new_access}"]
+
+
 def test_ensure_fresh_token_does_nothing_when_not_due():
     fresh = make_jwt(NOW_EPOCH + 86400, iat=NOW_EPOCH)
     client = make_client(lambda r: (_ for _ in ()).throw(AssertionError("no call")), token=fresh, refresh="R1")

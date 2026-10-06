@@ -22,7 +22,7 @@ The owner pastes the access token and the refresh token once. From then on the b
 ## Acceptance criteria
 
 1. **Seed once.**
-   Given `PLAUD_TOKEN` and `PLAUD_REFRESH_TOKEN` in `.env` and an empty database, when the app starts, then the pair is stored in `plaud_sessions`.
+   Given `PLAUD_REFRESH_TOKEN` (and optionally `PLAUD_TOKEN`) in `.env` and an empty database, when the app starts, then the seed is stored in `plaud_sessions`. With the refresh token alone, the first cycle fetches the access token.
 2. **Renew ahead of expiry.**
    Given an access token with 5 hours left of a 24 hour lifetime, when a cycle starts, then it is renewed before any other Plaud call.
 3. **Rotation is kept.**
@@ -60,7 +60,7 @@ Days between manual token pastes. Target: none after the first one, until Plaud 
 
 | Criterion | Tests |
 |---|---|
-| 1 | `test_plaud_auth.py::test_first_load_seeds_store_from_environment` |
+| 1 | `test_plaud_auth.py::test_first_load_seeds_store_from_environment`, `test_plaud_client.py::test_req_004_refresh_token_alone_is_enough_the_access_token_is_fetched_on_the_first_cycle` |
 | 2 | `test_plaud_auth.py::test_needs_refresh_by_remaining_lifetime`, `test_plaud_client.py::test_ensure_fresh_token_refreshes_when_due`, `test_sync_job.py::test_req_004_cycle_renews_token_before_importing` |
 | 3 | `test_plaud_auth.py::test_refresh_sends_refresh_cookie_and_stores_rotated_pair`, `test_stored_pair_wins_when_seed_is_unchanged` |
 | 4 | `test_plaud_auth.py::test_changed_seed_replaces_stored_pair` |

@@ -30,9 +30,10 @@ Requirements: `requirements/`. Decisions: `DECISIONS.md` (D-001 to D-004).
 
 ## Before switching deletion on
 
-1. Put both tokens into `.env` on the server: `PLAUD_TOKEN` (cookie `pld_ut`)
-   and `PLAUD_REFRESH_TOKEN` (cookie `pld_urt`), from Firefox dev tools on
-   web.plaud.ai under Storage, Cookies. Never commit them or paste them into a
+1. Put the refresh token into `.env` on the server: `PLAUD_REFRESH_TOKEN`
+   (cookie `pld_urt`), from Firefox dev tools on web.plaud.ai under Storage,
+   Cookies. `PLAUD_TOKEN` (cookie `pld_ut`) is optional and short-lived; the app
+   fetches its own access token. Never commit them or paste them into a
    chat. Then `docker compose up -d app`. From then on the app renews the
    access token itself and stores the current pair in the database
    (table `plaud_sessions`); `.env` is only the seed.
@@ -55,7 +56,7 @@ Requirements: `requirements/`. Decisions: `DECISIONS.md` (D-001 to D-004).
   the database. Do not log out of web.plaud.ai in the browser session you took
   the tokens from; that probably invalidates the refresh token. If the
   refresh token dies (log: "token refresh" error, mail if SMTP is set), paste
-  a new pair into `.env`: a changed value replaces the stored pair.
+  a new refresh token into `.env`: a changed value replaces the stored pair.
 - The database dump (`volumes/backups/`) contains the token pair. Protect the
   backup directory like `.env`.
 - `DATABASE_URL` needs the driver prefix `postgresql+psycopg://`.
