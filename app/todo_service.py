@@ -143,6 +143,25 @@ def set_topic_excluded(session: Session, name: str, excluded: bool) -> Topic:
     return topic
 
 
+def rename_topic(session: Session, topic_id: int, new_name: str) -> Topic:
+    """Owner only (no MCP tool). Tasks and notes follow because they point at the id.
+
+    A name that another topic already has (case-insensitive) is refused; merging is not offered.
+    """
+    topic = session.get(Topic, topic_id)
+    if topic is None:
+        raise TodoError(f"no topic with id {topic_id}")
+    new_name = _text(new_name, "topic", TOPIC_MAX, required=True)
+    clash = session.scalar(select(Topic).where(func.lower(Topic.name) == new_name.lower(), Topic.id != topic_id))
+    if clash is not None:
+        raise TodoError(f"a topic named '{clash.name}' exists already")
+    if new_name != topic.name:
+        log.info("Topic renamed id=%s", topic.id)
+        topic.name = new_name
+        session.commit()
+    return topic
+
+
 def _excluded_ids(session: Session) -> list:
     return list(session.scalars(select(Topic.id).where(Topic.excluded.is_(True))))
 

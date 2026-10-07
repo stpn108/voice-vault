@@ -49,9 +49,12 @@ Once a day Claude reads the recordings that are new since its last run, adds the
     Given a topic, then the owner can delete it on a confirmation page that says how many notes go and how many tasks stay. The topic and its notes are removed; its tasks stay without a topic, each change logged and undoable. A checkbox (on by default) keeps the topic as excluded, so the routine does not create it again. Deleting needs the CSRF token. Claude has no tool for it, and `todo_service` still has no delete function.
 14. **Sorting.**
     Given the task list, then the owner can sort by priority (grouped, default), due date, newest, oldest, topic or title. Any other sort shows a flat list; an unknown sort is a 400.
+15. **Topics are addressed by id and can be renamed.**
+    Given a topic, then its pages live at `/topics/{id}`, so any name works, including slashes, `#`, `?` and `%`. The owner can rename it on its page; tasks, notes and the exclusion flag follow because they point at the id. An empty name, one over 120 characters, or one another topic already has (any letter case) is refused with a readable error page. Claude has no rename tool.
 
 ## Out of scope
 
+- Merging two topics (a rename onto an existing name is refused).
 - Deleting tasks (owner decision). Deleting topics is allowed for the owner only (criterion 13).
 - A public or mobile web page for the list (owner decision: Claude on the phone is enough).
 - Reminders and notifications.

@@ -13,6 +13,11 @@
     <a class="btn small danger" style="padding:.25rem .7rem;font-size:.82rem" href="/topics/{{ topic.id }}/delete">{{ t("ui_topic_delete") }}</a>
   </form>
 </div>
+<form class="quick" method="post" action="/topics/{{ topic.id }}/rename" style="margin-bottom:.4rem">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <input type="text" name="name" value="{{ topic.name }}" maxlength="120" required aria-label="{{ t('ui_topic_name') }}" style="flex:1 1 14rem">
+  <button type="submit">{{ t("ui_rename") }}</button>
+</form>
 <h2>{{ t("ui_open_tasks") }}</h2>
 {% if rows %}
 <ul class="list">

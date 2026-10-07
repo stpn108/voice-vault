@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ headline }}{% endblock %}
+{% block content %}
+<div class="card" style="margin-top:1.6rem">
+  <h1 style="margin-bottom:.6rem">{{ headline }}</h1>
+  {% if detail %}<p>{{ detail }}</p>{% endif %}
+  <p class="actions"><a class="btn" href="/">{{ t("ui_nav_recordings") }}</a></p>
+</div>
+{% endblock %}

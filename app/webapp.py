@@ -19,6 +19,7 @@ from fastapi import Depends, FastAPI, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 import recording_service as svc
@@ -94,6 +95,15 @@ async def security_headers(request: Request, call_next):
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["Cache-Control"] = "no-store"
     return response
+
+
+@app.exception_handler(StarletteHTTPException)
+async def error_page(request: Request, exc: StarletteHTTPException) -> HTMLResponse:
+    """A readable page instead of bare JSON; the status code stays."""
+    cfg = load_config()
+    key = {403: "ui_error_forbidden", 404: "ui_error_not_found"}.get(exc.status_code, "ui_error_invalid")
+    return render(request, cfg, "error.html", status_code=exc.status_code, headline=get_text(key, cfg.ui_lang),
+                  detail=str(exc.detail) if exc.status_code == 400 else "")
 
 
 def render(request: Request, cfg: Config, name: str, status_code: int = 200, **context) -> HTMLResponse:
@@ -279,6 +289,19 @@ def topic_exclude(request: Request, name: str = Form("", max_length=todos.TOPIC_
     except todos.TodoError as exc:
         raise _todo_error(exc)
     return RedirectResponse(f"/topics/{topic.id}" if back == "topic" else "/topics", status_code=303)
+
+
+@app.post("/topics/{topic_id}/rename")
+def topic_rename(request: Request, topic_id: int, name: str = Form("", max_length=todos.TOPIC_MAX),
+                 csrf: str = Form(""), session: Session = Depends(get_session)):
+    require_csrf(request, csrf)
+    try:
+        todos.rename_topic(session, topic_id, name)
+    except todos.TodoError as exc:
+        if "no topic" in str(exc):
+            raise HTTPException(status_code=404, detail=str(exc))
+        raise _todo_error(exc)
+    return RedirectResponse(f"/topics/{topic_id}", status_code=303)
 
 
 @app.get("/topics/{topic_id}/delete", response_class=HTMLResponse)

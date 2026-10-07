@@ -164,3 +164,54 @@ def test_req_006_the_list_can_be_sorted_and_flattens_when_not_by_priority(client
     by_title = client.get("/todos?sort=title").text
     assert "<h2 class=\"group-title\"" not in by_title and by_title.index("Apple") < by_title.index("banana")
     assert client.get("/todos?sort=nonsense").status_code == 400
+
+
+# --- renaming ---------------------------------------------------------------------------------------
+def test_req_006_renaming_keeps_tasks_notes_and_the_exclusion(db_session):
+    rec = add_recording(db_session, 1)
+    task = make(db_session, "Plan trip", topic="Travel")
+    svc.add_topic_note(db_session, NOW, topic="Travel", recording_id=rec.id, note="Vienna")
+    svc.set_topic_excluded(db_session, "Travel", True)
+    topic = svc.rename_topic(db_session, tid(db_session, "Travel"), "Reisen / Wien")
+    assert (topic.name, topic.excluded) == ("Reisen / Wien", True)
+    found, entries = svc.topic_timeline(db_session, "reisen / wien")
+    assert found.id == topic.id and any(e["kind"] == "note" for e in entries)
+    db_session.refresh(task)
+    assert task.topic_id == topic.id
+    assert svc.topic_timeline(db_session, "Travel") is None
+
+
+@pytest.mark.parametrize("new_name,message", [("", "must not be empty"), ("   ", "must not be empty"),
+                                              ("x" * 121, "at most 120"), ("OTHER", "exists already")])
+def test_req_006_invalid_renames_are_refused(db_session, new_name, message):
+    make(db_session, "A", topic="Travel")
+    make(db_session, "B", topic="Other")
+    with pytest.raises(TodoError, match=message):
+        svc.rename_topic(db_session, tid(db_session, "Travel"), new_name)
+    assert tid(db_session, "Travel") is not None
+
+
+def test_req_006_a_topic_can_change_only_its_letter_case(db_session):
+    make(db_session, "A", topic="travel")
+    assert svc.rename_topic(db_session, tid(db_session, "travel"), "Travel").name == "Travel"
+
+
+def test_req_006_claude_has_no_rename_tool():
+    assert not [t["name"] for t in mcp_todo_tools.TOOLS if "rename" in t["name"]]
+
+
+def test_req_006_renaming_through_the_ui(client, session_factory):
+    with session_factory() as s:
+        make(s, "Plan trip", topic="Travel")
+    topic = topic_id(session_factory, "Travel")
+    assert 'action="/topics/%d/rename"' % topic in client.get(f"/topics/{topic}").text
+    assert client.post(f"/topics/{topic}/rename", data={"name": "X", "csrf": "bad"}).status_code == 403
+    assert post(client, f"/topics/{topic}/rename", name="Reisen").status_code == 303
+    assert "Reisen" in client.get(f"/topics/{topic}").text
+    assert post(client, f"/topics/{topic}/rename", name="").status_code == 400
+    assert post(client, "/topics/9999/rename", name="Reisen").status_code == 404
+
+
+def test_req_006_errors_show_a_readable_page(client):
+    page = client.get("/topics/9999")
+    assert page.status_code == 404 and "Nicht gefunden" in page.text and "<html" in page.text

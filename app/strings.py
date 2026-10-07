@@ -139,6 +139,11 @@ TEXTS = {
     "ui_topic_delete_text": {"de": "Das Thema und seine {notes} Notiz(en) werden endgültig gelöscht. Die {tasks} Aufgabe(n), davon {open_tasks} offen, bleiben erhalten und verlieren nur das Thema. Das lässt sich pro Aufgabe rückgängig machen.", "en": "The topic and its {notes} note(s) are deleted for good. The {tasks} task(s), {open_tasks} of them open, stay and only lose the topic. That can be undone per task."},
     "ui_topic_delete_exclude": {"de": "Danach ausschließen, damit Claude das Thema nicht neu anlegt", "en": "Exclude it afterwards so Claude does not create it again"},
     "ui_topic_delete_confirm": {"de": "Thema endgültig löschen", "en": "Delete topic for good"},
+    "ui_rename": {"de": "Umbenennen", "en": "Rename"},
+    "ui_topic_name": {"de": "Name des Themas", "en": "Topic name"},
+    "ui_error_not_found": {"de": "Nicht gefunden", "en": "Not found"},
+    "ui_error_forbidden": {"de": "Nicht erlaubt. Seite neu laden und noch einmal versuchen.", "en": "Not allowed. Reload the page and try again."},
+    "ui_error_invalid": {"de": "Das hat nicht geklappt", "en": "That did not work"},
     "ui_cleanup_confirm": {"de": "{count} Aufnahme(n) endgültig verwerfen", "en": "Discard {count} recording(s) for good"},
 }
 

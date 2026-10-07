@@ -229,3 +229,15 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner decision: the topic list grows with every run and holds names he does not want. Tasks are his work and are not thrown away with a label. The exclusion default is there because the routine would otherwise recreate the topic the next morning. Keeping the code in its own module keeps the guarantee that nothing Claude can reach deletes data. |
 | **Rejected alternatives** | (A) delete the tasks of the topic as well: one click could wipe the list; (B) a delete tool for Claude: a prompt injection could remove topics; (C) only hiding topics (exclusion): the list of topics would keep growing; (D) delete without a confirmation page: topic notes cannot be restored. |
 | **Status** | **FINAL** |
+
+
+### D-018: Topics are addressed by id; the owner can rename them (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-07 |
+| **Decision** | Amends D-017. The topic pages use the numeric id (`/topics/{id}`, `/topics/{id}/delete`, `POST /topics/delete` with `topic_id`), not the name, because a name such as "Wiz / DORA-Vertragsrisiko" breaks a path (the slash) and may hold other characters; a name is a label, not an address. The owner renames a topic on its page (`POST /topics/{id}/rename`). A rename keeps tasks, notes and the exclusion flag, since they reference the id. A name another topic already has is refused (case-insensitive); there is no merge. Old task events keep the old name in their JSON, so an undo of an event from before a rename is refused as "changed since" instead of creating the old topic again. The MCP tools still find topics by name, since Claude sees names only, and have no rename tool. Errors in the web UI now show a readable page with the same status code. |
+| **In plain words** | A topic can be called anything and renamed later without anything breaking. |
+| **Reasoning** | Reported by the owner: the delete page for a topic with a slash returned "Not Found". Ids are stable under renaming and need no escaping. |
+| **Rejected alternatives** | (A) escape the name in the path: the server decodes `%2F` before routing, so the slash would still break the route; (B) a name in a query parameter: works, but links would break on every rename; (C) automatic merge on a name clash: silently moves tasks between topics. |
+| **Status** | **FINAL** |
