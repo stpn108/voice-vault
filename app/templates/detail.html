@@ -1,20 +1,22 @@
 {% extends "base.html" %}
 {% block title %}{{ rec.title or t("ui_untitled") }}{% endblock %}
+{% block crumbs %}
+<nav class="crumbs" aria-label="breadcrumb"><a href="/">{{ t("ui_nav_recordings") }}</a><span class="sep">/</span><span aria-current="page">{{ rec.title or t("ui_untitled") }}</span></nav>
+{% endblock %}
 {% block content %}
-<a class="back" href="/">{{ t("ui_back") }}</a>
-<h1>{{ rec.title or t("ui_untitled") }}</h1>
-<p class="muted">
-  {{ rec.started_at | localtime }} · {{ rec.duration_ms | hms }} ·
-  <span class="pill state state-{{ state }}">{{ t("state_" ~ state) }}</span>
-</p>
+<div class="head" style="margin-bottom:.2rem">
+  <h1>{{ rec.title or t("ui_untitled") }}</h1>
+  <span class="pill state-{{ state }}">{{ t("state_" ~ state) }}</span>
+</div>
+<p class="sub">{{ rec.started_at | localtime }} · {{ rec.duration_ms | hms }}</p>
 <h2>{{ t("ui_summary") }}</h2>
 <div class="card"><pre class="text">{{ rec.summary }}</pre></div>
 <h2>{{ t("ui_transcript") }}</h2>
 <div class="card">
 {% for seg in segments %}
 <div class="segment">
-  <span class="muted">{{ seg.start_ms | mmss }}</span>
-  <strong>{{ seg.speaker }}</strong>
+  <span class="at">{{ seg.start_ms | mmss }}</span>
+  <span class="who">{{ seg.speaker }}</span>
   <span>{{ seg.text }}</span>
 </div>
 {% endfor %}

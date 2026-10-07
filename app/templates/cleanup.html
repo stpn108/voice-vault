@@ -1,24 +1,23 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>{{ t("ui_cleanup") }}</h1>
+<div class="head" style="margin-top:1.6rem"><h1>{{ t("ui_cleanup") }}</h1></div>
 {% if changed %}<p class="notice">{{ t("ui_cleanup_changed") }}</p>{% endif %}
-<form method="get" action="/cleanup">
-  <label>{{ t("ui_cleanup_text") }}
-    <input type="number" name="days" value="{{ days }}" min="1" max="3650">
-  </label>
+<form class="card quick" method="get" action="/cleanup">
+  <label>{{ t("ui_cleanup_text") }}</label>
+  <input type="number" name="days" value="{{ days }}" min="1" max="3650" style="width:6rem">
   <button type="submit">{{ t("ui_cleanup_show") }}</button>
 </form>
-<div class="card"><p><strong>{{ t("ui_cleanup_count", count=count, days=days) }}</strong></p>
+<div class="card">
+<p style="margin-top:0"><strong>{{ t("ui_cleanup_count", count=count, days=days) }}</strong></p>
 {% if count > 0 %}
 <p>{{ t("ui_discard_text") }}</p>
-<p>{{ plaud_note }}</p>
+<p class="notice">{{ plaud_note }}</p>
 <form method="post" action="/cleanup">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <input type="hidden" name="days" value="{{ days }}">
   <input type="hidden" name="expected_count" value="{{ count }}">
   <button class="danger" type="submit">{{ t("ui_cleanup_confirm", count=count) }}</button>
-</form></div>
-{% else %}</div>
+</form>
 {% endif %}
-<a class="back" href="/">{{ t("ui_back") }}</a>
+</div>
 {% endblock %}

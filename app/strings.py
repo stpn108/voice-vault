@@ -118,6 +118,12 @@ TEXTS = {
     "ui_topic_allow": {"de": "Wieder zulassen", "en": "Allow again"},
     "ui_topic_exclude_hint": {"de": "Ausgeschlossene Themen bekommen keine neuen Aufgaben und Notizen. Ihre Aufgaben erscheinen nicht in der Liste. Claude liest die Aufnahmen trotzdem.", "en": "Excluded topics get no new tasks or notes. Their tasks are hidden from the list. Claude still reads the recordings."},
     "ui_topic_exclude_name": {"de": "Thema ausschließen (Name)", "en": "Exclude a topic (name)"},
+    "ui_filter_clear": {"de": "Filter aufheben", "en": "Clear filter"},
+    "ui_due": {"de": "Fällig", "en": "Due"},
+    "ui_overdue": {"de": "Überfällig", "en": "Overdue"},
+    "ui_todo_drop_short": {"de": "Nicht relevant", "en": "Not relevant"},
+    "ui_detail": {"de": "Details", "en": "Details"},
+    "ui_status": {"de": "Status", "en": "Status"},
     "ui_cleanup_confirm": {"de": "{count} Aufnahme(n) endgültig verwerfen", "en": "Discard {count} recording(s) for good"},
 }
 

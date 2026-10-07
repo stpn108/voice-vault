@@ -26,6 +26,7 @@ import recording_service as svc
 import todo_service as todos
 from config import Config, load_config
 from database import engine, migrate_schema
+from markdown_lite import render_markdown
 from strings import get_text
 from utils import LOCAL_TZ, now_utc, setup_logging
 
@@ -81,7 +82,7 @@ def _mmss(ms) -> str:
     return f"{total // 60:02d}:{total % 60:02d}"
 
 
-templates.env.filters.update(localtime=_localtime, hms=_hms, mmss=_mmss)
+templates.env.filters.update(localtime=_localtime, hms=_hms, mmss=_mmss, md=render_markdown)
 
 
 @app.middleware("http")
@@ -192,6 +193,7 @@ def todo_list(request: Request, status: str = Query("open", max_length=10), topi
     rows, truncated = todos.list_todos(session, now_utc(), status=status, topic=topic or None,
                                        limit=todos.LIST_LIMIT_MAX)
     return render(request, cfg, "todos.html", rows=rows, truncated=truncated, status=status, topic=topic,
+                  today=now_utc().astimezone(LOCAL_TZ).date(),
                   counts=todos.counts(session), statuses=todos.STATUSES, priorities=todos.PRIORITIES)
 
 
