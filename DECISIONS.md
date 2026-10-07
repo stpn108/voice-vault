@@ -207,3 +207,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner decision: the list to tick off must stay short and his own; follow-up on others is a different kind of tracking. A flag that only the owner can set keeps a prompt injection from lifting an exclusion. |
 | **Rejected alternatives** | (A) an assignee field on each task and a second list for others: the owner wants tracking of others elsewhere; (B) hiding excluded topics only in the UI: Claude would still file tasks and notes into them; (C) stopping Claude from reading such recordings: the topic is only known after reading, and a transcript can touch several topics; (D) a Claude tool to exclude topics: weakens the guarantee. |
 | **Status** | **FINAL** |
+
+### D-016: Daily overviews are dated by the day of the conversations (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-07 |
+| **Decision** | Amends D-013. A digest belongs to the day the recordings were made, taken from the Plaud start time in local time with the 04:00 day boundary (`utils.local_day`, `utils.day_bounds`), not to the day the routine runs. `save_digest` is refused for a day on which no stored, not discarded recording started, and the error lists the recent days that have recordings. A run over several days writes one digest per day and extends an existing one instead of replacing it blindly. The UI lists the recordings of the shown day. |
+| **In plain words** | The overview of Tuesday's conversations is filed under Tuesday, even though the routine runs on Wednesday morning. |
+| **Reasoning** | Owner decision: the routine runs the morning after, so the run date would always be one day too late. The server checks the date because a prompt cannot be relied on to get it right every day. |
+| **Rejected alternatives** | (A) trust the day Claude passes: a wrong date goes unnoticed and files the overview in the wrong place; (B) the server picks the day from the recordings and ignores the argument: a run over a weekend could not be split into days; (C) UTC midnight as the day boundary: late-evening recordings would land on the next day. |
+| **Status** | **FINAL** |

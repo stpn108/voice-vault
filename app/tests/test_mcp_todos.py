@@ -5,7 +5,7 @@ from sqlalchemy import select
 
 import mcp_server
 from database import Recording, Todo, TodoEvent
-from tests.helpers import add_recording
+from tests.helpers import add_recording, add_recording_on
 from tests.mcp_helpers import call, make_cfg, text_of
 
 
@@ -102,7 +102,9 @@ def test_req_006_topic_notes_timeline_and_overview(client, rec_id):
     assert "Budget | open tasks 1 | notes 1" in text_of(call(client, "list_topics"))
 
 
-def test_req_006_digest_is_replaced_per_day(client):
+def test_req_006_digest_is_replaced_per_day(client, session_factory):
+    with session_factory() as s:
+        add_recording_on(s, "2026-10-05", "2026-10-06")
     call(client, "save_digest", {"day": "2026-10-05", "body": "first"})
     call(client, "save_digest", {"day": "2026-10-05", "body": "second"})
     call(client, "save_digest", {"day": "2026-10-06", "body": "other"})
@@ -132,3 +134,10 @@ def test_req_006_excluded_topic_is_refused_and_flagged_for_claude(client, sessio
     assert "Private | open tasks 0 | notes 0" in text_of(call(client, "list_topics"))
     assert "EXCLUDED by owner" in text_of(call(client, "list_topics"))
     assert is_error(call(client, "get_topic", {"name": "Private"}))
+
+
+def test_req_006_digest_for_the_run_date_without_recordings_is_refused(client, session_factory):
+    with session_factory() as s:
+        add_recording_on(s, "2026-10-06")
+    refused = call(client, "save_digest", {"day": "2026-10-07", "body": "b"})
+    assert is_error(refused) and "2026-10-06" in text_of(refused)

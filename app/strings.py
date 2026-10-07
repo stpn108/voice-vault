@@ -124,6 +124,9 @@ TEXTS = {
     "ui_todo_drop_short": {"de": "Nicht relevant", "en": "Not relevant"},
     "ui_detail": {"de": "Details", "en": "Details"},
     "ui_status": {"de": "Status", "en": "Status"},
+    "ui_older": {"de": "Älter", "en": "Older"},
+    "ui_newer": {"de": "Neuer", "en": "Newer"},
+    "ui_day_recordings": {"de": "Aufnahmen dieses Tages", "en": "Recordings of this day"},
     "ui_cleanup_confirm": {"de": "{count} Aufnahme(n) endgültig verwerfen", "en": "Discard {count} recording(s) for good"},
 }
 

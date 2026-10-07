@@ -94,9 +94,13 @@ TOOLS = [
     },
     {
         "name": "save_digest",
-        "description": "Save the daily overview for a day (Markdown). Saving again for the same day replaces it.",
+        "description": "Save the overview of one day of CONVERSATIONS (Markdown), not the day the routine runs: "
+                       "use the date the recordings were made (local time; a day runs from 04:00 to 04:00). One "
+                       "overview per recording day; if the run covers several days, call this once per day. "
+                       "Saving again for the same day replaces it, so read list_digests for that day first and extend it. "
+                       "Rejected for a day without recordings.",
         "inputSchema": {**_props(
-            day={"type": "string", "description": "Date, YYYY-MM-DD."},
+            day={"type": "string", "description": "Date of the conversations, YYYY-MM-DD."},
             body={"type": "string", "maxLength": svc.DIGEST_MAX}), "required": ["day", "body"]},
         "annotations": WRITE,
     },
