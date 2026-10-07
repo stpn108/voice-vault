@@ -14,7 +14,6 @@ import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Iterator
-from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -279,13 +278,13 @@ def topic_exclude(request: Request, name: str = Form("", max_length=todos.TOPIC_
         topic = todos.set_topic_excluded(session, name, excluded == "1")
     except todos.TodoError as exc:
         raise _todo_error(exc)
-    return RedirectResponse(f"/topics/{quote(topic.name)}" if back == "topic" else "/topics", status_code=303)
+    return RedirectResponse(f"/topics/{topic.id}" if back == "topic" else "/topics", status_code=303)
 
 
-@app.get("/topics/{name}/delete", response_class=HTMLResponse)
-def topic_delete_confirm(request: Request, name: str, session: Session = Depends(get_session),
+@app.get("/topics/{topic_id}/delete", response_class=HTMLResponse)
+def topic_delete_confirm(request: Request, topic_id: int, session: Session = Depends(get_session),
                          cfg: Config = Depends(get_config)):
-    found = topic_admin.topic_counts(session, name)
+    found = topic_admin.topic_counts(session, topic_id)
     if found is None:
         raise HTTPException(status_code=404, detail="topic not found")
     topic, open_tasks, tasks, notes = found
@@ -294,18 +293,18 @@ def topic_delete_confirm(request: Request, name: str, session: Session = Depends
 
 
 @app.post("/topics/delete")
-def topic_delete(request: Request, name: str = Form("", max_length=todos.TOPIC_MAX), exclude: str = Form(""),
+def topic_delete(request: Request, topic_id: int = Form(...), exclude: str = Form(""),
                  csrf: str = Form(""), session: Session = Depends(get_session)):
     require_csrf(request, csrf)
-    if topic_admin.delete_topic(session, now_utc(), name, keep_excluded=exclude == "1") is None:
+    if topic_admin.delete_topic(session, now_utc(), topic_id, keep_excluded=exclude == "1") is None:
         raise HTTPException(status_code=404, detail="topic not found")
     return RedirectResponse("/topics", status_code=303)
 
 
-@app.get("/topics/{name}", response_class=HTMLResponse)
-def topic_detail(request: Request, name: str, session: Session = Depends(get_session),
+@app.get("/topics/{topic_id}", response_class=HTMLResponse)
+def topic_detail(request: Request, topic_id: int, session: Session = Depends(get_session),
                  cfg: Config = Depends(get_config)):
-    found = todos.topic_timeline(session, name)
+    found = todos.topic_timeline_by_id(session, topic_id)
     if found is None:
         raise HTTPException(status_code=404, detail="topic not found")
     topic, entries = found

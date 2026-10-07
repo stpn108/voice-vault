@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ t("ui_topic_delete_title") }}{% endblock %}
 {% block crumbs %}
-<nav class="crumbs" aria-label="breadcrumb"><a href="/topics">{{ t("ui_nav_topics") }}</a><span class="sep">/</span><a href="/topics/{{ topic.name | urlencode }}">{{ topic.name }}</a><span class="sep">/</span><span aria-current="page">{{ t("ui_topic_delete") }}</span></nav>
+<nav class="crumbs" aria-label="breadcrumb"><a href="/topics">{{ t("ui_nav_topics") }}</a><span class="sep">/</span><a href="/topics/{{ topic.id }}">{{ topic.name }}</a><span class="sep">/</span><span aria-current="page">{{ t("ui_topic_delete") }}</span></nav>
 {% endblock %}
 {% block content %}
 <div class="card">
@@ -9,11 +9,11 @@
 <p><strong>{{ topic.name }}</strong></p>
 <p>{{ t("ui_topic_delete_text", tasks=tasks, open_tasks=open_tasks, notes=notes) }}</p>
 <form method="post" action="/topics/delete">
-  <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="name" value="{{ topic.name }}">
+  <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="topic_id" value="{{ topic.id }}">
   <p><label><input type="checkbox" name="exclude" value="1" checked> {{ t("ui_topic_delete_exclude") }}</label></p>
   <div class="actions">
     <button class="danger" type="submit">{{ t("ui_topic_delete_confirm") }}</button>
-    <a class="btn" href="/topics/{{ topic.name | urlencode }}">{{ t("ui_cancel") }}</a>
+    <a class="btn" href="/topics/{{ topic.id }}">{{ t("ui_cancel") }}</a>
   </div>
 </form>
 </div>

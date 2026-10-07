@@ -57,6 +57,7 @@ class TodoRow:
     created_at: dt.datetime
     done_at: Optional[dt.datetime]
     age_days: int
+    topic_id: Optional[int] = None
 
 
 # --- validation -------------------------------------------------------------------------
@@ -337,7 +338,7 @@ def _rows(session: Session, todos: list, now: dt.datetime) -> list:
     return [
         TodoRow(t.id, t.title, t.detail, t.priority, t.status, t.due_date, topics.get(t.topic_id), t.recording_id,
                 t.created_by, as_utc(t.created_at), as_utc(t.done_at) if t.done_at else None,
-                max((now - as_utc(t.created_at)).days, 0))
+                max((now - as_utc(t.created_at)).days, 0), t.topic_id)
         for t in todos
     ]
 
@@ -436,10 +437,19 @@ def list_topics(session: Session) -> list:
 
 
 def topic_timeline(session: Session, name: str):
-    """Everything about one topic, newest first: (topic, entries) or None. Entry is a dict."""
+    """Everything about one topic, found by name (MCP): (topic, entries) or None."""
     topic = session.scalar(select(Topic).where(func.lower(Topic.name) == name.strip().lower()))
-    if topic is None:
-        return None
+    return None if topic is None else (topic, _timeline(session, topic))
+
+
+def topic_timeline_by_id(session: Session, topic_id: int):
+    """The same, found by id (web UI; ids are safe in addresses, names are not): (topic, entries) or None."""
+    topic = session.get(Topic, topic_id)
+    return None if topic is None else (topic, _timeline(session, topic))
+
+
+def _timeline(session: Session, topic: Topic) -> list:
+    """Notes and task events of a topic, newest first. Each entry is a dict."""
     entries = []
     for note in session.scalars(select(TopicNote).where(TopicNote.topic_id == topic.id)):
         rec = session.get(Recording, note.recording_id)
@@ -451,7 +461,7 @@ def topic_timeline(session: Session, name: str):
             entries.append({"kind": event.kind, "at": as_utc(event.created_at), "text": text,
                             "recording_id": event.recording_id, "todo_id": todo.id, "actor": event.actor})
     entries.sort(key=lambda e: e["at"], reverse=True)
-    return topic, entries
+    return entries
 
 
 # --- daily overviews ---------------------------------------------------------------------------

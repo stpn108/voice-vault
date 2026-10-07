@@ -16,9 +16,9 @@ from database import Todo, Topic, TopicNote
 log = logging.getLogger(__name__)
 
 
-def topic_counts(session: Session, name: str) -> Optional[tuple]:
+def topic_counts(session: Session, topic_id: int) -> Optional[tuple]:
     """(topic, open tasks, all tasks, notes) or None for an unknown topic."""
-    topic = session.scalar(select(Topic).where(func.lower(Topic.name) == name.strip().lower()))
+    topic = session.get(Topic, topic_id)
     if topic is None:
         return None
     tasks = session.scalars(select(Todo).where(Todo.topic_id == topic.id)).all()
@@ -26,13 +26,13 @@ def topic_counts(session: Session, name: str) -> Optional[tuple]:
     return topic, sum(1 for t in tasks if t.status == "open"), len(tasks), notes
 
 
-def delete_topic(session: Session, now: dt.datetime, name: str, *, keep_excluded: bool = False) -> Optional[dict]:
+def delete_topic(session: Session, now: dt.datetime, topic_id: int, *, keep_excluded: bool = False) -> Optional[dict]:
     """Delete a topic and its notes. Its tasks stay, without a topic, each change logged and undoable.
 
     With `keep_excluded` the topic row stays as an excluded topic, so the routine does not
     create it again from the next conversation. Returns what was removed, or None if unknown.
     """
-    found = topic_counts(session, name)
+    found = topic_counts(session, topic_id)
     if found is None:
         return None
     topic, _, tasks, notes = found

@@ -97,7 +97,7 @@ def test_req_006_invalid_input_is_rejected(client, make_todo, url, data):
     assert post(client, url, **data).status_code in (400, 422)
 
 
-@pytest.mark.parametrize("url", ["/todos/999", "/topics/Nothing"])
+@pytest.mark.parametrize("url", ["/todos/999", "/topics/999"])
 def test_req_006_unknown_ids_are_404(client, url):
     assert client.get(url).status_code == 404
 
@@ -111,7 +111,10 @@ def test_req_006_topics_timeline_and_digests_render(client, make_todo, session_f
         svc.add_topic_note(s, now_utc(), topic="Budget", recording_id=rec_id, note="Estimate 12k")
         svc.save_digest(s, now_utc(), dt.date(2026, 10, 5), "Today: <b>budget</b>")
     assert "Budget" in client.get("/topics").text
-    topic = client.get("/topics/budget").text
+    from database import Topic
+    with session_factory() as s:
+        budget_id = s.scalar(select(Topic.id).where(Topic.name == "Budget"))
+    topic = client.get(f"/topics/{budget_id}").text
     assert "Estimate 12k" in topic and "Prepare budget" in topic
     digests = client.get("/digests").text
     assert "05.10.2026" in digests and "&lt;b&gt;budget" in digests

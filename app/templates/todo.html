@@ -13,7 +13,7 @@
   </div>
   <p class="sub" style="margin:0 0 1.2rem">{{ t("ui_created_by") }} {{ row.created_by }}, {{ row.created_at | localtime }}
     {% if row.recording_id %} · <a href="/recordings/{{ row.recording_id }}">{{ t("ui_recording") }} {{ row.recording_id }}</a>{% endif %}
-    {% if row.topic %} · <a href="/topics/{{ row.topic | urlencode }}">{{ row.topic }}</a>{% endif %}</p>
+    {% if row.topic %} · <a href="/topics/{{ row.topic_id }}">{{ row.topic }}</a>{% endif %}</p>
   <div class="split">
     <div class="card"><label class="field"><span>{{ t("ui_detail") }}</span>
       <textarea name="detail" rows="8" maxlength="4000">{{ row.detail }}</textarea></label></div>
