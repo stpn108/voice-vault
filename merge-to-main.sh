@@ -10,6 +10,25 @@ fi
 
 echo "Merge ${BRANCH} → main"
 
+# Take over what others pushed to the feature branch meanwhile (another clone, a Claude
+# session, the version-bump Action). Without this the final push is rejected and what was
+# pushed there is missing from main. A merge, never a rebase or force: nothing is rewritten.
+# A conflict in VERSION alone is settled by keeping the local file; the version is taken
+# from main below anyway.
+if git fetch -q origin "$BRANCH" 2>/dev/null; then
+    if ! git merge --no-edit "origin/${BRANCH}"; then
+        if [ "$(git diff --name-only --diff-filter=U)" = "VERSION" ]; then
+            git checkout --ours VERSION
+            git add VERSION
+            git commit --no-edit
+        else
+            git merge --abort
+            echo "Conflict while merging origin/${BRANCH} into ${BRANCH}. Resolve it by hand, then run again." >&2
+            exit 1
+        fi
+    fi
+fi
+
 git switch main
 
 # Sync local main with origin BEFORE attempting the merge so a moving
@@ -33,7 +52,7 @@ git push
 
 echo "Waiting for version-bump (GitHub Action)..."
 sleep 15
-git pull origin main
+git pull --ff-only origin main
 echo "Version: $(cat VERSION)"
 
 # Fast-forward feature branch to main (including version bump).
