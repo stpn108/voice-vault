@@ -13,18 +13,7 @@ import mcp_tools
 from config import load_config
 from database import Recording, Segment
 from tests.helpers import add_recording
-
-TOKEN = "t" * 40
-OTHER_TOKEN = "o" * 40
-AUTH = {"Authorization": f"Bearer {TOKEN}"}
-
-
-def make_cfg(**overrides):
-    base = dict(mcp_tokens=(TOKEN,), mcp_allowed_hosts=("mcp.example.org",),
-                mcp_allowed_origins=("https://allowed.example",))
-    base.update(overrides)
-    return dataclasses.replace(load_config(), **base)
-
+from tests.mcp_helpers import AUTH, OTHER_TOKEN, TOKEN, call, make_cfg, rpc, text_of
 
 @pytest.fixture
 def client(session_factory):
@@ -38,21 +27,6 @@ def seed(session_factory):
         with session_factory() as s:
             return add_recording(s, **kwargs).id
     return add
-
-
-def rpc(client, method, params=None, id=1, headers=AUTH, **kwargs):
-    message = {"jsonrpc": "2.0", "method": method, "id": id}
-    if params is not None:
-        message["params"] = params
-    return client.post("/mcp", json=message, headers=headers, **kwargs)
-
-
-def call(client, name, arguments=None):
-    return rpc(client, "tools/call", {"name": name, "arguments": arguments or {}})
-
-
-def text_of(response):
-    return response.json()["result"]["content"][0]["text"]
 
 
 # --- start-up safety ---------------------------------------------------------
@@ -224,12 +198,19 @@ def test_unknown_methods_are_32601(client, method):
     assert rpc(client, method).json()["error"]["code"] == -32601
 
 
-def test_tools_list_names_two_read_only_tools(client):
+def test_tools_list_has_no_delete_tool_and_marks_write_tools(client):
     tools = rpc(client, "tools/list").json()["result"]["tools"]
-    assert [t["name"] for t in tools] == ["list_recordings", "get_recording"]
+    names = [t["name"] for t in tools]
+    assert names[:2] == ["list_recordings", "get_recording"]
+    writers = {"add_todo", "update_todo", "add_topic_note", "mark_recording_analyzed", "save_digest"}
+    assert writers <= set(names)
     for tool in tools:
-        assert tool["annotations"]["readOnlyHint"] is True and tool["annotations"]["destructiveHint"] is False
-        assert tool["inputSchema"]["type"] == "object" and "untrusted" in tool["description"]
+        assert not any(word in tool["name"] for word in ("delete", "remove", "discard", "trash"))
+        assert tool["annotations"]["destructiveHint"] is False
+        assert tool["annotations"]["readOnlyHint"] is (tool["name"] not in writers)
+        assert tool["inputSchema"]["type"] == "object"
+    for tool in tools[:2]:
+        assert "untrusted" in tool["description"]
 
 
 # --- list_recordings -------------------------------------------------------------

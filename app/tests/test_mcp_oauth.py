@@ -355,7 +355,7 @@ def test_req_005_the_access_token_opens_the_mcp_endpoint(client):
     assert mcp_ping(client, token).status_code == 200
     tools = client.post("/mcp", json={"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
                         headers={"Authorization": f"Bearer {token}"}).json()
-    assert [t["name"] for t in tools["result"]["tools"]] == ["list_recordings", "get_recording"]
+    assert [t["name"] for t in tools["result"]["tools"]][:2] == ["list_recordings", "get_recording"]
 
 
 def test_the_refresh_token_does_not_open_the_mcp_endpoint(client):

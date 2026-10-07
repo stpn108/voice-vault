@@ -34,6 +34,7 @@ class RecordingRow:
     duration_ms: int
     state: str
     excerpt: str = ""
+    analyzed: bool = False
 
 
 @dataclass
@@ -106,13 +107,16 @@ def make_excerpt(text: str, max_chars: int = EXCERPT_CHARS) -> str:
 
 def list_recordings(session: Session, now: dt.datetime, stability_minutes: int,
                     query: str = "", cursor: Optional[str] = None, limit: int = PAGE_SIZE,
-                    since: Optional[dt.datetime] = None, until: Optional[dt.datetime] = None) -> Page:
+                    since: Optional[dt.datetime] = None, until: Optional[dt.datetime] = None,
+                    unanalyzed_only: bool = False) -> Page:
     """Newest first, keyset paging (no offset), optional case-insensitive search.
 
     `since` is inclusive, `until` exclusive, both compared with the start of the recording.
     """
     limit = min(max(limit, 1), PAGE_SIZE)
     stmt = select(Recording).where(_visible())
+    if unanalyzed_only:
+        stmt = stmt.where(Recording.analyzed_at.is_(None))
     if since is not None:
         stmt = stmt.where(Recording.started_at >= as_utc(since))
     if until is not None:
@@ -140,7 +144,7 @@ def list_recordings(session: Session, now: dt.datetime, stability_minutes: int,
     next_cursor = encode_cursor(page[-1].started_at, page[-1].id) if len(found) > limit else None
     rows = [
         RecordingRow(r.id, r.title, as_utc(r.started_at), r.duration_ms,
-                     recording_state(r, now, stability_minutes), make_excerpt(r.summary))
+                     recording_state(r, now, stability_minutes), make_excerpt(r.summary), r.analyzed_at is not None)
         for r in page
     ]
     return Page(rows, next_cursor)

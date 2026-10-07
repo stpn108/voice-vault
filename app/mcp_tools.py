@@ -1,7 +1,7 @@
 """
-Read-only MCP tools over the stored recordings (REQ-003, D-011).
+MCP tools over the stored recordings (REQ-003, D-011) plus the task tools of mcp_todo_tools.
 
-Every tool only reads. Arguments are validated here; a bad argument raises
+The tools in this module only read. Arguments are validated here; a bad argument raises
 ToolArgumentError, which the adapter turns into a JSON-RPC "invalid params" error.
 """
 import datetime as dt
@@ -9,7 +9,9 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
+import mcp_todo_tools
 import recording_service as svc
+from mcp_args import ToolArgumentError, bool_arg, int_arg, str_arg, text_result
 from utils import LOCAL_TZ, as_utc
 
 DEFAULT_LIST_LIMIT = 20
@@ -42,6 +44,8 @@ TOOLS = [
                           "description": "Only recordings starting before this date or datetime (a plain date means that day is excluded)."},
                 "limit": {"type": "integer", "minimum": 1, "maximum": MAX_LIST_LIMIT, "default": DEFAULT_LIST_LIMIT},
                 "cursor": {"type": "string", "description": "next_cursor of the previous result."},
+                "unanalyzed_only": {"type": "boolean", "default": False,
+                                    "description": "Only recordings that were not yet marked with mark_recording_analyzed."},
             },
             "additionalProperties": False,
         },
@@ -69,26 +73,6 @@ TOOLS = [
         "annotations": READ_ONLY,
     },
 ]
-
-
-class ToolArgumentError(ValueError):
-    """The arguments do not match the tool's input schema."""
-
-
-def _int(arguments: dict, name: str, default: Optional[int], low: int, high: int) -> Optional[int]:
-    value = arguments.get(name, default)
-    if value is None:
-        return None
-    if isinstance(value, bool) or not isinstance(value, int) or not low <= value <= high:
-        raise ToolArgumentError(f"'{name}' must be an integer between {low} and {high}")
-    return value
-
-
-def _str(arguments: dict, name: str, max_chars: int) -> str:
-    value = arguments.get(name, "")
-    if not isinstance(value, str) or len(value) > max_chars:
-        raise ToolArgumentError(f"'{name}' must be a string of at most {max_chars} characters")
-    return value
 
 
 def parse_when(value: str, name: str, date_means_next_day: bool = False) -> Optional[dt.datetime]:
@@ -122,42 +106,41 @@ def _mmss(ms: Optional[int]) -> str:
     return f"{total // 60:02d}:{total % 60:02d}"
 
 
-def _text(text: str, is_error: bool = False) -> dict:
-    return {"content": [{"type": "text", "text": text}], "isError": is_error}
-
-
 def list_recordings_tool(session: Session, arguments: dict, now: dt.datetime, stability_minutes: int) -> dict:
-    query = _str(arguments, "query", MAX_QUERY_CHARS)
-    limit = _int(arguments, "limit", DEFAULT_LIST_LIMIT, 1, MAX_LIST_LIMIT)
-    cursor = _str(arguments, "cursor", 200)
-    since = parse_when(_str(arguments, "since", 40), "since")
-    until = parse_when(_str(arguments, "until", 40), "until", date_means_next_day=True)
+    query = str_arg(arguments, "query", MAX_QUERY_CHARS)
+    limit = int_arg(arguments, "limit", DEFAULT_LIST_LIMIT, 1, MAX_LIST_LIMIT)
+    cursor = str_arg(arguments, "cursor", 200)
+    unanalyzed_only = bool_arg(arguments, "unanalyzed_only")
+    since = parse_when(str_arg(arguments, "since", 40), "since")
+    until = parse_when(str_arg(arguments, "until", 40), "until", date_means_next_day=True)
     try:
-        page = svc.list_recordings(session, now, stability_minutes, query, cursor or None, limit, since, until)
+        page = svc.list_recordings(session, now, stability_minutes, query, cursor or None, limit, since, until,
+                                   unanalyzed_only)
     except ValueError:
         raise ToolArgumentError("'cursor' is not a cursor returned by this tool")
     if not page.rows:
-        return _text("No recordings found.")
+        return text_result("No recordings found.")
     lines = []
     for row in page.rows:
-        lines.append(f"id {row.id} | {_local(row.started_at)} | {_hms(row.duration_ms)} | {row.state} | "
+        state = row.state + (", analyzed" if row.analyzed else "")
+        lines.append(f"id {row.id} | {_local(row.started_at)} | {_hms(row.duration_ms)} | {state} | "
                      f"{row.title or '(untitled)'}")
         if row.excerpt:
             lines.append("    " + row.excerpt)
     if page.next_cursor:
         lines.append(f"next_cursor: {page.next_cursor}")
-    return _text("\n".join(lines))
+    return text_result("\n".join(lines))
 
 
 def get_recording_tool(session: Session, arguments: dict, now: dt.datetime, stability_minutes: int) -> dict:
-    rec_id = _int(arguments, "id", None, 1, 2**31 - 1)
+    rec_id = int_arg(arguments, "id", None, 1, 2**31 - 1)
     if rec_id is None:
         raise ToolArgumentError("'id' is required")
-    offset = _int(arguments, "segment_offset", 0, 0, 10**9)
-    limit = _int(arguments, "segment_limit", DEFAULT_SEGMENT_LIMIT, 1, MAX_SEGMENT_LIMIT)
+    offset = int_arg(arguments, "segment_offset", 0, 0, 10**9)
+    limit = int_arg(arguments, "segment_limit", DEFAULT_SEGMENT_LIMIT, 1, MAX_SEGMENT_LIMIT)
     found = svc.get_detail(session, rec_id)
     if found is None:
-        return _text(f"No recording with id {rec_id}.", is_error=True)
+        return text_result(f"No recording with id {rec_id}.", is_error=True)
     rec, _all_segments = found
     segments = svc.get_segments(session, rec.id, offset, limit)
     state = svc.recording_state(rec, now, stability_minutes)
@@ -175,10 +158,12 @@ def get_recording_tool(session: Session, arguments: dict, now: dt.datetime, stab
     lines += [f"[{_mmss(s.start_ms)}] {s.speaker or 'Speaker'}: {s.text}" for s in segments]
     if offset + len(segments) < total:
         lines.append(f"next_segment_offset: {offset + len(segments)}")
-    return _text("\n".join(lines))
+    return text_result("\n".join(lines))
 
 
-HANDLERS = {"list_recordings": list_recordings_tool, "get_recording": get_recording_tool}
+HANDLERS = {"list_recordings": list_recordings_tool, "get_recording": get_recording_tool,
+            **mcp_todo_tools.HANDLERS}
+TOOLS = TOOLS + mcp_todo_tools.TOOLS
 
 
 def call_tool(session: Session, name: str, arguments: object, now: dt.datetime, stability_minutes: int) -> dict:
@@ -189,7 +174,7 @@ def call_tool(session: Session, name: str, arguments: object, now: dt.datetime, 
         arguments = {}
     if not isinstance(arguments, dict):
         raise ToolArgumentError("arguments must be an object")
-    unknown = set(arguments) - set(next(t for t in TOOLS if t["name"] == name)["inputSchema"]["properties"])
+    unknown = set(arguments) - set(next(tool for tool in TOOLS if tool["name"] == name)["inputSchema"]["properties"])
     if unknown:
         raise ToolArgumentError(f"unknown argument(s): {', '.join(sorted(unknown))}")
     return handler(session, arguments, now, stability_minutes)
