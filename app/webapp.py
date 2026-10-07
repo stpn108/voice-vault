@@ -147,6 +147,18 @@ def detail(request: Request, recording_id: int, session: Session = Depends(get_s
     return render(request, cfg, "detail.html", rec=rec, segments=segments, state=state)
 
 
+@app.post("/recordings/{recording_id}/unanalyze")
+def recording_unanalyze(request: Request, recording_id: int, csrf: str = Form(""),
+                        session: Session = Depends(get_session)):
+    """Let the routine read the recording again."""
+    require_csrf(request, csrf)
+    try:
+        todos.unmark_analyzed(session, recording_id)
+    except todos.TodoError:
+        raise HTTPException(status_code=404, detail="recording not found")
+    return RedirectResponse(f"/recordings/{recording_id}", status_code=303)
+
+
 @app.get("/recordings/{recording_id}/discard", response_class=HTMLResponse)
 def discard_confirm(request: Request, recording_id: int, session: Session = Depends(get_session),
                     cfg: Config = Depends(get_config)):
@@ -353,5 +365,6 @@ def digest_page(request: Request, day: str = "", session: Session = Depends(get_
             raise HTTPException(status_code=404, detail="overview not found")
     older, newer = todos.digest_neighbours(session, digest.day) if digest else (None, None)
     day_recordings = todos.recordings_of_day(session, digest.day) if digest else []
+    versions = todos.digest_versions(session, digest.day) if digest else []
     return render(request, cfg, "digests.html", digest=digest, recent=recent, older=older, newer=newer,
-                  day_recordings=day_recordings)
+                  day_recordings=day_recordings, versions=versions)

@@ -125,15 +125,16 @@ def test_req_006_analyzed_flag_filters_recordings(client, session_factory):
         assert s.get(Recording, first).analyzed_at is not None
 
 
-def test_req_006_excluded_topic_is_refused_and_flagged_for_claude(client, session_factory):
+def test_req_006_excluded_topic_is_refused_and_not_named_for_claude(client, session_factory):
     import todo_service as svc
     with session_factory() as s:
         svc.set_topic_excluded(s, "Private", True)
     refused = call(client, "add_todo", {"title": "Secret", "topic": "private"})
     assert is_error(refused) and "excluded by the owner" in text_of(refused)
-    assert "Private | open tasks 0 | notes 0" in text_of(call(client, "list_topics"))
-    assert "EXCLUDED by owner" in text_of(call(client, "list_topics"))
-    assert is_error(call(client, "get_topic", {"name": "Private"}))
+    listing = text_of(call(client, "list_topics"))
+    assert "Private" not in listing and "1 further topic(s) are excluded" in listing
+    unknown = call(client, "get_topic", {"name": "Private"})
+    assert is_error(unknown) and "Unknown topic" in text_of(unknown)
 
 
 def test_req_006_digest_for_the_run_date_without_recordings_is_refused(client, session_factory):
@@ -141,3 +142,55 @@ def test_req_006_digest_for_the_run_date_without_recordings_is_refused(client, s
         add_recording_on(s, "2026-10-06")
     refused = call(client, "save_digest", {"day": "2026-10-07", "body": "b"})
     assert is_error(refused) and "2026-10-06" in text_of(refused)
+
+
+# --- findings of the security review (D-020) --------------------------------------------------------
+@pytest.fixture
+def secret_task(session_factory):
+    import todo_service as svc
+    from utils import now_utc
+    with session_factory() as s:
+        task = svc.create_todo(s, now_utc(), title="Secret divorce lawyer meeting", actor="owner", topic="Private")
+        svc.set_topic_excluded(s, "Private", True)
+        return task.id
+
+
+def test_review_a_task_in_an_excluded_topic_cannot_be_probed_through_the_duplicate_check(client, secret_task):
+    response = call(client, "add_todo", {"title": "Secret divorce lawyer meeting call"})
+    assert not is_error(response) and "similar" not in text_of(response)
+
+
+def test_review_claude_cannot_change_or_move_a_task_in_an_excluded_topic(client, secret_task, session_factory):
+    for arguments in ({"title": "pwned"}, {"topic": ""}, {"status": "done"}):
+        response = call(client, "update_todo", {"id": secret_task, **arguments})
+        assert is_error(response) and text_of(response) == f"no task with id {secret_task}"
+    with session_factory() as s:
+        task = s.get(Todo, secret_task)
+        assert (task.title, task.status) == ("Secret divorce lawyer meeting", "open") and task.topic_id is not None
+    assert text_of(call(client, "update_todo", {"id": 99999, "title": "x"})) == "no task with id 99999"
+
+
+def test_review_overwritten_digests_and_notes_stay_readable(client, session_factory):
+    import todo_service as svc
+    from database import TextVersion
+    with session_factory() as s:
+        rec = add_recording_on(s, "2026-10-06")[0]
+    call(client, "save_digest", {"day": "2026-10-06", "body": "the owner's overview"})
+    call(client, "save_digest", {"day": "2026-10-06", "body": "overwritten by injection"})
+    call(client, "save_digest", {"day": "2026-10-06", "body": "overwritten by injection"})  # same text: no new version
+    call(client, "add_topic_note", {"topic": "T", "recording_id": rec, "note": "first"})
+    call(client, "add_topic_note", {"topic": "T", "recording_id": rec, "note": "second"})
+    with session_factory() as s:
+        versions = s.query(TextVersion).order_by(TextVersion.id).all()
+        assert [(v.kind, v.body) for v in versions] == [("digest", "the owner's overview"), ("topic_note", "first")]
+        import datetime as dt
+        assert [v.body for v in svc.digest_versions(s, dt.date(2026, 10, 6))] == ["the owner's overview"]
+
+
+def test_review_the_number_of_open_tasks_is_capped(client, session_factory, monkeypatch):
+    import todo_service as svc
+    monkeypatch.setattr(svc, "MAX_OPEN_TASKS", 3)
+    for i in range(3):
+        assert not is_error(call(client, "add_todo", {"title": f"task {i}", "allow_similar": True}))
+    refused = call(client, "add_todo", {"title": "one more completely different thing"})
+    assert is_error(refused) and "open tasks already" in text_of(refused)

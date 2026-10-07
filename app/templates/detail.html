@@ -21,5 +21,10 @@
 </div>
 {% endfor %}
 </div>
-<p class="actions"><a class="btn" href="/recordings/{{ rec.id }}/discard">{{ t("ui_discard") }}</a></p>
+<p class="actions"><a class="btn" href="/recordings/{{ rec.id }}/discard">{{ t("ui_discard") }}</a>
+{% if rec.analyzed_at %}
+  <form class="inline" method="post" action="/recordings/{{ rec.id }}/unanalyze">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><button type="submit">{{ t("ui_unanalyze") }}</button>
+  </form>
+{% endif %}</p>
 {% endblock %}

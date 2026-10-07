@@ -16,7 +16,7 @@ from typing import Optional
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from database import Digest, Recording, Todo, TodoEvent, Topic, TopicNote
+from database import Digest, Recording, TextVersion, Todo, TodoEvent, Topic, TopicNote
 from utils import as_utc, day_bounds, local_day
 
 log = logging.getLogger(__name__)
@@ -27,6 +27,7 @@ STATUSES = ("open", "done", "dropped")
 ACTORS = ("claude", "owner")
 TITLE_MAX, DETAIL_MAX, NOTE_MAX, TOPIC_MAX, DIGEST_MAX = 300, 4000, 1000, 120, 20000
 LIST_LIMIT_MAX = 200
+MAX_OPEN_TASKS = 2000
 SIMILARITY_THRESHOLD = 0.6
 UNDOABLE_KINDS = ("updated", "completed", "reopened", "dropped")
 UNSET = object()  # "argument not given", as opposed to None or "" which clear a field
@@ -190,7 +191,11 @@ def similar_open(session: Session, title: str, limit: int = 3) -> list:
     """Open tasks whose title is close to `title` (word overlap), most similar first."""
     wanted = _tokens(title)
     scored = []
-    for todo in session.scalars(select(Todo).where(Todo.status == "open")):
+    stmt = select(Todo).where(Todo.status == "open")
+    hidden = _excluded_ids(session)
+    if hidden:  # the tasks of an excluded topic must not show up, not even as "a similar task exists"
+        stmt = stmt.where(Todo.topic_id.is_(None) | Todo.topic_id.not_in(hidden))
+    for todo in session.scalars(stmt):
         other = _tokens(todo.title)
         if not wanted or not other:
             score = 1.0 if todo.title.strip().lower() == title.strip().lower() else 0.0
@@ -253,6 +258,9 @@ def create_todo(session: Session, now: dt.datetime, *, title: str, actor: str, p
     priority = _priority(priority)
     due_date = _due(due)
     recording_id = _visible_recording(session, recording_id)
+    open_tasks = session.scalar(select(func.count()).select_from(Todo).where(Todo.status == "open"))
+    if open_tasks >= MAX_OPEN_TASKS:
+        raise TodoError(f"there are {open_tasks} open tasks already; finish or drop some first")
     if not allow_similar:
         similar = similar_open(session, title)
         if similar:
@@ -301,7 +309,8 @@ def update_todo(session: Session, now: dt.datetime, todo_id: int, *, actor: str,
     """Change a task. Returns (todo, changed). Fields left at UNSET stay as they are."""
     actor = _actor(actor)
     todo = session.get(Todo, todo_id)
-    if todo is None:
+    if todo is None or (actor == "claude" and todo.topic_id in _excluded_ids(session)):
+        # Same answer for both: Claude learns nothing about tasks in a topic the owner excluded.
         raise TodoError(f"no task with id {todo_id}")
     note = _text(note, "note", NOTE_MAX)
     recording_id = _visible_recording(session, recording_id)
@@ -343,6 +352,10 @@ def undo_event(session: Session, now: dt.datetime, event_id: int, actor: str = "
     before, after = json.loads(event.before_json), json.loads(event.after_json)
     if _snapshot(session, todo, tuple(after)) != after:
         raise TodoError("the task was changed since, nothing to undo")
+    if before.get("topic"):
+        restored = session.scalar(select(Topic).where(func.lower(Topic.name) == before["topic"].lower()))
+        if restored is not None and restored.excluded:
+            raise TodoError(f"the topic '{restored.name}' is excluded, the task cannot go back into it")
     _apply(session, todo, before)
     todo.updated_at = now
     session.flush()
@@ -436,6 +449,8 @@ def add_topic_note(session: Session, now: dt.datetime, *, topic: str, recording_
         existing = TopicNote(topic_id=topic_row.id, recording_id=recording_id, note=note, created_at=now, updated_at=now)
         session.add(existing)
     else:
+        if existing.note != note:
+            _remember(session, "topic_note", str(existing.id), existing.note, now)
         existing.note, existing.updated_at = note, now
     session.commit()
     return existing
@@ -510,9 +525,22 @@ def save_digest(session: Session, now: dt.datetime, day, body: str) -> Digest:
         digest = Digest(day=day, body=body, created_at=now, updated_at=now)
         session.add(digest)
     else:
+        if digest.body != body:
+            _remember(session, "digest", day.isoformat(), digest.body, now)
         digest.body, digest.updated_at = body, now
     session.commit()
     return digest
+
+
+def _remember(session: Session, kind: str, ref: str, body: str, now: dt.datetime) -> None:
+    """Keep the text that a write is about to replace (D-020): an overwrite can be read and restored."""
+    session.add(TextVersion(kind=kind, ref=ref, body=body, saved_at=now))
+
+
+def digest_versions(session: Session, day: dt.date) -> list:
+    """Earlier texts of the overview of a day, newest first."""
+    return session.scalars(select(TextVersion).where(TextVersion.kind == "digest", TextVersion.ref == day.isoformat())
+                           .order_by(TextVersion.id.desc())).all()
 
 
 def list_digests(session: Session, limit: int = 7) -> list:
@@ -539,4 +567,17 @@ def mark_analyzed(session: Session, now: dt.datetime, recording_id: int) -> bool
         return False
     rec.analyzed_at = now
     session.commit()
+    log.info("Recording marked analyzed id=%s", recording_id)
+    return True
+
+
+def unmark_analyzed(session: Session, recording_id: int) -> bool:
+    """Owner only (no MCP tool): let the routine look at the recording again. False if it was not marked."""
+    _visible_recording(session, recording_id)
+    rec = session.get(Recording, recording_id)
+    if rec.analyzed_at is None:
+        return False
+    rec.analyzed_at = None
+    session.commit()
+    log.info("Recording analyzed mark removed id=%s", recording_id)
     return True

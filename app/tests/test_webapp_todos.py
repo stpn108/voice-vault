@@ -157,3 +157,37 @@ def test_req_006_digests_can_be_paged_through_by_day(client, session_factory):
 @pytest.mark.parametrize("day", ["2026-10-02", "nonsense", "2026-13-40"])
 def test_req_006_unknown_digest_days_are_404(client, day):
     assert client.get(f"/digests/{day}").status_code == 404
+
+
+# --- findings of the security review (D-020) --------------------------------------------------------
+def test_review_undo_cannot_put_a_task_back_into_an_excluded_topic(client, make_todo, session_factory):
+    from database import TodoEvent
+    task = make_todo(title="Plan trip", topic="Secret")
+    post(client, f"/todos/{task}", title="Plan trip", detail="", priority="3", due="", topic="Other", status="open")
+    with session_factory() as s:
+        svc.set_topic_excluded(s, "Secret", True)
+        event = s.scalars(select(TodoEvent).order_by(TodoEvent.id.desc())).first().id
+    assert post(client, f"/todos/events/{event}/undo").status_code == 400
+
+
+def test_review_earlier_versions_of_an_overview_are_shown(client, session_factory):
+    with session_factory() as s:
+        add_recording_on(s, "2026-10-06")
+        svc.save_digest(s, now_utc(), "2026-10-06", "first version")
+        svc.save_digest(s, now_utc(), "2026-10-06", "second version")
+    page = client.get("/digests/2026-10-06").text
+    assert "second version" in page and "first version" in page and "Frühere Fassungen dieses Tages (1)" in page
+
+
+def test_review_the_owner_can_let_the_routine_read_a_recording_again(client, session_factory):
+    from database import Recording
+    with session_factory() as s:
+        rec_id = add_recording(s, index=1).id
+        svc.mark_analyzed(s, now_utc(), rec_id)
+    assert "unanalyze" in client.get(f"/recordings/{rec_id}").text
+    assert client.post(f"/recordings/{rec_id}/unanalyze", data={"csrf": "bad"}).status_code == 403
+    assert post(client, f"/recordings/{rec_id}/unanalyze").status_code == 303
+    with session_factory() as s:
+        assert s.get(Recording, rec_id).analyzed_at is None
+    assert "unanalyze" not in client.get(f"/recordings/{rec_id}").text
+    assert post(client, "/recordings/9999/unanalyze").status_code == 404

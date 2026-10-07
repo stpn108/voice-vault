@@ -15,6 +15,14 @@
   <h3 class="digest-day">{{ digest.day.strftime("%d.%m.%Y") }}</h3>
   <div class="prose">{{ digest.body | md }}</div>
 </section>
+{% if versions %}
+<details class="card"><summary>{{ t("ui_digest_versions", count=versions | length) }}</summary>
+  {% for v in versions %}
+  <h2>{{ v.saved_at | localtime }}</h2>
+  <div class="prose">{{ v.body | md }}</div>
+  {% endfor %}
+</details>
+{% endif %}
 {% if day_recordings %}
 <h2>{{ t("ui_day_recordings") }}</h2>
 <div class="list">

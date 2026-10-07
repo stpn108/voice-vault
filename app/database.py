@@ -136,6 +136,16 @@ class Digest(Base):
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class TextVersion(Base):
+    """An earlier text of a daily overview or a topic note, kept when a later write replaced it."""
+    __tablename__ = "text_versions"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    kind: Mapped[str] = mapped_column(String(12), index=True)
+    ref: Mapped[str] = mapped_column(String(64), index=True)
+    body: Mapped[str] = mapped_column(Text)
+    saved_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
+
+
 class OAuthCode(Base):
     """A one-time OAuth authorization code of the MCP server (stored as a hash, 60 s lifetime)."""
     __tablename__ = "oauth_codes"

@@ -145,6 +145,8 @@ TEXTS = {
     "ui_error_not_found": {"de": "Nicht gefunden", "en": "Not found"},
     "ui_error_forbidden": {"de": "Nicht erlaubt. Seite neu laden und noch einmal versuchen.", "en": "Not allowed. Reload the page and try again."},
     "ui_error_invalid": {"de": "Das hat nicht geklappt", "en": "That did not work"},
+    "ui_digest_versions": {"de": "Frühere Fassungen dieses Tages ({count})", "en": "Earlier versions of this day ({count})"},
+    "ui_unanalyze": {"de": "Routine erneut lesen lassen", "en": "Let the routine read it again"},
     "ui_cleanup_confirm": {"de": "{count} Aufnahme(n) endgültig verwerfen", "en": "Discard {count} recording(s) for good"},
 }
 
