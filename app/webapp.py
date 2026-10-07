@@ -294,5 +294,19 @@ def topic_detail(request: Request, name: str, session: Session = Depends(get_ses
 
 
 @app.get("/digests", response_class=HTMLResponse)
-def digest_list(request: Request, session: Session = Depends(get_session), cfg: Config = Depends(get_config)):
-    return render(request, cfg, "digests.html", digests=todos.list_digests(session, 14))
+@app.get("/digests/{day}", response_class=HTMLResponse)
+def digest_page(request: Request, day: str = "", session: Session = Depends(get_session),
+                cfg: Config = Depends(get_config)):
+    """One day's overview with links to the previous and next saved day; the latest by default."""
+    recent = todos.list_digests(session, 14)
+    if not day:
+        digest = recent[0] if recent else None
+    else:
+        try:
+            digest = todos.get_digest(session, day)
+        except todos.TodoError:
+            raise HTTPException(status_code=404, detail="overview not found")
+        if digest is None:
+            raise HTTPException(status_code=404, detail="overview not found")
+    older, newer = todos.digest_neighbours(session, digest.day) if digest else (None, None)
+    return render(request, cfg, "digests.html", digest=digest, recent=recent, older=older, newer=newer)

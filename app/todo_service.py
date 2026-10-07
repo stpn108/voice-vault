@@ -444,6 +444,13 @@ def list_digests(session: Session, limit: int = 7) -> list:
     return session.scalars(select(Digest).order_by(Digest.day.desc()).limit(min(max(limit, 1), 60))).all()
 
 
+def digest_neighbours(session: Session, day: dt.date) -> tuple:
+    """(older, newer): the days of the nearest saved overviews before and after `day`, or None."""
+    older = session.scalar(select(func.max(Digest.day)).where(Digest.day < day))
+    newer = session.scalar(select(func.min(Digest.day)).where(Digest.day > day))
+    return older, newer
+
+
 def get_digest(session: Session, day) -> Optional[Digest]:
     return session.scalar(select(Digest).where(Digest.day == _date(day, "day")))
 

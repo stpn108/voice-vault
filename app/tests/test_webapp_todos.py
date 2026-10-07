@@ -133,3 +133,21 @@ def test_req_006_owner_excludes_and_allows_a_topic(client, make_todo, session_fa
 
 def test_req_006_excluding_needs_the_csrf_token(client):
     assert client.post("/topics/exclude", data={"name": "X", "csrf": "bad"}).status_code == 403
+
+
+def test_req_006_digests_can_be_paged_through_by_day(client, session_factory):
+    with session_factory() as s:
+        for day, body in ((dt.date(2026, 10, 1), "first day"), (dt.date(2026, 10, 3), "third day"),
+                          (dt.date(2026, 10, 7), "last day")):
+            svc.save_digest(s, now_utc(), day, body)
+    latest = client.get("/digests").text
+    assert "last day" in latest and 'href="/digests/2026-10-03"' in latest and 'rel="next"' in latest
+    assert 'href="/digests/2026-10-07"' not in latest.split('rel="next"')[0].rsplit("<a", 1)[-1]
+    middle = client.get("/digests/2026-10-03").text
+    assert "third day" in middle and 'href="/digests/2026-10-01"' in middle and 'href="/digests/2026-10-07"' in middle
+    assert "first day" in client.get("/digests/2026-10-01").text
+
+
+@pytest.mark.parametrize("day", ["2026-10-02", "nonsense", "2026-13-40"])
+def test_req_006_unknown_digest_days_are_404(client, day):
+    assert client.get(f"/digests/{day}").status_code == 404
