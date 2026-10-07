@@ -19,7 +19,7 @@ Requirements: `requirements/`. Decisions: `DECISIONS.md` (D-001 to D-004).
    compared by content hash and segment count (verified import). A changed
    summary or transcript is re-imported.
 3. Move to the Plaud trash only if: Plaud reports both tasks done, the
-   recording ended at least `MIN_AGE_MINUTES` ago (default 12 hours) and has a known duration, the import is verified
+   recording ended at least `MIN_AGE_MINUTES` ago (default 7 days) and has a known duration, the import is verified
    and the content was unchanged for `STABILITY_MINUTES`. Otherwise it is
    checked again next cycle.
 4. Delete permanently `PERMANENT_DELETE_AFTER_HOURS` after trashing, only

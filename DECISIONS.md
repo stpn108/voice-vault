@@ -185,3 +185,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | The owner wants a routine that works without him and a list he only checks off. That needs write access. The risk is a prompt injection in a transcript; with no delete and an undo for each change, the worst case is a wrong or missing task. Recordings stay protected, which was the point of D-011. Keeping the list in the same database avoids a second system that holds the contents of the conversations. |
 | **Rejected alternatives** | (A) read-only MCP plus Google Tasks or a Markdown file: second storage place for the content, and no undo; (B) free-text list in one document: no priorities, no check-off, no history; (C) Claude may delete tasks: an injected instruction could wipe the list; (D) no duplicate check: the daily run would re-create tasks from every follow-up conversation; (E) undo of any past event: later changes make old values wrong. |
 | **Status** | **FINAL** |
+
+### D-014: Defaults are 7 days minimum age and 3 days trash wait, about ten days in total (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-07 |
+| **Decision** | Amends the default values of D-010. `MIN_AGE_MINUTES` defaults to 10080 (7 days) and `PERMANENT_DELETE_AFTER_HOURS` to 72 (3 days). A recording goes into the Plaud trash 7 days after it ended and is deleted permanently 3 days later. Both stay configurable, and an explicit value in `.env` wins over the default, so a `.env` that still sets the old values has to be changed. All other gates (processed, verified, stable, known duration) and the discard rules of D-009 are unchanged. |
+| **In plain words** | Plaud keeps a recording for a week, then it sits in the Plaud trash for three more days before it is gone for good. |
+| **Reasoning** | Owner decision. With the daily routine of REQ-006 and a first backup that only worked after a fix, a longer period gives time to notice a problem while the original is still at Plaud. Seven days also match the routine's look-back window. |
+| **Rejected alternatives** | (A) keep 12 h plus 12 h (D-010): little room to notice a failed import, backup or routine; (B) 7 days with no trash step: nothing restorable at Plaud. |
+| **Status** | **FINAL** |

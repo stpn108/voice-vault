@@ -33,7 +33,7 @@ contract that keeps conversation and code from drifting apart.
 | Aufgabe | A task taken from the conversations, with priority 1 (urgent) to 4 (low), status open, done or dropped. | `todos`, `todo_service.py` | Created by `claude` or `owner`. Never deleted, only dropped. |
 | Thema | A subject that runs through several conversations. | `topics`, `topic_notes` | Matched by name without regard to case. |
 | Tagesübersicht | The daily overview Claude writes, one per day. | `digests`, `save_digest` | Saving again replaces the day. |
-| Mindestalter | Minimum age of a recording before it may be trashed, default 12 hours (720 minutes, D-010). A recording with unknown (0) duration is never trashed. | `MIN_AGE_MINUTES` | Measured from the end of the recording (`start_time + duration`). |
+| Mindestalter | Minimum age of a recording before it may be trashed, default 7 days (10080 minutes, D-014). A recording with unknown (0) duration is never trashed. | `MIN_AGE_MINUTES` | Measured from the end of the recording (`start_time + duration`). |
 
 ## Units and formats
 
