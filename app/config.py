@@ -74,6 +74,7 @@ class Config:
     mcp_oauth_client_secret: str
     mcp_oauth_password: str
     mcp_oauth_redirect_uris: tuple
+    mcp_trust_forwarded_for: bool
 
 
 def load_config() -> Config:
@@ -105,4 +106,5 @@ def load_config() -> Config:
         mcp_oauth_client_secret=os.getenv("MCP_OAUTH_CLIENT_SECRET", "").strip(),
         mcp_oauth_password=os.getenv("MCP_OAUTH_PASSWORD", ""),
         mcp_oauth_redirect_uris=_csv("MCP_OAUTH_REDIRECT_URIS", "https://claude.ai/api/mcp/auth_callback"),
+        mcp_trust_forwarded_for=_bool("MCP_TRUST_FORWARDED_FOR", False),
     )

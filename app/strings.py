@@ -65,6 +65,7 @@ TEXTS = {
     "oauth_password": {"de": "Freigabe-Passwort", "en": "Approval password"},
     "oauth_allow": {"de": "Freigeben", "en": "Approve"},
     "oauth_deny": {"de": "Ablehnen", "en": "Deny"},
+    "oauth_locked": {"de": "Zu viele Versuche. Bitte in {seconds} Sekunden noch einmal.", "en": "Too many attempts. Please try again in {seconds} seconds."},
     "oauth_wrong_password": {"de": "Das Passwort stimmt nicht.", "en": "The password is wrong."},
     "oauth_bad_request": {"de": "Die Anfrage ist ungültig. Starte die Verbindung in Claude neu.", "en": "The request is invalid. Start the connection in Claude again."},
     "oauth_expired": {"de": "Die Anmeldung ist abgelaufen. Starte die Verbindung in Claude neu.", "en": "The sign-in expired. Start the connection in Claude again."},

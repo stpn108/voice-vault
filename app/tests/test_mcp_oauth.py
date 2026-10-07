@@ -39,27 +39,28 @@ def make_cfg(**overrides):
     return dataclasses.replace(load_config(), **base)
 
 
-class Sleeper:
+class Clock:
+    """A clock the tests move by hand; the lock after failed logins runs on it."""
     def __init__(self):
-        self.delays = []
+        self.now = 1000.0
 
-    async def __call__(self, seconds):
-        self.delays.append(seconds)
+    def __call__(self):
+        return self.now
 
 
-def make_client(session_factory, sleeper=None, **cfg_overrides):
-    app = mcp_server.create_app(make_cfg(**cfg_overrides), session_factory, sleeper or Sleeper())
+def make_client(session_factory, clock=None, **cfg_overrides):
+    app = mcp_server.create_app(make_cfg(**cfg_overrides), session_factory, clock or Clock())
     return TestClient(app, base_url=PUBLIC, follow_redirects=False)
 
 
 @pytest.fixture
-def sleeper():
-    return Sleeper()
+def clock():
+    return Clock()
 
 
 @pytest.fixture
-def client(session_factory, sleeper):
-    return make_client(session_factory, sleeper)
+def client(session_factory, clock):
+    return make_client(session_factory, clock)
 
 
 def pkce():
@@ -75,12 +76,13 @@ def authorize_params(challenge, **overrides):
     return {k: v for k, v in params.items() if v is not None}
 
 
-def login(client, challenge, password=PASSWORD, action="allow", **overrides):
-    page = client.get("/authorize", params=authorize_params(challenge, **overrides))
+def login(client, challenge, password=PASSWORD, action="allow", headers=None, **overrides):
+    page = client.get("/authorize", params=authorize_params(challenge, **overrides), headers=headers)
     assert page.status_code == 200, page.text
     req = re.search(r'name="req" value="([^"]+)"', page.text).group(1)
     sig = re.search(r'name="sig" value="([^"]+)"', page.text).group(1)
-    return client.post("/authorize", data={"req": req, "sig": sig, "password": password, "action": action})
+    return client.post("/authorize", data={"req": req, "sig": sig, "password": password, "action": action},
+                       headers=headers)
 
 
 def code_from(response):
@@ -261,31 +263,96 @@ def test_req_005_correct_password_redirects_with_code_state_and_issuer(client, s
         assert stored[0].code_hash == hashlib.sha256(query["code"][0].encode()).hexdigest()
 
 
-def test_req_005_wrong_password_gives_no_code_and_gets_slower(client, session_factory, sleeper):
+def test_req_005_wrong_password_gives_no_code_and_locks_the_client(client, session_factory, clock):
     _, challenge = pkce()
-    for _ in range(3):
-        response = login(client, challenge, password="wrong password " * 3)
-        assert response.status_code == 401 and "location" not in response.headers
-        assert "Das Passwort stimmt nicht." in response.text
-    assert sleeper.delays == [1, 2, 4]
+    first = login(client, challenge, password="wrong password " * 3)
+    assert first.status_code == 401 and "location" not in first.headers
+    assert "Das Passwort stimmt nicht." in first.text
+    # While locked, even the right password is not looked at: no code, no password check.
+    locked = login(client, challenge)
+    assert locked.status_code == 429 and "location" not in locked.headers and "Zu viele Versuche" in locked.text
     with session_factory() as s:
         assert s.scalars(select(OAuthCode)).all() == []
 
 
-def test_delay_is_capped_and_resets_after_a_successful_login(client, sleeper):
+def test_req_005_the_lock_doubles_and_is_capped(client, clock):
     _, challenge = pkce()
-    for _ in range(8):
-        login(client, challenge, password="nope" * 8)
-    assert max(sleeper.delays) == mcp_oauth_web.MAX_DELAY_SECONDS
-    assert login(client, challenge).status_code == 302
+    for failure in range(8):
+        delay = min(2 ** failure, mcp_oauth_web.MAX_DELAY_SECONDS)
+        assert login(client, challenge, password="nope" * 8).status_code == 401
+        clock.now += delay - 0.5
+        assert login(client, challenge, password="nope" * 8).status_code == 429  # still locked, not counted
+        clock.now += 1
+    assert delay == mcp_oauth_web.MAX_DELAY_SECONDS
+
+
+def test_login_works_again_after_the_lock_and_the_count_resets(client, clock):
+    _, challenge = pkce()
     login(client, challenge, password="nope" * 8)
-    assert sleeper.delays[-1] == 1
+    login(client, challenge, password="nope" * 8)  # turned away while locked: not counted
+    clock.now += 1.1
+    login(client, challenge, password="nope" * 8)  # second failure: locked for 2 s
+    clock.now += 2.1
+    assert login(client, challenge).status_code == 302  # success forgets the failures
+    login(client, challenge, password="nope" * 8)  # first failure again: a 1 s lock, not 4 s
+    clock.now += 1.1
+    assert login(client, challenge).status_code == 302
 
 
-def test_password_is_compared_exactly(client):
+def test_failures_are_forgotten_after_a_quiet_quarter_of_an_hour(client, clock):
+    _, challenge = pkce()
+    for _ in range(5):
+        login(client, challenge, password="nope" * 8)
+        clock.now += mcp_oauth_web.MAX_DELAY_SECONDS
+    clock.now += mcp_oauth_web.LOCK_FORGET_SECONDS + 1
+    login(client, challenge, password="nope" * 8)
+    clock.now += 1.1
+    assert login(client, challenge).status_code == 302
+
+
+def test_review_without_a_trusted_proxy_all_callers_share_one_lock(client, clock):
+    _, challenge = pkce()
+    login(client, challenge, password="nope" * 8, headers={"x-forwarded-for": "198.51.100.7"})
+    assert login(client, challenge, headers={"x-forwarded-for": "203.0.113.9"}).status_code == 429
+
+
+def test_review_with_a_trusted_proxy_an_attacker_locks_out_only_himself(session_factory, clock):
+    client = make_client(session_factory, clock, mcp_trust_forwarded_for=True)
+    _, challenge = pkce()
+    login(client, challenge, password="nope" * 8, headers={"x-forwarded-for": "198.51.100.7"})
+    assert login(client, challenge, headers={"x-forwarded-for": "198.51.100.7"}).status_code == 429
+    assert login(client, challenge, headers={"x-forwarded-for": "203.0.113.9"}).status_code == 302
+
+
+def test_review_the_last_forwarded_address_counts_and_forged_ones_do_not_help(session_factory, clock):
+    client = make_client(session_factory, clock, mcp_trust_forwarded_for=True)
+    _, challenge = pkce()
+    login(client, challenge, password="nope" * 8, headers={"x-forwarded-for": "1.1.1.1, 198.51.100.7"})
+    assert login(client, challenge, headers={"x-forwarded-for": "9.9.9.9, 198.51.100.7"}).status_code == 429
+
+
+def test_review_oversized_or_unusual_bodies_are_refused_before_parsing(client):
+    big = "x=" + "a" * 9000
+    assert client.post("/token", content=big, headers={"content-type": "application/x-www-form-urlencoded"}).status_code == 413
+    assert client.post("/authorize", content=big, headers={"content-type": "application/x-www-form-urlencoded"}).status_code == 413
+    multipart = client.post("/token", files={"a": ("a.txt", b"x")})
+    assert multipart.status_code == 415
+    assert client.post("/token", content="x=1", headers={"content-type": "application/json"}).status_code == 415
+
+
+def test_review_a_chunked_body_over_the_limit_is_refused(client):
+    def chunks():
+        for _ in range(10):
+            yield b"a=" + b"b" * 1000 + b"&"
+    response = client.post("/token", content=chunks(), headers={"content-type": "application/x-www-form-urlencoded"})
+    assert response.status_code == 413
+
+
+def test_password_is_compared_exactly(client, clock):
     _, challenge = pkce()
     for wrong in (PASSWORD + " ", PASSWORD.upper(), PASSWORD[:-1], ""):
         assert login(client, challenge, password=wrong).status_code == 401
+        clock.now += mcp_oauth_web.MAX_DELAY_SECONDS + 1
 
 
 def test_req_005_deny_redirects_with_access_denied_and_creates_nothing(client, session_factory):
@@ -415,7 +482,7 @@ def test_req_005_incomplete_token_requests(client, fields, error):
 
 def test_json_bodies_are_not_a_token_request(client):
     response = client.post("/token", json={"grant_type": "refresh_token", "refresh_token": "x", "client_id": CLIENT_ID})
-    assert response.status_code == 401 and response.json()["error"] == "invalid_client"
+    assert response.status_code == 415 and response.json()["error"] == "invalid_request"
 
 
 @pytest.mark.parametrize("fields", [{}, {"client_id": "someone-else"}, {"client_id": CLIENT_ID.upper()}])

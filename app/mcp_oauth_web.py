@@ -5,7 +5,6 @@ login page, the token endpoint and the check for OAuth access tokens.
 One pre-registered client (no dynamic registration), PKCE with S256 on every request,
 the owner proves identity with a password, redirect URIs must match a fixed list.
 """
-import asyncio
 import base64
 import hmac
 import json
@@ -16,7 +15,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional
-from urllib.parse import quote, unquote, urlparse
+from urllib.parse import parse_qsl, quote, unquote, urlparse
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -37,6 +36,9 @@ MIN_PASSWORD_CHARS = 20
 MIN_CLIENT_ID_CHARS = 8
 MAX_STATE_CHARS = 512
 MAX_DELAY_SECONDS = 30
+LOCK_FORGET_SECONDS = 900  # failures older than this no longer count
+MAX_TRACKED_CLIENTS = 1000
+MAX_FORM_BYTES = 8 * 1024
 SCOPES = ["mcp", "offline_access"]
 LOOPBACK = ("localhost", "127.0.0.1")
 NO_STORE = {"Cache-Control": "no-store", "Pragma": "no-cache"}
@@ -52,6 +54,7 @@ class OAuthSettings:
     client_secret: str
     password: str
     redirect_uris: tuple
+    trust_forwarded_for: bool = False
 
 
 @dataclass
@@ -83,6 +86,7 @@ def build_settings(cfg: Config) -> OAuthSettings:
         issuer=base, resource=f"{base}/mcp", metadata_url=f"{base}/.well-known/oauth-protected-resource",
         client_id=cfg.mcp_oauth_client_id, client_secret=cfg.mcp_oauth_client_secret,
         password=cfg.mcp_oauth_password, redirect_uris=tuple(cfg.mcp_oauth_redirect_uris),
+        trust_forwarded_for=cfg.mcp_trust_forwarded_for,
     )
 
 
@@ -112,12 +116,66 @@ def _same(a: str, b: str) -> bool:
     return hmac.compare_digest(a.encode(), b.encode())
 
 
+class FormRejected(Exception):
+    def __init__(self, status: int):
+        self.status = status
+
+
+async def read_form(request: Request) -> dict:
+    """The urlencoded body of a request from an unauthenticated caller: small, and nothing else.
+    Multipart and oversized bodies are refused before anything is parsed or buffered."""
+    if request.headers.get("content-type", "").split(";")[0].strip().lower() != "application/x-www-form-urlencoded":
+        raise FormRejected(415)
+    declared = request.headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > MAX_FORM_BYTES:
+        raise FormRejected(413)
+    body = bytearray()
+    async for chunk in request.stream():
+        body.extend(chunk)
+        if len(body) > MAX_FORM_BYTES:
+            raise FormRejected(413)
+    try:
+        pairs = parse_qsl(body.decode("utf-8"), keep_blank_values=True, max_num_fields=50)
+    except (ValueError, UnicodeDecodeError):
+        raise FormRejected(400) from None
+    form: dict = {}
+    for key, value in pairs:
+        form.setdefault(key, value)  # the first of a repeated field counts
+    return form
+
+
 def setup_oauth(app: FastAPI, settings: OAuthSettings, session_factory: Callable[[], Session], lang: str,
-                sleep: Callable = asyncio.sleep) -> OAuthRuntime:
+                clock: Callable[[], float] = time.monotonic) -> OAuthRuntime:
     templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
     form_secret = secrets.token_bytes(32)
-    login_lock = asyncio.Lock()
-    failures = {"count": 0}
+    # Failed logins per client: {key: [failure count, locked until, time of last failure]}. A locked
+    # client is turned away at once and its password is not even looked at, so guessing is limited to
+    # one try per lock period, and nobody holds a worker or a lock while waiting.
+    attempts: dict = {}
+
+    def client_key(request: Request) -> str:
+        """The caller. Behind the owner's proxy (MCP_TRUST_FORWARDED_FOR=true, the proxy sets
+        X-Forwarded-For to $remote_addr) that is the real address, so an attacker locks out only
+        himself. Without it all callers share one counter, which an attacker can keep locked."""
+        if settings.trust_forwarded_for:
+            last = request.headers.get("x-forwarded-for", "").split(",")[-1].strip()
+            return re.sub(r"[^0-9a-fA-F:.]", "", last)[:45] or "unknown"
+        return "all"
+
+    def lock_remaining(key: str) -> int:
+        entry = attempts.get(key)
+        left = entry[1] - clock() if entry else 0
+        return int(left) + 1 if left > 0 else 0
+
+    def record_failure(key: str) -> int:
+        now = clock()
+        entry = attempts.get(key)
+        count = 1 if entry is None or now - entry[2] > LOCK_FORGET_SECONDS else entry[0] + 1
+        attempts[key] = [count, now + min(2 ** (count - 1), MAX_DELAY_SECONDS), now]
+        if len(attempts) > MAX_TRACKED_CLIENTS:
+            for stale in sorted(attempts, key=lambda k: attempts[k][2])[: len(attempts) - MAX_TRACKED_CLIENTS // 2]:
+                del attempts[stale]
+        return count
 
     def t(key: str, **kwargs) -> str:
         return get_text(key, lang, **kwargs)
@@ -134,9 +192,9 @@ def setup_oauth(app: FastAPI, settings: OAuthSettings, session_factory: Callable
     def error_page(request: Request, key: str, status: int = 400):
         return page(request, "oauth_error.html", status, message=t(key))
 
-    def login_page(request: Request, payload: dict, status: int = 200, error: bool = False):
+    def login_page(request: Request, payload: dict, status: int = 200, error: bool = False, locked: int = 0):
         encoded = base64.urlsafe_b64encode(json.dumps(payload).encode()).decode()
-        return page(request, "oauth_login.html", status, req=encoded, sig=sign(encoded), error=error,
+        return page(request, "oauth_login.html", status, req=encoded, sig=sign(encoded), error=error, locked=locked,
                     redirect_host=urlparse(payload["redirect_uri"]).netloc)
 
     @app.get("/.well-known/oauth-protected-resource")
@@ -191,7 +249,10 @@ def setup_oauth(app: FastAPI, settings: OAuthSettings, session_factory: Callable
 
     @app.post("/authorize")
     async def authorize_submit(request: Request):
-        form = await request.form()
+        try:
+            form = await read_form(request)
+        except FormRejected as rejected:
+            return error_page(request, "oauth_bad_request", rejected.status)
         encoded, signature = str(form.get("req", "")), str(form.get("sig", ""))
         if not _same(sign(encoded), signature):
             log.warning("OAuth login rejected: form signature invalid")
@@ -209,15 +270,16 @@ def setup_oauth(app: FastAPI, settings: OAuthSettings, session_factory: Callable
         if form.get("action") == "deny":
             return _redirect(redirect_uri, error="access_denied", state=state, iss=settings.issuer)
 
-        async with login_lock:  # one attempt at a time, each failure makes the next one slower
-            if not _same(str(form.get("password", "")), settings.password):
-                failures["count"] += 1
-                delay = min(2 ** (failures["count"] - 1), MAX_DELAY_SECONDS)
-                forwarded = re.sub(r"[^0-9a-fA-F:., ]", "", request.headers.get("x-forwarded-for", ""))[:80]
-                log.warning("OAuth login failed attempts=%d forwarded_for=%s", failures["count"], forwarded)
-                await sleep(delay)
-                return login_page(request, payload, status=401, error=True)
-            failures["count"] = 0
+        key = client_key(request)
+        wait = lock_remaining(key)
+        if wait:
+            log.warning("OAuth login refused: client is locked wait_seconds=%d client=%s", wait, key)
+            return login_page(request, payload, status=429, locked=wait)
+        if not _same(str(form.get("password", "")), settings.password):
+            count = record_failure(key)
+            log.warning("OAuth login failed attempts=%d client=%s", count, key)
+            return login_page(request, payload, status=401, error=True)
+        attempts.pop(key, None)
 
         def issue() -> str:
             with session_factory() as session:
@@ -233,7 +295,10 @@ def setup_oauth(app: FastAPI, settings: OAuthSettings, session_factory: Callable
 
     @app.post("/token")
     async def token(request: Request):
-        form = await request.form()
+        try:
+            form = await read_form(request)
+        except FormRejected as rejected:
+            return token_error("invalid_request", "unreadable or too large request", rejected.status)
         client_id, client_secret = str(form.get("client_id", "")), str(form.get("client_secret", ""))
         basic = request.headers.get("authorization", "")
         if basic.lower().startswith("basic "):

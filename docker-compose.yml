@@ -141,6 +141,7 @@ services:
       MCP_OAUTH_CLIENT_SECRET: ${MCP_OAUTH_CLIENT_SECRET:-}
       MCP_OAUTH_PASSWORD: ${MCP_OAUTH_PASSWORD:-}
       MCP_OAUTH_REDIRECT_URIS: ${MCP_OAUTH_REDIRECT_URIS:-https://claude.ai/api/mcp/auth_callback}
+      MCP_TRUST_FORWARDED_FOR: ${MCP_TRUST_FORWARDED_FOR:-false}
       UI_LANG: ${UI_LANG:-de}
     ports:
       - "127.0.0.1:${PORTS_PREFIX}020:8000"
