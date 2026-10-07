@@ -25,8 +25,8 @@ Once a day Claude reads the recordings that are new since its last run, adds the
    Given a task from a recording, when Claude calls `add_todo`, then a task with title, priority 1 to 4 (urgent to low), optional detail, due date, topic and source recording is stored, created by `claude`. A similar open task (same words, Jaccard 0.6) is rejected with a pointer to the existing one unless `allow_similar` is set.
 2. **Changes are logged and undoable.**
    Given any change by Claude or the owner, then an event with actor, kind, old and new values and source recording is written. The owner can undo the latest event of a task in the UI; an undo is refused when the task changed since.
-3. **No delete.**
-   Given any tool or page, then no task, topic, note, digest or recording can be deleted. The strongest change is status `dropped`.
+3. **No delete for Claude.**
+   Given any tool, then no task, topic, note, digest or recording can be deleted. The strongest change is status `dropped`. The owner alone can delete a topic in the UI (criterion 13).
 4. **Check off.**
    Given the UI list, when the owner presses the check mark, then the task is `done` with a timestamp, logged as `owner`. Claude can do the same with `update_todo`.
 5. **Topics.**
@@ -45,10 +45,14 @@ Once a day Claude reads the recordings that are new since its last run, adds the
     Given a commitment of another person, then it is not a task. The tool description and the routine prompt say so; Claude may mention it in a topic note instead. (Added 2026-10-07 on the owner's request: "Aufgaben zum Abhaken nur meine. Die von anderen ist eine andere Art zu tracken.")
 12. **Topics the owner excludes.**
     Given a topic the owner excluded in the UI (`/topics`, also for a name that does not exist yet), then `add_todo`, `update_todo` (moving a task into it) and `add_topic_note` are refused with a tool error, its open tasks are hidden from the list and the counts, and `list_topics` marks it `EXCLUDED`. Claude has no tool to change the flag. Allowing it again shows everything as before. Claude still reads the recordings; the flag stops storing, not reading.
+13. **The owner can delete a topic.**
+    Given a topic, then the owner can delete it on a confirmation page that says how many notes go and how many tasks stay. The topic and its notes are removed; its tasks stay without a topic, each change logged and undoable. A checkbox (on by default) keeps the topic as excluded, so the routine does not create it again. Deleting needs the CSRF token. Claude has no tool for it, and `todo_service` still has no delete function.
+14. **Sorting.**
+    Given the task list, then the owner can sort by priority (grouped, default), due date, newest, oldest, topic or title. Any other sort shows a flat list; an unknown sort is a 400.
 
 ## Out of scope
 
-- Deleting tasks (owner decision).
+- Deleting tasks (owner decision). Deleting topics is allowed for the owner only (criterion 13).
 - A public or mobile web page for the list (owner decision: Claude on the phone is enough).
 - Reminders and notifications.
 - Calendar or Drive export.

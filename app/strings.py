@@ -127,6 +127,18 @@ TEXTS = {
     "ui_older": {"de": "Älter", "en": "Older"},
     "ui_newer": {"de": "Neuer", "en": "Newer"},
     "ui_day_recordings": {"de": "Aufnahmen dieses Tages", "en": "Recordings of this day"},
+    "ui_sort": {"de": "Sortierung", "en": "Sort"},
+    "ui_sort_priority": {"de": "Priorität", "en": "Priority"},
+    "ui_sort_due": {"de": "Fälligkeit", "en": "Due date"},
+    "ui_sort_newest": {"de": "Neueste", "en": "Newest"},
+    "ui_sort_oldest": {"de": "Älteste", "en": "Oldest"},
+    "ui_sort_topic": {"de": "Thema", "en": "Topic"},
+    "ui_sort_title": {"de": "A–Z", "en": "A–Z"},
+    "ui_topic_delete": {"de": "Löschen", "en": "Delete"},
+    "ui_topic_delete_title": {"de": "Thema löschen?", "en": "Delete this topic?"},
+    "ui_topic_delete_text": {"de": "Das Thema und seine {notes} Notiz(en) werden endgültig gelöscht. Die {tasks} Aufgabe(n), davon {open_tasks} offen, bleiben erhalten und verlieren nur das Thema. Das lässt sich pro Aufgabe rückgängig machen.", "en": "The topic and its {notes} note(s) are deleted for good. The {tasks} task(s), {open_tasks} of them open, stay and only lose the topic. That can be undone per task."},
+    "ui_topic_delete_exclude": {"de": "Danach ausschließen, damit Claude das Thema nicht neu anlegt", "en": "Exclude it afterwards so Claude does not create it again"},
+    "ui_topic_delete_confirm": {"de": "Thema endgültig löschen", "en": "Delete topic for good"},
     "ui_cleanup_confirm": {"de": "{count} Aufnahme(n) endgültig verwerfen", "en": "Discard {count} recording(s) for good"},
 }
 

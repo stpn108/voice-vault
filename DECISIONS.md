@@ -218,3 +218,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner decision: the routine runs the morning after, so the run date would always be one day too late. The server checks the date because a prompt cannot be relied on to get it right every day. |
 | **Rejected alternatives** | (A) trust the day Claude passes: a wrong date goes unnoticed and files the overview in the wrong place; (B) the server picks the day from the recordings and ignores the argument: a run over a weekend could not be split into days; (C) UTC midnight as the day boundary: late-evening recordings would land on the next day. |
 | **Status** | **FINAL** |
+
+### D-017: The owner can delete topics, in a separate module and behind a confirmation page (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-07 |
+| **Decision** | Amends D-013, which allowed no deletion at all. Only the owner can delete, and only topics. `topic_admin.py` holds the deletion; `todo_service.py` keeps having no delete function, and a test checks that the MCP tools and the service never reference `topic_admin`. The UI asks first (`/topics/{name}/delete`) and shows how many notes go and how many tasks stay. Deleting removes the topic and its notes for good. Its tasks stay, lose the topic, and each of them gets a logged `updated` event with the old topic, so the owner can undo it per task. A checkbox, on by default, keeps the topic as an excluded one (D-015) so the next routine run does not create it again from a conversation. The task list can be sorted by priority (default, grouped), due date, newest, oldest, topic or title. |
+| **In plain words** | You can delete a topic after a confirmation. Its notes are gone, its tasks stay on the list, and by default Claude is told not to bring the topic back. |
+| **Reasoning** | Owner decision: the topic list grows with every run and holds names he does not want. Tasks are his work and are not thrown away with a label. The exclusion default is there because the routine would otherwise recreate the topic the next morning. Keeping the code in its own module keeps the guarantee that nothing Claude can reach deletes data. |
+| **Rejected alternatives** | (A) delete the tasks of the topic as well: one click could wipe the list; (B) a delete tool for Claude: a prompt injection could remove topics; (C) only hiding topics (exclusion): the list of topics would keep growing; (D) delete without a confirmation page: topic notes cannot be restored. |
+| **Status** | **FINAL** |

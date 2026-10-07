@@ -146,6 +146,17 @@ def _excluded_ids(session: Session) -> list:
     return list(session.scalars(select(Topic.id).where(Topic.excluded.is_(True))))
 
 
+def detach_topic_tasks(session: Session, now: dt.datetime, topic: Topic, actor: str, note: str) -> int:
+    """Take the tasks out of a topic (each change is logged and can be undone). Returns how many."""
+    tasks = session.scalars(select(Todo).where(Todo.topic_id == topic.id)).all()
+    for todo in tasks:
+        todo.topic_id = None
+        todo.updated_at = now
+        _log(session, now, todo, "updated", _actor(actor), None, note, {"topic": topic.name}, {"topic": None})
+    session.flush()
+    return len(tasks)
+
+
 def _topic_name(session: Session, topic_id: Optional[int]) -> Optional[str]:
     return session.get(Topic, topic_id).name if topic_id else None
 
@@ -331,11 +342,30 @@ def _rows(session: Session, todos: list, now: dt.datetime) -> list:
     ]
 
 
+SORTS = ("priority", "due", "newest", "oldest", "topic", "title")
+
+
+def _order(sort: str) -> tuple:
+    """ORDER BY terms for a sort name. The id always breaks ties so paging and tests are stable."""
+    if sort not in SORTS:
+        raise TodoError(f"sort must be one of: {', '.join(SORTS)}")
+    by_priority = (Todo.priority, Todo.due_date.is_(None), Todo.due_date, Todo.created_at, Todo.id)
+    return {
+        "priority": by_priority,
+        "due": (Todo.due_date.is_(None), Todo.due_date, Todo.priority, Todo.created_at, Todo.id),
+        "newest": (Todo.created_at.desc(), Todo.id.desc()),
+        "oldest": (Todo.created_at, Todo.id),
+        "topic": (Topic.name.is_(None), func.lower(Topic.name), *by_priority),
+        "title": (func.lower(Todo.title), Todo.id),
+    }[sort]
+
+
 def list_todos(session: Session, now: dt.datetime, *, status: str = "open", topic: Optional[str] = None,
-               limit: int = 50, include_excluded: bool = False) -> tuple:
-    """Most urgent first, without tasks of excluded topics. Returns (rows, truncated)."""
+               limit: int = 50, include_excluded: bool = False, sort: str = "priority") -> tuple:
+    """Without tasks of excluded topics; most urgent first unless `sort` says otherwise.
+    Returns (rows, truncated)."""
     limit = min(max(limit, 1), LIST_LIMIT_MAX)
-    stmt = select(Todo)
+    stmt = select(Todo).outerjoin(Topic, Topic.id == Todo.topic_id)
     if not include_excluded:
         hidden = _excluded_ids(session)
         if hidden:
@@ -347,7 +377,7 @@ def list_todos(session: Session, now: dt.datetime, *, status: str = "open", topi
         if found is None:
             return [], False
         stmt = stmt.where(Todo.topic_id == found.id)
-    stmt = stmt.order_by(Todo.priority, Todo.due_date.is_(None), Todo.due_date, Todo.created_at, Todo.id).limit(limit + 1)
+    stmt = stmt.order_by(*_order(sort)).limit(limit + 1)
     found_rows = session.scalars(stmt).all()
     return _rows(session, found_rows[:limit], now), len(found_rows) > limit
 

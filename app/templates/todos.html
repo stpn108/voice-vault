@@ -4,10 +4,14 @@
 <div class="head" style="margin-top:1.6rem">
   <h1>{{ t("ui_nav_todos") }}</h1>
   <div class="seg">
-  {% for s in statuses %}<a href="/todos?status={{ s }}{% if topic %}&amp;topic={{ topic | urlencode }}{% endif %}" {% if s == status %}class="current"{% endif %}>{{ t("todo_status_" ~ s) }}<small>{{ counts[s] }}</small></a>{% endfor %}
+  {% for s in statuses %}<a href="/todos?status={{ s }}&amp;sort={{ sort }}{% if topic %}&amp;topic={{ topic | urlencode }}{% endif %}" {% if s == status %}class="current"{% endif %}>{{ t("todo_status_" ~ s) }}<small>{{ counts[s] }}</small></a>{% endfor %}
   </div>
 </div>
-{% if topic %}<p class="sub" style="margin:-.5rem 0 1rem">{{ t("ui_topic") }}: <strong>{{ topic }}</strong> · <a href="/todos?status={{ status }}">{{ t("ui_filter_clear") }}</a></p>{% endif %}
+<div class="pager" style="margin-top:-.2rem">
+  <span class="muted" style="font-size:.85rem">{{ t("ui_sort") }}</span>
+  {% for s in sorts %}<a class="chip {% if s == sort %}current{% endif %}" href="/todos?status={{ status }}&amp;sort={{ s }}{% if topic %}&amp;topic={{ topic | urlencode }}{% endif %}">{{ t("ui_sort_" ~ s) }}</a>{% endfor %}
+</div>
+{% if topic %}<p class="sub" style="margin:-.5rem 0 1rem">{{ t("ui_topic") }}: <strong>{{ topic }}</strong> · <a href="/todos?status={{ status }}&amp;sort={{ sort }}">{{ t("ui_filter_clear") }}</a></p>{% endif %}
 <form class="card quick" method="post" action="/todos">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <input type="text" name="title" placeholder="{{ t('ui_todo_new') }}" maxlength="300" required>
@@ -17,9 +21,10 @@
   <button class="primary" type="submit">{{ t("ui_todo_add") }}</button>
 </form>
 {% if rows %}
-{% set groups = rows | groupby("priority") if status == "open" else [("", rows)] %}
+{% set grouped = status == "open" and sort == "priority" %}
+{% set groups = rows | groupby("priority") if grouped else [("", rows)] %}
 {% for prio, items in groups %}
-{% if status == "open" %}<h2 class="group-title"><span class="dot p{{ prio }}"></span>{{ t("todo_prio_" ~ prio) }}<span class="count">{{ items | length }}</span></h2>{% endif %}
+{% if grouped %}<h2 class="group-title"><span class="dot p{{ prio }}"></span>{{ t("todo_prio_" ~ prio) }}<span class="count">{{ items | length }}</span></h2>{% endif %}
 <ul class="list">
   {% for row in items %}
   <li class="task {% if row.status != 'open' %}finished{% endif %}">
@@ -32,7 +37,8 @@
       <a class="task-title" href="/todos/{{ row.id }}">{{ row.title }}</a>
       <div class="task-meta">
         {% if row.due_date %}<span class="due {% if row.status == 'open' and row.due_date < today %}overdue{% endif %}">{{ t("ui_overdue") if row.status == 'open' and row.due_date < today else t("ui_due") }} {{ row.due_date.strftime("%d.%m.") }}</span>{% endif %}
-        {% if row.topic %}<a href="/todos?status={{ status }}&amp;topic={{ row.topic | urlencode }}">{{ row.topic }}</a>{% endif %}
+        {% if row.topic %}<a href="/todos?status={{ status }}&amp;sort={{ sort }}&amp;topic={{ row.topic | urlencode }}">{{ row.topic }}</a>{% endif %}
+        {% if not grouped %}<span>{{ t("todo_prio_" ~ row.priority) }}</span>{% endif %}
         {% if row.created_by == "claude" %}<span class="by">Claude</span>{% endif %}
         <span>{{ row.age_days }} {{ t("ui_days") }}</span>
       </div>

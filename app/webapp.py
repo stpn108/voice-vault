@@ -24,6 +24,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 import recording_service as svc
 import todo_service as todos
+import topic_admin
 from config import Config, load_config
 from database import engine, migrate_schema
 from markdown_lite import render_markdown
@@ -187,12 +188,12 @@ def _todo_error(exc: todos.TodoError) -> HTTPException:
 
 @app.get("/todos", response_class=HTMLResponse)
 def todo_list(request: Request, status: str = Query("open", max_length=10), topic: str = Query("", max_length=120),
-              session: Session = Depends(get_session), cfg: Config = Depends(get_config)):
-    if status not in todos.STATUSES:
-        raise HTTPException(status_code=400, detail="invalid status")
+              sort: str = Query("priority", max_length=10), session: Session = Depends(get_session), cfg: Config = Depends(get_config)):
+    if status not in todos.STATUSES or sort not in todos.SORTS:
+        raise HTTPException(status_code=400, detail="invalid status or sort")
     rows, truncated = todos.list_todos(session, now_utc(), status=status, topic=topic or None,
-                                       limit=todos.LIST_LIMIT_MAX)
-    return render(request, cfg, "todos.html", rows=rows, truncated=truncated, status=status, topic=topic,
+                                       limit=todos.LIST_LIMIT_MAX, sort=sort)
+    return render(request, cfg, "todos.html", rows=rows, truncated=truncated, status=status, topic=topic, sort=sort, sorts=todos.SORTS,
                   today=now_utc().astimezone(LOCAL_TZ).date(),
                   counts=todos.counts(session), statuses=todos.STATUSES, priorities=todos.PRIORITIES)
 
@@ -279,6 +280,26 @@ def topic_exclude(request: Request, name: str = Form("", max_length=todos.TOPIC_
     except todos.TodoError as exc:
         raise _todo_error(exc)
     return RedirectResponse(f"/topics/{quote(topic.name)}" if back == "topic" else "/topics", status_code=303)
+
+
+@app.get("/topics/{name}/delete", response_class=HTMLResponse)
+def topic_delete_confirm(request: Request, name: str, session: Session = Depends(get_session),
+                         cfg: Config = Depends(get_config)):
+    found = topic_admin.topic_counts(session, name)
+    if found is None:
+        raise HTTPException(status_code=404, detail="topic not found")
+    topic, open_tasks, tasks, notes = found
+    return render(request, cfg, "confirm_delete_topic.html", topic=topic, open_tasks=open_tasks, tasks=tasks,
+                  notes=notes)
+
+
+@app.post("/topics/delete")
+def topic_delete(request: Request, name: str = Form("", max_length=todos.TOPIC_MAX), exclude: str = Form(""),
+                 csrf: str = Form(""), session: Session = Depends(get_session)):
+    require_csrf(request, csrf)
+    if topic_admin.delete_topic(session, now_utc(), name, keep_excluded=exclude == "1") is None:
+        raise HTTPException(status_code=404, detail="topic not found")
+    return RedirectResponse("/topics", status_code=303)
 
 
 @app.get("/topics/{name}", response_class=HTMLResponse)
