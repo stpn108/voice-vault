@@ -5,6 +5,7 @@ All queries are parameterised through SQLAlchemy; the UI never builds SQL.
 import base64
 import datetime as dt
 import logging
+import re
 from dataclasses import dataclass
 from typing import Optional
 
@@ -80,6 +81,27 @@ def _visible():
 
 
 EXCERPT_CHARS = 240
+_MARKDOWN_PREFIX = re.compile(r"^\s*(?:#{1,6}\s+|>+\s*|[-*+]\s+|\d+[.)]\s+)+(?:\[[ xX]\]\s*)?")
+_MARKDOWN_LINK = re.compile(r"\[([^\]]+)\]\([^)]*\)")
+_MARKDOWN_MARKS = re.compile(r"\*\*|__|`")
+
+
+def make_excerpt(text: str, max_chars: int = EXCERPT_CHARS) -> str:
+    """The start of a summary as plain text: markdown marks removed, lines joined, cut at a word."""
+    parts = []
+    for line in text.splitlines():
+        line = _MARKDOWN_LINK.sub(r"\1", line)
+        line = _MARKDOWN_PREFIX.sub("", line)
+        line = " ".join(_MARKDOWN_MARKS.sub("", line).split())
+        if line:
+            parts.append(line)
+    cleaned = " \u00b7 ".join(parts)
+    if len(cleaned) <= max_chars:
+        return cleaned
+    cut = cleaned[:max_chars].rstrip()
+    if " " in cut and cleaned[max_chars] != " ":  # do not stop in the middle of a word
+        cut = cut.rsplit(" ", 1)[0]
+    return cut.rstrip(" \u00b7,;:-") + "\u2026"
 
 
 def list_recordings(session: Session, now: dt.datetime, stability_minutes: int,
@@ -118,7 +140,7 @@ def list_recordings(session: Session, now: dt.datetime, stability_minutes: int,
     next_cursor = encode_cursor(page[-1].started_at, page[-1].id) if len(found) > limit else None
     rows = [
         RecordingRow(r.id, r.title, as_utc(r.started_at), r.duration_ms,
-                     recording_state(r, now, stability_minutes), r.summary[:EXCERPT_CHARS])
+                     recording_state(r, now, stability_minutes), make_excerpt(r.summary))
         for r in page
     ]
     return Page(rows, next_cursor)

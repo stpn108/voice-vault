@@ -143,7 +143,7 @@ def list_recordings_tool(session: Session, arguments: dict, now: dt.datetime, st
         lines.append(f"id {row.id} | {_local(row.started_at)} | {_hms(row.duration_ms)} | {row.state} | "
                      f"{row.title or '(untitled)'}")
         if row.excerpt:
-            lines.append("    " + " ".join(row.excerpt.split()))
+            lines.append("    " + row.excerpt)
     if page.next_cursor:
         lines.append(f"next_cursor: {page.next_cursor}")
     return _text("\n".join(lines))

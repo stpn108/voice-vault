@@ -242,6 +242,13 @@ def test_req_003_list_recordings_lists_newest_first_with_excerpt(client, seed):
     assert "Summary 2" in text and "verified" in lines[0]
 
 
+def test_req_003_list_shows_a_plain_readable_excerpt(client, seed):
+    seed(index=1, summary="> Datum: heute\n## Notizen\n- **Wichtig**: erster Punkt\n- [ ] zweiter Punkt")
+    text = text_of(call(client, "list_recordings"))
+    assert "Datum: heute \u00b7 Notizen \u00b7 Wichtig: erster Punkt \u00b7 zweiter Punkt" in text
+    assert "##" not in text and "**" not in text and "\n>" not in text
+
+
 def test_list_with_no_match_says_so(client):
     assert text_of(call(client, "list_recordings")) == "No recordings found."
 
