@@ -51,6 +51,8 @@ Once a day Claude reads the recordings that are new since its last run, adds the
     Given the task list, then the owner can sort by priority (grouped, default), due date, newest, oldest, topic or title. Any other sort shows a flat list; an unknown sort is a 400.
 15. **Topics are addressed by id and can be renamed.**
     Given a topic, then its pages live at `/topics/{id}`, so any name works, including slashes, `#`, `?` and `%`. The owner can rename it on its page; tasks, notes and the exclusion flag follow because they point at the id. An empty name, one over 120 characters, or one another topic already has (any letter case) is refused with a readable error page. Claude has no rename tool.
+16. **Hardening after the security review (D-020).**
+    Given a task in a topic the owner excluded, then Claude can neither find it through the duplicate check, nor change or move it (it gets the same answer as for an unknown id), nor see the topic name in `list_topics`. A digest or topic note that a later write replaces is kept as an earlier version; the digest page lists them. At most 2000 tasks may be open. The owner can let the routine read a recording again. A batch has at most 20 messages.
 
 ## Out of scope
 
