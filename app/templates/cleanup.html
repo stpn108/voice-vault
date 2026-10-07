@@ -8,7 +8,7 @@
   </label>
   <button type="submit">{{ t("ui_cleanup_show") }}</button>
 </form>
-<p>{{ t("ui_cleanup_count", count=count, days=days) }}</p>
+<div class="card"><p><strong>{{ t("ui_cleanup_count", count=count, days=days) }}</strong></p>
 {% if count > 0 %}
 <p>{{ t("ui_discard_text") }}</p>
 <p>{{ plaud_note }}</p>
@@ -17,7 +17,8 @@
   <input type="hidden" name="days" value="{{ days }}">
   <input type="hidden" name="expected_count" value="{{ count }}">
   <button class="danger" type="submit">{{ t("ui_cleanup_confirm", count=count) }}</button>
-</form>
+</form></div>
+{% else %}</div>
 {% endif %}
-<p><a href="/">{{ t("ui_back") }}</a></p>
+<a class="back" href="/">{{ t("ui_back") }}</a>
 {% endblock %}

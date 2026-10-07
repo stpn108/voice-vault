@@ -1,8 +1,9 @@
 {% extends "base.html" %}
 {% block title %}{{ t("ui_nav_topics") }}{% endblock %}
 {% block content %}
+<h1>{{ t("ui_nav_topics") }}</h1>
 {% if topics %}
-<table>
+<div class="card flush"><table>
   <thead><tr><th>{{ t("ui_topic") }}</th><th>{{ t("ui_col_open") }}</th><th class="hide-small">{{ t("ui_col_notes") }}</th><th>{{ t("ui_col_activity") }}</th></tr></thead>
   <tbody>
   {% for topic, open_count, notes, last in topics %}
@@ -10,7 +11,7 @@
     <td class="hide-small">{{ notes }}</td><td>{{ last | localtime }}</td></tr>
   {% endfor %}
   </tbody>
-</table>
+</table></div>
 {% else %}
 <p class="muted">{{ t("ui_topics_empty") }}</p>
 {% endif %}

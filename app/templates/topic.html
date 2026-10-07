@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 {% block title %}{{ topic.name }}{% endblock %}
 {% block content %}
-<p><a href="/topics">{{ t("ui_back_topics") }}</a></p>
-<h2>{{ topic.name }}</h2>
+<a class="back" href="/topics">{{ t("ui_back_topics") }}</a>
+<h1>{{ topic.name }}</h1>
 <h3>{{ t("ui_open_tasks") }}</h3>
-{% if rows %}
-<ul>{% for row in rows %}<li><span class="prio-{{ row.priority }}">{{ t("todo_prio_" ~ row.priority) }}</span> <a href="/todos/{{ row.id }}">{{ row.title }}</a></li>{% endfor %}</ul>
-{% else %}<p class="muted">{{ t("ui_todo_empty") }}</p>{% endif %}
+<div class="card">{% if rows %}
+{% for row in rows %}<div style="padding:.2rem 0"><span class="pill chip p{{ row.priority }}">{{ t("todo_prio_" ~ row.priority) }}</span> <a class="task-title" href="/todos/{{ row.id }}">{{ row.title }}</a></div>{% endfor %}
+{% else %}<span class="muted">{{ t("ui_todo_empty") }}</span>{% endif %}</div>
 <h3>{{ t("ui_timeline") }}</h3>
-<table>
+<div class="card flush"><table>
   <tbody>
   {% for e in entries %}
   <tr>
@@ -19,5 +19,5 @@
   </tr>
   {% endfor %}
   </tbody>
-</table>
+</table></div>
 {% endblock %}

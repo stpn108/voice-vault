@@ -1,22 +1,23 @@
 {% extends "base.html" %}
 {% block title %}{{ t("ui_nav_todos") }}{% endblock %}
 {% block content %}
-<p class="tabs">
+<h1>{{ t("ui_nav_todos") }}</h1>
+<div class="seg">
 {% for s in statuses %}
   <a href="/todos?status={{ s }}{% if topic %}&amp;topic={{ topic | urlencode }}{% endif %}" {% if s == status %}class="current"{% endif %}>{{ t("todo_status_" ~ s) }} ({{ counts[s] }})</a>
 {% endfor %}
-{% if topic %}<span class="muted">{{ t("ui_topic") }}: {{ topic }} · <a href="/todos?status={{ status }}">×</a></span>{% endif %}
-</p>
-<form class="add" method="post" action="/todos">
+</div>
+{% if topic %}<p class="muted">{{ t("ui_topic") }}: <strong>{{ topic }}</strong> · <a href="/todos?status={{ status }}">×</a></p>{% endif %}
+<div class="card"><form class="add" method="post" action="/todos">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <input type="text" name="title" placeholder="{{ t('ui_todo_new') }}" size="36" maxlength="300" required>
   <select name="priority">{% for p in priorities %}<option value="{{ p }}" {% if p == 3 %}selected{% endif %}>{{ t("todo_prio_" ~ p) }}</option>{% endfor %}</select>
   <input type="date" name="due">
   <input type="text" name="topic" placeholder="{{ t('ui_topic') }}" size="14" maxlength="120">
-  <button type="submit">{{ t("ui_todo_add") }}</button>
-</form>
+  <button class="primary" type="submit">{{ t("ui_todo_add") }}</button>
+</form></div>
 {% if rows %}
-<table>
+<div class="card flush"><table>
   <thead><tr><th></th><th>{{ t("ui_col_prio") }}</th><th>{{ t("ui_col_task") }}</th><th class="hide-small">{{ t("ui_col_due") }}</th><th class="hide-small">{{ t("ui_topic") }}</th><th class="hide-small">{{ t("ui_col_age") }}</th></tr></thead>
   <tbody>
   {% for row in rows %}
@@ -25,23 +26,23 @@
       <form class="inline" method="post" action="/todos/{{ row.id }}/status">
         <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="list">
         {% if row.status == "open" %}
-        <button type="submit" name="status" value="done" title="{{ t('ui_todo_check') }}">✓</button>
-        <button type="submit" name="status" value="dropped" title="{{ t('ui_todo_drop') }}">✗</button>
+        <button class="check" type="submit" name="status" value="done" title="{{ t('ui_todo_check') }}">✓</button>
+        <button class="drop" type="submit" name="status" value="dropped" title="{{ t('ui_todo_drop') }}">✕</button>
         {% else %}
         <button type="submit" name="status" value="open">{{ t("ui_todo_reopen") }}</button>
         {% endif %}
       </form>
     </td>
-    <td class="prio-{{ row.priority }}">{{ t("todo_prio_" ~ row.priority) }}</td>
-    <td><a href="/todos/{{ row.id }}" {% if row.status != "open" %}class="done"{% endif %}>{{ row.title }}</a>
-      {% if row.created_by == "claude" %}<span class="muted"> · Claude</span>{% endif %}</td>
+    <td><span class="pill chip p{{ row.priority }}">{{ t("todo_prio_" ~ row.priority) }}</span></td>
+    <td><a class="task-title {% if row.status != "open" %}done{% endif %}" href="/todos/{{ row.id }}">{{ row.title }}</a>
+      {% if row.created_by == "claude" %}<span class="by">Claude</span>{% endif %}</td>
     <td class="hide-small">{{ row.due_date.strftime("%d.%m.%Y") if row.due_date else "" }}</td>
     <td class="hide-small">{% if row.topic %}<a href="/topics/{{ row.topic | urlencode }}">{{ row.topic }}</a>{% endif %}</td>
     <td class="hide-small muted">{{ row.age_days }} {{ t("ui_days") }}</td>
   </tr>
   {% endfor %}
   </tbody>
-</table>
+</table></div>
 {% if truncated %}<p class="muted">{{ t("ui_todo_truncated") }}</p>{% endif %}
 {% else %}
 <p class="muted">{{ t("ui_todo_empty") }}</p>

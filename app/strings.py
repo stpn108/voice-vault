@@ -68,6 +68,7 @@ TEXTS = {
     "oauth_wrong_password": {"de": "Das Passwort stimmt nicht.", "en": "The password is wrong."},
     "oauth_bad_request": {"de": "Die Anfrage ist ungültig. Starte die Verbindung in Claude neu.", "en": "The request is invalid. Start the connection in Claude again."},
     "oauth_expired": {"de": "Die Anmeldung ist abgelaufen. Starte die Verbindung in Claude neu.", "en": "The sign-in expired. Start the connection in Claude again."},
+    "ui_nav_recordings": {"de": "Aufnahmen", "en": "Recordings"},
     "ui_nav_todos": {"de": "Aufgaben", "en": "Tasks"},
     "ui_nav_topics": {"de": "Themen", "en": "Topics"},
     "ui_nav_digests": {"de": "Tagesübersicht", "en": "Daily overview"},

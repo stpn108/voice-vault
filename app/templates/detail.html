@@ -1,15 +1,16 @@
 {% extends "base.html" %}
 {% block title %}{{ rec.title or t("ui_untitled") }}{% endblock %}
 {% block content %}
-<p><a href="/">{{ t("ui_back") }}</a></p>
+<a class="back" href="/">{{ t("ui_back") }}</a>
 <h1>{{ rec.title or t("ui_untitled") }}</h1>
 <p class="muted">
   {{ rec.started_at | localtime }} · {{ rec.duration_ms | hms }} ·
-  <span class="state state-{{ state }}">{{ t("state_" ~ state) }}</span>
+  <span class="pill state state-{{ state }}">{{ t("state_" ~ state) }}</span>
 </p>
 <h2>{{ t("ui_summary") }}</h2>
-<pre class="text">{{ rec.summary }}</pre>
+<div class="card"><pre class="text">{{ rec.summary }}</pre></div>
 <h2>{{ t("ui_transcript") }}</h2>
+<div class="card">
 {% for seg in segments %}
 <div class="segment">
   <span class="muted">{{ seg.start_ms | mmss }}</span>
@@ -17,5 +18,6 @@
   <span>{{ seg.text }}</span>
 </div>
 {% endfor %}
-<p><a href="/recordings/{{ rec.id }}/discard">{{ t("ui_discard") }}</a></p>
+</div>
+<p class="actions"><a class="btn" href="/recordings/{{ rec.id }}/discard">{{ t("ui_discard") }}</a></p>
 {% endblock %}

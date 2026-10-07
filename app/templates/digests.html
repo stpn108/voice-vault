@@ -1,8 +1,9 @@
 {% extends "base.html" %}
 {% block title %}{{ t("ui_nav_digests") }}{% endblock %}
 {% block content %}
+<h1>{{ t("ui_nav_digests") }}</h1>
 {% for d in digests %}
-<section class="digest">
+<section class="card digest">
   <h3>{{ d.day.strftime("%d.%m.%Y") }}</h3>
   <pre class="text">{{ d.body }}</pre>
 </section>
