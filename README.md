@@ -77,32 +77,54 @@ Requirements: `requirements/`. Decisions: `DECISIONS.md` (D-001 to D-004).
 - While Plaud keeps a recording (shadow mode, or waiting for stability) every
   cycle re-reads its detail, transcript and summary to detect changes.
 
-## Claude access over MCP (REQ-003, D-011)
+## Claude access over MCP (REQ-003, REQ-005, D-011, D-012)
 
 Opt-in. The `mcp` service gives Claude read-only access to the recordings: search
 (`list_recordings`) and read (`get_recording`, summary plus transcript with speaker and time).
-It cannot change or delete anything.
+It cannot change or delete recordings.
 
-1. In `.env`: `COMPOSE_PROFILES=mcp`, `MCP_TOKENS=$(openssl rand -hex 32)` and
-   `MCP_ALLOWED_HOSTS=<public host name of your reverse proxy>`. Without a token of at
-   least 32 characters the service refuses to start.
-2. `./redeploy.sh` starts and health-checks it. It listens on
-   `127.0.0.1:${PORTS_PREFIX}020`, separate from the UI port.
-3. Reverse proxy: terminate TLS, forward only `/mcp` to that port, pass the `Host`
-   header (`proxy_set_header Host $host;` in nginx), do not buffer responses, and add a
-   rate limit. Do not expose `/healthz`.
-4. Claude Code:
-   `claude mcp add --transport http voice-vault https://<host>/mcp --header "Authorization: Bearer <token>"`.
-   claude.ai: custom connector with the URL and the same header under "Request headers"
-   (beta, not available to every organisation; otherwise claude.ai needs OAuth, not built yet).
-5. Rotate the token: put the new token next to the old one in `MCP_TOKENS`
-   (comma separated), redeploy, update Claude, then remove the old one.
+**Set up**
 
-Anyone with the token can read every stored conversation. Keep it like a password. What
-Claude reads goes to Anthropic for processing; that is the point of the tool, but it
-means the recordings are no longer only on your server once you ask Claude about them.
-Recording text is untrusted: a spoken sentence like "ignore previous instructions" must
-not be obeyed, which is why the tools are read-only.
+1. In `.env`: `COMPOSE_PROFILES=mcp`, then the sign-in settings below, then
+   `MCP_ALLOWED_HOSTS=<host name of your reverse proxy>` (without `https://`).
+2. `./redeploy.sh` starts and health-checks the service. It listens on
+   `127.0.0.1:${PORTS_PREFIX}020`, separate from the UI port. It refuses to start without a
+   safe way to sign in.
+3. Reverse proxy: terminate TLS, pass the `Host` header (`proxy_set_header Host $host;` in
+   nginx), do not buffer responses, add a rate limit. Forward only these paths to the port:
+   `/mcp`, `/authorize`, `/token`, `/.well-known/oauth-protected-resource` (with and without
+   `/mcp` after it) and `/.well-known/oauth-authorization-server`. Do not forward `/healthz`.
+   Claude's servers call from `160.79.104.0/21`: a firewall or WAF in front of the proxy must
+   let them reach all of these paths, including the `/.well-known/` ones.
+
+**Claude Code (static token)**
+
+`MCP_TOKENS=$(openssl rand -hex 32)`, then
+`claude mcp add --transport http voice-vault https://<host>/mcp --header "Authorization: Bearer <token>"`.
+To rotate, put the new token next to the old one (comma separated), redeploy, update Claude,
+then remove the old one.
+
+**claude.ai, Desktop and mobile (OAuth)**
+
+1. In `.env`: `MCP_PUBLIC_URL=https://<host>` (origin only), `MCP_OAUTH_CLIENT_ID=<random string,
+   8+ characters>` and `MCP_OAUTH_PASSWORD=<20+ characters>`. `MCP_OAUTH_CLIENT_SECRET` is optional.
+2. Redeploy. In Claude: Customize, Connectors, add a custom connector. Server URL
+   `https://<host>/mcp`. Under the advanced settings choose "Use your own OAuth client" and enter
+   the client ID (and the secret, if you set one).
+3. Connect. Claude opens the approval page of your server; enter `MCP_OAUTH_PASSWORD` and
+   approve. Access tokens last 1 hour, refresh tokens 30 days and are replaced on every use.
+4. Log everything out: `docker compose exec db sh -c 'psql -U "$POSTGRES_USER" "$POSTGRES_DB" -c
+   "UPDATE oauth_tokens SET revoked_at = now() WHERE revoked_at IS NULL"'`. Changing
+   `MCP_OAUTH_PASSWORD` stops new sign-ins but does not end existing sessions.
+
+There is no open client registration: only the client ID you configured can start a sign-in,
+only the listed redirect addresses are accepted, and every request needs PKCE (S256).
+
+Anyone with a token or the approval password can read every stored conversation. Keep both like
+passwords. What Claude reads goes to Anthropic for processing; that is the point of the tool, but
+it means the recordings are no longer only on your server once you ask Claude about them. Recording
+text is untrusted: a spoken sentence like "ignore previous instructions" must not be obeyed, which
+is why the tools are read-only.
 
 ## Operations
 

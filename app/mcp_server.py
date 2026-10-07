@@ -3,15 +3,18 @@ MCP server for the stored recordings (REQ-003, D-011).
 
 Minimal MCP over "Streamable HTTP": one endpoint, POST /mcp, JSON-RPC in, JSON out,
 stateless, no server-initiated stream. Tools only, all read-only. Meant to sit behind
-the owner's reverse proxy on its own port, so it is authenticated on every request
-with a static bearer token, checks Host and Origin, and never starts without a token.
+the owner's reverse proxy on its own port, so it is authenticated on every request:
+a static bearer token (Claude Code) or an OAuth access token (claude.ai, see mcp_oauth_web.py).
+It checks Host and Origin and never starts without a way to authenticate.
 
 Run with:  uvicorn mcp_server:create_app --factory --host 0.0.0.0 --port 8000
 """
+import asyncio
 import hmac
 import json
 import logging
 import re
+from contextlib import asynccontextmanager
 from typing import Callable, Optional
 
 from fastapi import FastAPI, Request, Response
@@ -22,8 +25,9 @@ from starlette.concurrency import run_in_threadpool
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 import mcp_tools
-from config import Config, load_config
-from database import engine
+from config import Config, ConfigError, host_name, load_config
+from database import engine, migrate_schema
+from mcp_oauth_web import build_settings, setup_oauth
 from utils import now_utc, setup_logging
 
 setup_logging()
@@ -42,13 +46,8 @@ INSTRUCTIONS = (
 PARSE_ERROR, INVALID_REQUEST, METHOD_NOT_FOUND, INVALID_PARAMS, INTERNAL_ERROR = -32700, -32600, -32601, -32602, -32603
 
 
-class ConfigError(RuntimeError):
-    """The server is not configured safely enough to start."""
-
-
 def validate_tokens(tokens: tuple) -> tuple:
-    if not tokens:
-        raise ConfigError("MCP_TOKENS is empty: refusing to start an unauthenticated server")
+    """Static bearer tokens: each must be long enough to be unguessable."""
     if any(len(t) < MIN_TOKEN_CHARS for t in tokens):
         raise ConfigError(f"every MCP token needs at least {MIN_TOKEN_CHARS} characters (openssl rand -hex 32)")
     return tuple(tokens)
@@ -125,14 +124,32 @@ def handle_message(message: object, session_factory: Callable[[], Session], cfg:
     return _error(request_id, METHOD_NOT_FOUND, f"method not found: {method}")
 
 
-def create_app(cfg: Optional[Config] = None, session_factory: Optional[Callable[[], Session]] = None) -> FastAPI:
+def create_app(cfg: Optional[Config] = None, session_factory: Optional[Callable[[], Session]] = None,
+               sleep: Callable = asyncio.sleep) -> FastAPI:
     cfg = cfg or load_config()
-    tokens = validate_tokens(cfg.mcp_tokens)
+    default_database = session_factory is None
     session_factory = session_factory or (lambda: Session(engine))
     allowed_origins = set(cfg.mcp_allowed_origins)
+    tokens = validate_tokens(cfg.mcp_tokens)
+    # Any OAuth setting switches OAuth on and demands a complete, safe configuration; a forgotten
+    # password must not silently leave the server with less protection than intended.
+    wants_oauth = any((cfg.mcp_oauth_password, cfg.mcp_oauth_client_id, cfg.mcp_oauth_client_secret, cfg.mcp_public_url))
+    oauth_settings = build_settings(cfg) if wants_oauth else None
+    if not tokens and oauth_settings is None:
+        raise ConfigError("neither MCP_TOKENS nor MCP_OAUTH_PASSWORD is set: refusing to start an unauthenticated server")
 
-    app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
-    app.add_middleware(TrustedHostMiddleware, allowed_hosts=LOCAL_HOSTS + list(cfg.mcp_allowed_hosts))
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        if default_database:
+            migrate_schema()  # the OAuth tables must exist
+        yield
+
+    hosts = LOCAL_HOSTS + list(cfg.mcp_allowed_hosts)
+    if oauth_settings is not None:
+        hosts.append(host_name(oauth_settings.issuer))
+    app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=hosts)
+    oauth = setup_oauth(app, oauth_settings, session_factory, cfg.ui_lang, sleep) if oauth_settings else None
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next):
@@ -165,11 +182,18 @@ def create_app(cfg: Optional[Config] = None, session_factory: Optional[Callable[
 
     @app.post("/mcp")
     async def mcp_endpoint(request: Request):
-        if not token_is_valid(bearer_token(request.headers.get("authorization")), tokens):
+        presented = bearer_token(request.headers.get("authorization"))
+        allowed = token_is_valid(presented, tokens)
+        if not allowed and oauth is not None and presented:
+            allowed = await run_in_threadpool(oauth.access_ok, presented)
+        if not allowed:
             forwarded = re.sub(r"[^0-9a-fA-F:., ]", "", request.headers.get("x-forwarded-for", ""))[:80]
             log.warning("MCP request rejected: bad or missing token client=%s forwarded_for=%s",
                         request.client.host if request.client else "?", forwarded)
-            return reject(401, "unauthorized", {"WWW-Authenticate": 'Bearer realm="voice-vault"'})
+            challenge = 'Bearer realm="voice-vault"'
+            if oauth is not None:  # Claude starts its sign-in from this pointer
+                challenge += f', resource_metadata="{oauth.settings.metadata_url}"'
+            return reject(401, "unauthorized", {"WWW-Authenticate": challenge})
         origin = request.headers.get("origin")
         if origin and origin not in allowed_origins:
             log.warning("MCP request rejected: origin not allowed origin=%s", origin[:80])

@@ -71,6 +71,33 @@ class Segment(Base):
     )
 
 
+class OAuthCode(Base):
+    """A one-time OAuth authorization code of the MCP server (stored as a hash, 60 s lifetime)."""
+    __tablename__ = "oauth_codes"
+    code_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    redirect_uri: Mapped[str] = mapped_column(Text)
+    code_challenge: Mapped[str] = mapped_column(String(128))
+    expires_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class OAuthToken(Base):
+    """An OAuth access or refresh token of the MCP server. Only the SHA-256 hash is stored."""
+    __tablename__ = "oauth_tokens"
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(10))
+    family_id: Mapped[str] = mapped_column(String(64), index=True)
+    expires_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 class PlaudSession(Base):
     """The one current Plaud token pair (single row, id=1). Secret: never log or export."""
     __tablename__ = "plaud_sessions"

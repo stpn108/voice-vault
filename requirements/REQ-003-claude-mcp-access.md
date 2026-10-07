@@ -43,7 +43,7 @@ Claude (Claude Code, and claude.ai where the connector can send a header) reads 
 ## Out of scope
 
 - Writing, tagging, discarding or deleting through MCP.
-- OAuth for claude.ai connectors without the request-header beta (see open questions).
+- OAuth for claude.ai connectors: REQ-005.
 - TLS and rate limiting: the owner's reverse proxy does both.
 - A read-only database role for the service (possible later).
 
@@ -55,7 +55,7 @@ Claude answers a question about a stored recording using only `list_recordings` 
 
 | Date | Question | Answer |
 |------|----------|--------|
-| 2026-10-07 | Which Claude do you use: Claude Code, or claude.ai (web, desktop, mobile)? claude.ai accepts a fixed `Authorization` header only for organisations in a beta; otherwise it needs OAuth, which this requirement does not include yet. | open |
+| 2026-10-07 | Which Claude do you use? claude.ai accepts a fixed `Authorization` header only for organisations in a beta. | OAuth is needed (owner, 2026-10-07): see REQ-005 |
 | 2026-10-07 | What do you want to do with Claude on the recordings? This decides whether more tools are needed (for example summaries across a period, action items, discarding). | open |
 
 ## Tests

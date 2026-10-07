@@ -34,3 +34,17 @@ def test_delete_flag_parsing(monkeypatch, value, expected):
 def test_refresh_token_is_read_and_stripped(monkeypatch):
     monkeypatch.setenv("PLAUD_REFRESH_TOKEN", "  abc  ")
     assert load_config().plaud_refresh_token == "abc"
+
+
+@pytest.mark.parametrize("value", [None, ""])
+def test_redirect_uris_fall_back_to_the_claude_callback_when_unset_or_empty(monkeypatch, value):
+    if value is None:
+        monkeypatch.delenv("MCP_OAUTH_REDIRECT_URIS", raising=False)
+    else:
+        monkeypatch.setenv("MCP_OAUTH_REDIRECT_URIS", value)
+    assert load_config().mcp_oauth_redirect_uris == ("https://claude.ai/api/mcp/auth_callback",)
+
+
+def test_redirect_uris_can_be_extended(monkeypatch):
+    monkeypatch.setenv("MCP_OAUTH_REDIRECT_URIS", "https://claude.ai/api/mcp/auth_callback, http://localhost/callback")
+    assert load_config().mcp_oauth_redirect_uris == ("https://claude.ai/api/mcp/auth_callback", "http://localhost/callback")

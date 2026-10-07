@@ -56,6 +56,18 @@ TEXTS = {
     "ui_cleanup_show": {"de": "Anzeigen", "en": "Show"},
     "ui_cleanup_count": {"de": "Betroffen: {count} Aufnahme(n), älter als {days} Tage.", "en": "Affected: {count} recording(s), older than {days} days."},
     "ui_cleanup_changed": {"de": "Die Anzahl hat sich geändert. Es wurde nichts verworfen. Bitte erneut prüfen.", "en": "The count changed. Nothing was discarded. Please check again."},
+    "oauth_title": {"de": "voice-vault: Zugriff freigeben", "en": "voice-vault: grant access"},
+    "oauth_intro": {
+        "de": "Claude möchte lesend auf Deine Aufnahmen zugreifen: Suchen und Lesen von Zusammenfassungen und Transkripten. Verändern oder Löschen ist nicht möglich.",
+        "en": "Claude wants read-only access to your recordings: searching and reading summaries and transcripts. Changing or deleting is not possible.",
+    },
+    "oauth_redirect_note": {"de": "Nach der Freigabe geht es zurück zu {host}.", "en": "After you approve, you are sent back to {host}."},
+    "oauth_password": {"de": "Freigabe-Passwort", "en": "Approval password"},
+    "oauth_allow": {"de": "Freigeben", "en": "Approve"},
+    "oauth_deny": {"de": "Ablehnen", "en": "Deny"},
+    "oauth_wrong_password": {"de": "Das Passwort stimmt nicht.", "en": "The password is wrong."},
+    "oauth_bad_request": {"de": "Die Anfrage ist ungültig. Starte die Verbindung in Claude neu.", "en": "The request is invalid. Start the connection in Claude again."},
+    "oauth_expired": {"de": "Die Anmeldung ist abgelaufen. Starte die Verbindung in Claude neu.", "en": "The sign-in expired. Start the connection in Claude again."},
     "ui_cleanup_confirm": {"de": "{count} Aufnahme(n) endgültig verwerfen", "en": "Discard {count} recording(s) for good"},
 }
 

@@ -1,14 +1,33 @@
 """All environment configuration, read in one place (.claude/architecture.md §3)."""
 import os
 from dataclasses import dataclass
+from urllib.parse import urlparse
 
 
 def _bool(name: str, default: bool) -> bool:
     return os.getenv(name, str(default)).strip().lower() in ("1", "true", "yes", "on")
 
 
-def _csv(name: str) -> tuple:
-    return tuple(v.strip() for v in os.getenv(name, "").split(",") if v.strip())
+class ConfigError(RuntimeError):
+    """The configuration is not safe or complete enough to start a service."""
+
+
+def _csv(name: str, default: str = "") -> tuple:
+    raw = os.getenv(name) or default  # compose passes unset variables on as empty strings
+    return tuple(v.strip() for v in raw.split(",") if v.strip())
+
+
+def host_name(value: str) -> str:
+    """A bare lowercase host name from a host, host:port or full URL (a pasted https://host/path works)."""
+    value = value.strip().lower()
+    if "://" in value:
+        value = urlparse(value).netloc
+    value = value.split("/")[0]
+    return value.rsplit(":", 1)[0] if value.count(":") == 1 else value
+
+
+def _hosts(name: str) -> tuple:
+    return tuple(h for h in (host_name(v) for v in _csv(name)) if h)
 
 
 @dataclass(frozen=True)
@@ -34,6 +53,11 @@ class Config:
     mcp_tokens: tuple
     mcp_allowed_hosts: tuple
     mcp_allowed_origins: tuple
+    mcp_public_url: str
+    mcp_oauth_client_id: str
+    mcp_oauth_client_secret: str
+    mcp_oauth_password: str
+    mcp_oauth_redirect_uris: tuple
 
 
 def load_config() -> Config:
@@ -57,6 +81,11 @@ def load_config() -> Config:
         ui_lang=os.getenv("UI_LANG", "de").strip() or "de",
         ui_allowed_hosts=tuple(h.strip() for h in os.getenv("UI_ALLOWED_HOSTS", "").split(",") if h.strip()),
         mcp_tokens=_csv("MCP_TOKENS"),
-        mcp_allowed_hosts=_csv("MCP_ALLOWED_HOSTS"),
+        mcp_allowed_hosts=_hosts("MCP_ALLOWED_HOSTS"),
         mcp_allowed_origins=_csv("MCP_ALLOWED_ORIGINS"),
+        mcp_public_url=os.getenv("MCP_PUBLIC_URL", "").strip().rstrip("/"),
+        mcp_oauth_client_id=os.getenv("MCP_OAUTH_CLIENT_ID", "").strip(),
+        mcp_oauth_client_secret=os.getenv("MCP_OAUTH_CLIENT_SECRET", "").strip(),
+        mcp_oauth_password=os.getenv("MCP_OAUTH_PASSWORD", ""),
+        mcp_oauth_redirect_uris=_csv("MCP_OAUTH_REDIRECT_URIS", "https://claude.ai/api/mcp/auth_callback"),
     )
