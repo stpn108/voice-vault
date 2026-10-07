@@ -107,7 +107,7 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **In plain words** | Nothing is deleted at Plaud before it is a day old, and never when Plaud has not reported how long the recording is. |
 | **Reasoning** | Owner decision. A longer wait leaves room for Plaud to finish or change summaries and for the owner to notice problems. Plaud may list a recording before its length is known, and then the age calculation would be wrong. |
 | **Rejected alternatives** | (A) keep 15 minutes: owner chose one day; (B) one day for the permanent delete only: the trash step is already reversible, the age gate protects against premature deletion of unfinished recordings; (C) block on duration only inside the import: the guard belongs where the decision is made. |
-| **Status** | **FINAL** |
+| **Status** | **FINAL**; the default values are amended by D-010, the duration guard stands |
 
 ### D-007: Database backups via Ofelia labels on the db service, no db-backup container (FINAL)
 
@@ -140,5 +140,16 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **In plain words** | When you throw a recording away in the page, it is also removed at Plaud on the normal schedule, so nothing of it is left anywhere. |
 | **Reasoning** | Owner decision. Leaving it at Plaud would keep conversation content there for good, against the purpose of the tool (D-004). The verification gate protects the only copy; after a deliberate discard there is no copy to protect. |
 | **Rejected alternatives** | (A) leave discarded recordings at Plaud: contradicts data minimisation, was the safe default only until the owner decided; (B) delete at Plaud immediately on discard: skips the age and duration protection against unfinished recordings and the Plaud trash step. |
+| **Status** | **FINAL** |
+
+### D-010: Defaults are 12 hours minimum age and 12 hours trash wait, about one day in total (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-07 |
+| **Decision** | Amends the default values of D-006. `MIN_AGE_MINUTES` defaults to 720 (12 hours) and `PERMANENT_DELETE_AFTER_HOURS` to 12, so a recording is gone at Plaud about one day after it ended: in the Plaud trash after 12 hours, deleted permanently 12 hours later. Both stay configurable and an explicit value in `.env` wins over the default. The duration guard of D-006 and the discard rules of D-009 are unchanged. |
+| **In plain words** | After about one day nothing of a recording is left at Plaud. Half a day passes before it goes into the Plaud trash, and half a day more before it is deleted for good. |
+| **Reasoning** | Owner decision: the owner wants the content gone at Plaud after one day in total, and keeps the Plaud trash as a half-day safety net. D-006's one day plus 24 hours meant about two days. |
+| **Rejected alternatives** | (A) 24 h plus 24 h (about two days at Plaud): longer than the owner wants; (B) 24 h plus 0 (no trash step): nothing restorable at Plaud. |
 | **Status** | **FINAL** |
 

@@ -74,10 +74,10 @@ def test_zero_duration_recording_is_never_trashed_even_if_everything_else_holds(
     assert plaud.trashed == [] and stats.held_back == 1
 
 
-def test_default_minimum_age_is_one_day():
-    rec = make_recording(ended_at=NOW - dt.timedelta(hours=23))
+def test_default_minimum_age_is_twelve_hours():
+    rec = make_recording(ended_at=NOW - dt.timedelta(hours=11))
     assert "too_young" in unmet_trash_conditions(rec, NOW, load_config())
-    rec = make_recording(ended_at=NOW - dt.timedelta(hours=24))
+    rec = make_recording(ended_at=NOW - dt.timedelta(hours=12))
     assert "too_young" not in unmet_trash_conditions(rec, NOW, load_config())
 
 
