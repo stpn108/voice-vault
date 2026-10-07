@@ -132,7 +132,9 @@ The UI (`/todos`, `/topics`, `/digests`) shows a prioritized task list you check
 of each topic and the daily overviews. Through MCP Claude can use `list_todos`, `add_todo`,
 `update_todo` (status `done`, `dropped` or `open`), `list_topics`, `get_topic`, `add_topic_note`,
 `mark_recording_analyzed`, `save_digest` and `list_digests`. Every change is logged with who made
-it and can be undone on the task page. Nothing can be deleted, by Claude or in the UI.
+it and can be undone on the task page. Claude can delete nothing. You can delete a topic on its page,
+after a confirmation: its notes go, its tasks stay. The task list sorts by priority, due date, age, topic
+or title.
 
 Prompt for the daily routine (connector `Dennis_Voice-Vault`):
 
