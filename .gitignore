@@ -15,3 +15,9 @@ app/.requirements_hash
 .coverage
 .coverage*
 htmlcov/
+.env.*
+!.env.example
+*.sql
+*.sql.gz
+*.pem
+*.key

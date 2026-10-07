@@ -90,12 +90,44 @@ It cannot change or delete recordings. It also lets Claude maintain tasks (see t
 2. `./redeploy.sh` starts and health-checks the service. It listens on
    `127.0.0.1:${PORTS_PREFIX}020`, separate from the UI port. It refuses to start without a
    safe way to sign in.
-3. Reverse proxy: terminate TLS, pass the `Host` header (`proxy_set_header Host $host;` in
-   nginx), do not buffer responses, add a rate limit. Forward only these paths to the port:
-   `/mcp`, `/authorize`, `/token`, `/.well-known/oauth-protected-resource` (with and without
-   `/mcp` after it) and `/.well-known/oauth-authorization-server`. Do not forward `/healthz`.
-   Claude's servers call from `160.79.104.0/21`: a firewall or WAF in front of the proxy must
-   let them reach all of these paths, including the `/.well-known/` ones.
+3. Reverse proxy (nginx as a reference). Terminate TLS, forward only these exact paths and answer
+   everything else with 404. Never put the UI port behind the proxy: the UI has no login.
+   `/healthz` stays internal. Claude's servers call from `160.79.104.0/21`: a firewall or WAF in
+   front of the proxy must let them reach all of these paths, including the `/.well-known/` ones.
+
+   ```nginx
+   # http { }
+   limit_req_zone $binary_remote_addr zone=vv_mcp:10m  rate=120r/m;
+   limit_req_zone $binary_remote_addr zone=vv_auth:10m rate=10r/m;
+
+   # snippets/voice-vault-proxy.conf
+   proxy_pass http://127.0.0.1:26020;      # ${PORTS_PREFIX}020
+   proxy_set_header Host $host;
+   proxy_set_header X-Forwarded-For $remote_addr;   # overwrite, never append: see MCP_TRUST_FORWARDED_FOR
+   proxy_buffering off;
+   proxy_read_timeout 60s;
+
+   server {
+       listen 443 ssl;
+       server_name mcp.example.org;
+       # ssl_certificate ...; ssl_protocols TLSv1.2 TLSv1.3;
+       add_header Strict-Transport-Security "max-age=31536000" always;
+       server_tokens off;
+       client_max_body_size 64k;
+
+       location / { return 404; }
+       location = /mcp { limit_req zone=vv_mcp burst=30 nodelay; include snippets/voice-vault-proxy.conf; }
+       location = /authorize { client_max_body_size 8k; limit_req zone=vv_auth burst=5 nodelay; include snippets/voice-vault-proxy.conf; }
+       location = /token { client_max_body_size 8k; limit_req zone=vv_auth burst=5 nodelay; include snippets/voice-vault-proxy.conf; }
+       location = /.well-known/oauth-protected-resource { include snippets/voice-vault-proxy.conf; }
+       location = /.well-known/oauth-protected-resource/mcp { include snippets/voice-vault-proxy.conf; }
+       location = /.well-known/oauth-authorization-server { include snippets/voice-vault-proxy.conf; }
+   }
+   ```
+
+   With this header set, put `MCP_TRUST_FORWARDED_FOR=true` in `.env`. A wrong approval password then
+   locks only the address it came from. Without it all callers share one lock, and someone who keeps
+   guessing can keep you out of the approval page (never in: the lock only refuses attempts).
 
 **Claude Code (static token)**
 

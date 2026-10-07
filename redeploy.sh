@@ -1,6 +1,6 @@
 #!/bin/bash
-# Tests -> Build -> Deploy -> Verify. Aborts on the first failure and leaves
-# the running app untouched. Runs interactively or from the deploy pipeline.
+# Tests -> Build -> Check -> Deploy -> Verify. Tests, build and the pre-deploy checks run while the
+# old services keep running; once they are stopped (step 2) a failure leaves them down until fixed. Runs interactively or from the deploy pipeline.
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -81,6 +81,27 @@ if [ $BUILD_EXIT_CODE -ne 0 ]; then
     exit 1
 fi
 
+# --- STEP 1b: CHECKS BEFORE ANYTHING IS STOPPED ---
+# Everything that can be checked is checked here, so a failed deploy does not leave the services down.
+if grep -Eq '^POSTGRES_PASSWORD=(change-me|changeme|password)?[[:space:]]*$' .env 2>/dev/null; then
+    err "POSTGRES_PASSWORD in .env is empty or the example value. Set a random one (openssl rand -hex 24)."
+    exit 1
+fi
+if ! docker compose config -q 2>/tmp/compose-config.err; then
+    err "docker compose config is invalid (a missing variable in .env?):"
+    cat /tmp/compose-config.err >&2
+    exit 1
+fi
+# The backup job (Ofelia) runs as the current user: the target folder must exist and be writable for it
+# and closed to others. Docker would create a missing folder as root, and the job then fails silently.
+mkdir -p volumes/backups
+if [ ! -w volumes/backups ]; then
+    err "volumes/backups is not writable for $(id -un). The database backup would fail."
+    err "Fix: sudo chown $(id -u):$(id -g) volumes/backups"
+    exit 1
+fi
+chmod 700 volumes/backups 2>/dev/null || warn "Could not restrict volumes/backups to the owner (chmod 700)."
+
 # 2. Stop the service (image is already built -> short downtime)
 log "2. Stopping services: ${SERVICES}..."
 docker compose stop $SERVICES
@@ -103,15 +124,6 @@ if [ -n "$ORPHANS" ]; then
     docker rm -f $ORPHANS
 else
     echo "No orphaned containers found. All clean."
-fi
-
-# 4b. The backup job (Ofelia) runs as the current user: the target folder must exist and be
-#     writable for it. Docker would create a missing folder as root, and the job then fails silently.
-mkdir -p volumes/backups
-if [ ! -w volumes/backups ]; then
-    err "volumes/backups is not writable for $(id -un). The database backup would fail."
-    err "Fix: sudo chown $(id -u):$(id -g) volumes/backups"
-    exit 1
 fi
 
 # 5. Start container with new image (--remove-orphans drops the retired db-backup service)

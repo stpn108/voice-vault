@@ -50,6 +50,8 @@ services:
     mem_limit: 512m
     memswap_limit: 512m
     user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
     environment:
       DATABASE_URL: ${DATABASE_URL}
       TZ: ${TZ:-Europe/Berlin}
@@ -92,6 +94,8 @@ services:
     mem_limit: 256m
     memswap_limit: 256m
     user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
     environment:
       DATABASE_URL: ${DATABASE_URL}
       TZ: ${TZ:-Europe/Berlin}
@@ -128,6 +132,8 @@ services:
     mem_limit: 256m
     memswap_limit: 256m
     user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
     environment:
       DATABASE_URL: ${DATABASE_URL}
       TZ: ${TZ:-Europe/Berlin}
