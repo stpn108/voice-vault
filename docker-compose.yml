@@ -115,6 +115,39 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # MCP server for Claude (REQ-003, D-011). Opt-in: set COMPOSE_PROFILES=mcp and MCP_TOKENS in .env.
+  # Own port, read-only tools, bearer token on every request. Put TLS and a rate limit in the
+  # reverse proxy; the proxy forwards to 127.0.0.1:${PORTS_PREFIX}020.
+  mcp:
+    profiles: ["mcp"]
+    image: ${COMPOSE_PROJECT_NAME:-voice-vault}-app
+    pull_policy: never
+    command: ["uvicorn", "mcp_server:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+    logging: *default-logging
+    mem_limit: 256m
+    memswap_limit: 256m
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      TZ: ${TZ:-Europe/Berlin}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      STABILITY_MINUTES: ${STABILITY_MINUTES:-10}
+      MCP_TOKENS: ${MCP_TOKENS:-}
+      MCP_ALLOWED_HOSTS: ${MCP_ALLOWED_HOSTS:-}
+      MCP_ALLOWED_ORIGINS: ${MCP_ALLOWED_ORIGINS:-}
+    ports:
+      - "127.0.0.1:${PORTS_PREFIX}020:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+      retries: 3
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
   app-tests:
     build:
       context: ./app

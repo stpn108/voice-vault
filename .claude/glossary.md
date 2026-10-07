@@ -28,6 +28,7 @@ contract that keeps conversation and code from drifting apart.
 | Zugangstoken | Short-lived Plaud user token (cookie `pld_ut`), sent as bearer on every API call. | `plaud_sessions.access_token`, `PlaudAuth.access_token()` | Roughly 24 hours (observed in other clients, to be confirmed live). Secret. |
 | Refresh-Token | Long-lived Plaud token (cookie `pld_urt`) that mints a new Zugangstoken without a login. | `plaud_sessions.refresh_token`, `PlaudAuth.refresh()` | About 30 days, may rotate on use. Secret. |
 | Verwerfen | Removing a recording's content (title, summary, transcript) from the database in the UI. The row stays as a tombstone so the import never fetches it again. | `recordings.discarded_at`, `recording_service.discard()` | Also makes the deletion pipeline remove the recording at Plaud (D-009). Cannot be undone. |
+| MCP-Zugang | Read-only door for Claude to the stored recordings: its own service `mcp`, protected by a bearer token. | `mcp_server.py`, `mcp_tools.py`, `MCP_TOKENS` | Claude can search and read, never write or delete. |
 | Mindestalter | Minimum age of a recording before it may be trashed, default 12 hours (720 minutes, D-010). A recording with unknown (0) duration is never trashed. | `MIN_AGE_MINUTES` | Measured from the end of the recording (`start_time + duration`). |
 
 ## Units and formats

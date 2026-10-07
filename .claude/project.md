@@ -39,7 +39,7 @@ of built:
 - **Database**: PostgreSQL 16 (SQLAlchemy 2.x, numbered migrations)
 - **Scheduling**: APScheduler (as in google-contacts-sync), every 10 minutes
 - **Web**: FastAPI + Jinja2 + uvicorn, service `web`, viewing and cleanup UI (REQ-002, D-008)
-- **Claude access**: MCP server on the owner's server (REQ-003)
+- **Claude access**: MCP server, service `mcp`, bearer token, read-only (REQ-003, D-011)
 - **External**: Plaud web API (unofficial, EU region)
 - **LLM** (optional): see `.claude/llm.md`
 - **Deployment**: Docker Compose on one server; GitHub Actions self-hosted runner runs `./redeploy.sh`

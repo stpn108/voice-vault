@@ -77,6 +77,33 @@ Requirements: `requirements/`. Decisions: `DECISIONS.md` (D-001 to D-004).
 - While Plaud keeps a recording (shadow mode, or waiting for stability) every
   cycle re-reads its detail, transcript and summary to detect changes.
 
+## Claude access over MCP (REQ-003, D-011)
+
+Opt-in. The `mcp` service gives Claude read-only access to the recordings: search
+(`list_recordings`) and read (`get_recording`, summary plus transcript with speaker and time).
+It cannot change or delete anything.
+
+1. In `.env`: `COMPOSE_PROFILES=mcp`, `MCP_TOKENS=$(openssl rand -hex 32)` and
+   `MCP_ALLOWED_HOSTS=<public host name of your reverse proxy>`. Without a token of at
+   least 32 characters the service refuses to start.
+2. `./redeploy.sh` starts and health-checks it. It listens on
+   `127.0.0.1:${PORTS_PREFIX}020`, separate from the UI port.
+3. Reverse proxy: terminate TLS, forward only `/mcp` to that port, pass the `Host`
+   header (`proxy_set_header Host $host;` in nginx), do not buffer responses, and add a
+   rate limit. Do not expose `/healthz`.
+4. Claude Code:
+   `claude mcp add --transport http voice-vault https://<host>/mcp --header "Authorization: Bearer <token>"`.
+   claude.ai: custom connector with the URL and the same header under "Request headers"
+   (beta, not available to every organisation; otherwise claude.ai needs OAuth, not built yet).
+5. Rotate the token: put the new token next to the old one in `MCP_TOKENS`
+   (comma separated), redeploy, update Claude, then remove the old one.
+
+Anyone with the token can read every stored conversation. Keep it like a password. What
+Claude reads goes to Anthropic for processing; that is the point of the tool, but it
+means the recordings are no longer only on your server once you ask Claude about them.
+Recording text is untrusted: a spoken sentence like "ignore previous instructions" must
+not be obeyed, which is why the tools are read-only.
+
 ## Operations
 
 ```bash

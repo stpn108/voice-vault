@@ -7,6 +7,10 @@ def _bool(name: str, default: bool) -> bool:
     return os.getenv(name, str(default)).strip().lower() in ("1", "true", "yes", "on")
 
 
+def _csv(name: str) -> tuple:
+    return tuple(v.strip() for v in os.getenv(name, "").split(",") if v.strip())
+
+
 @dataclass(frozen=True)
 class Config:
     plaud_token: str
@@ -27,6 +31,9 @@ class Config:
     mail_to: str
     ui_lang: str
     ui_allowed_hosts: tuple
+    mcp_tokens: tuple
+    mcp_allowed_hosts: tuple
+    mcp_allowed_origins: tuple
 
 
 def load_config() -> Config:
@@ -49,4 +56,7 @@ def load_config() -> Config:
         mail_to=os.getenv("MAIL_TO", ""),
         ui_lang=os.getenv("UI_LANG", "de").strip() or "de",
         ui_allowed_hosts=tuple(h.strip() for h in os.getenv("UI_ALLOWED_HOSTS", "").split(",") if h.strip()),
+        mcp_tokens=_csv("MCP_TOKENS"),
+        mcp_allowed_hosts=_csv("MCP_ALLOWED_HOSTS"),
+        mcp_allowed_origins=_csv("MCP_ALLOWED_ORIGINS"),
     )
