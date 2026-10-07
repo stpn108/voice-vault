@@ -34,7 +34,7 @@ Claude (Claude Code, and claude.ai where the connector can send a header) reads 
 7. **Read one recording.**
    Given a recording id, when Claude calls `get_recording`, then it gets title, metadata, summary and the transcript as `[mm:ss] Speaker: text` lines. Long transcripts come in slices of up to 2000 segments with `next_segment_offset`. Unknown or discarded recordings return a tool error, not a protocol error.
 8. **Read-only.**
-   Given any request, then no row is written. Every tool is annotated `readOnlyHint`. Discarding and deleting stay in the UI.
+   Given any request to the two recording tools, then no row is written. Both are annotated `readOnlyHint`. Discarding and deleting stay in the UI. Amended by REQ-006 and D-013: further tools write to the task tables only.
 9. **Bad input is rejected cleanly.**
    Given arguments of the wrong type, out of range or unknown, then JSON-RPC error -32602; unknown methods -32601; invalid JSON 400 with -32700; internal errors return a generic message without details.
 10. **No content in the log.**
