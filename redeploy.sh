@@ -105,6 +105,15 @@ else
     echo "No orphaned containers found. All clean."
 fi
 
+# 4b. The backup job (Ofelia) runs as the current user: the target folder must exist and be
+#     writable for it. Docker would create a missing folder as root, and the job then fails silently.
+mkdir -p volumes/backups
+if [ ! -w volumes/backups ]; then
+    err "volumes/backups is not writable for $(id -un). The database backup would fail."
+    err "Fix: sudo chown $(id -u):$(id -g) volumes/backups"
+    exit 1
+fi
+
 # 5. Start container with new image (--remove-orphans drops the retired db-backup service)
 log "5. Starting container with new image..."
 docker compose up -d --remove-orphans $SERVICES
