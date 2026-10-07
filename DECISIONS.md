@@ -263,3 +263,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | The code was written and tested by the same author; independent reviewers with the task to break it are the best check available without an external audit. Every finding was reproduced by a probe before it counted. |
 | **Rejected alternatives** | (A) a CAPTCHA or e-mail confirmation for the approval page: more moving parts for one user; (B) per-address locks without a trusted proxy header: the address cannot be known reliably, a spoofed header would then unlock the guess limit; (C) leave the dependency versions: the advisories concern multipart and file responses, which the public endpoints do not use, but the upgrade passed all checks and removes the question. |
 | **Status** | **FINAL** |
+
+### D-021: Referrer policy `same-origin` for the web UI, and `Origin: null` only from the browser's own same-origin requests (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-07 |
+| **Decision** | Amends D-008 and D-020. The web UI sends `Referrer-Policy: same-origin` instead of `no-referrer`. With `no-referrer` browsers send `Origin: null` on every form post, even to the same site, and the origin check of D-008 then refused every button of the UI ("Nicht erlaubt"). The CSRF check still needs the token and an origin that equals `scheme://host`; `Origin: null` is accepted only together with `Sec-Fetch-Site: same-origin`, which a web page cannot set. `Sec-Fetch-Site: same-site` (another port on the same host) and `cross-site` are refused. |
+| **In plain words** | The buttons work again. The protection against forged requests from other websites is the same as before. |
+| **Reasoning** | Reported by the owner. The tests used a client that sets the headers by hand and so never saw the browser's behaviour; it was reproduced in Chromium (old policy: `Origin: null`, refused; new policy: real origin, accepted). |
+| **Rejected alternatives** | (A) drop the origin check: the CSRF token alone protects, but the origin check is a second layer that costs nothing; (B) accept `Origin: null` always: a sandboxed page of another site sends `null` too; (C) keep `no-referrer` and rely on the token only: same as A. |
+| **Status** | **FINAL** |

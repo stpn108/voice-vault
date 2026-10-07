@@ -322,9 +322,18 @@ def test_review_an_unexpected_error_still_gets_the_security_headers(session_fact
     ({"origin": "http://localhost"}, 303), ({"origin": "evil://localhost"}, 403), ({"origin": "https://localhost"}, 403),
     ({"origin": "http://localhost.evil.com"}, 403), ({"origin": "null"}, 403),
     ({"sec-fetch-site": "cross-site"}, 403), ({"sec-fetch-site": "same-origin"}, 303), ({}, 303),
+    # browsers send `Origin: null` for form posts under some referrer policies: only same-origin counts
+    ({"origin": "null", "sec-fetch-site": "same-origin"}, 303), ({"origin": "null", "sec-fetch-site": "same-site"}, 403),
+    ({"origin": "null", "sec-fetch-site": "cross-site"}, 403), ({"origin": "null", "sec-fetch-site": "none"}, 403),
+    ({"origin": "http://localhost:3000", "sec-fetch-site": "same-site"}, 403),
 ])
 def test_review_the_origin_must_match_exactly_and_cross_site_requests_are_refused(client, seed, headers, expected):
     rec_id = seed(index=1)
     response = client.post(f"/recordings/{rec_id}/discard", data={"csrf": token()}, headers=headers,
                            follow_redirects=False)
     assert response.status_code == expected
+
+
+def test_review_the_pages_send_a_referrer_policy_that_keeps_form_origins_intact(client):
+    # With "no-referrer" browsers post `Origin: null` and every form would be refused.
+    assert client.get("/").headers["referrer-policy"] == "same-origin"

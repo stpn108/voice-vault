@@ -97,7 +97,9 @@ def secure(response):
     response.headers["Content-Security-Policy"] = CSP
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
-    response.headers["Referrer-Policy"] = "no-referrer"
+    # "no-referrer" would make browsers send `Origin: null` with every form post. "same-origin" sends
+    # no referrer to other sites either, but our own forms carry their real origin.
+    response.headers["Referrer-Policy"] = "same-origin"
     response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -146,9 +148,13 @@ def require_csrf(request: Request, token: str) -> None:
     if not hmac.compare_digest(token or "", csrf_token()):
         raise HTTPException(status_code=403, detail="invalid csrf token")
     origin = request.headers.get("origin")
-    if origin and origin != f"{request.url.scheme}://{request.headers.get('host')}":
+    fetch_site = request.headers.get("sec-fetch-site")
+    # Some browsers send `Origin: null` for same-origin form posts (depends on the referrer policy). That is
+    # trusted only when the browser itself says the request is same-origin: pages cannot set Sec-Fetch-Site.
+    null_from_same_origin = origin == "null" and fetch_site == "same-origin"
+    if origin and not null_from_same_origin and origin != f"{request.url.scheme}://{request.headers.get('host')}":
         raise HTTPException(status_code=403, detail="origin mismatch")
-    if request.headers.get("sec-fetch-site") == "cross-site":
+    if fetch_site in ("cross-site", "same-site"):
         raise HTTPException(status_code=403, detail="cross-site request")
 
 
