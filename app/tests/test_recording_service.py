@@ -162,3 +162,67 @@ def test_req_002_reading_does_not_change_rows(db_session):
     db_session.expire_all()
     after = db_session.get(Recording, rec.id)
     assert (after.summary, after.segment_count, after.discarded_at) == before
+
+
+# --- excerpt of a summary ---------------------------------------------------------------------
+@pytest.mark.parametrize("summary,expected", [
+    ("", ""),
+    ("   \n\n  ", ""),
+    ("plain text", "plain text"),
+    ("## Heading\nBody text", "Heading \u00b7 Body text"),
+    ("### Deep heading", "Deep heading"),
+    ("> Date: today\n> Place: here", "Date: today \u00b7 Place: here"),
+    ("- one\n- two\n* three\n+ four", "one \u00b7 two \u00b7 three \u00b7 four"),
+    ("1. first\n2) second", "first \u00b7 second"),
+    ("- [ ] open task\n- [x] done task\n- [X] other", "open task \u00b7 done task \u00b7 other"),
+    ("**bold** and __also bold__ and `code`", "bold and also bold and code"),
+    ("see [the docs](https://example.org/x) now", "see the docs now"),
+    ("keep [Name] and [Other Name] as they are", "keep [Name] and [Other Name] as they are"),
+    ("snake_case_name stays", "snake_case_name stays"),
+    ("a *single* star stays", "a *single* star stays"),
+    ("line one\n\n\n   line   two  ", "line one \u00b7 line two"),
+    # Section numbers are dropped like list numbers: all leading marks are peeled off, for readability.
+    ("## 1. Numbered heading", "Numbered heading"),
+    ("> ## Quoted heading\n> - nested bullet", "Quoted heading \u00b7 nested bullet"),
+])
+def test_make_excerpt_strips_markdown_and_joins_lines(summary, expected):
+    assert svc.make_excerpt(summary) == expected
+
+
+def test_make_excerpt_of_a_realistic_summary_header():
+    summary = ("> Datum: 06.10.2026 17:49:30\n> Ort: [Ort Einf\u00fcgen]\n> Teilnehmer: [Ian] [Dennis]\n\n"
+               "## Sitzungsnotizen\n### Analyse\n- **Diskussion**: Ein Kunde hat Mails erhalten")
+    out = svc.make_excerpt(summary)
+    assert out == ("Datum: 06.10.2026 17:49:30 \u00b7 Ort: [Ort Einf\u00fcgen] \u00b7 Teilnehmer: [Ian] [Dennis] \u00b7 "
+                   "Sitzungsnotizen \u00b7 Analyse \u00b7 Diskussion: Ein Kunde hat Mails erhalten")
+    assert "#" not in out and ">" not in out and "**" not in out
+
+
+def test_make_excerpt_cuts_at_a_word_and_marks_the_cut():
+    out = svc.make_excerpt("alpha beta gamma delta epsilon", max_chars=14)
+    assert out == "alpha beta\u2026"  # 'gamma' would be cut in half
+
+
+def test_make_excerpt_keeps_a_word_that_ends_exactly_at_the_limit():
+    assert svc.make_excerpt("alpha beta gamma", max_chars=10) == "alpha beta\u2026"
+    assert svc.make_excerpt("alpha beta", max_chars=10) == "alpha beta"
+
+
+def test_make_excerpt_hard_cuts_a_single_long_word():
+    out = svc.make_excerpt("x" * 50, max_chars=10)
+    assert out == "x" * 10 + "\u2026"
+
+
+def test_make_excerpt_does_not_end_with_a_dangling_separator():
+    out = svc.make_excerpt("one\ntwo\nthree\nfour", max_chars=9)
+    assert not out.rstrip("\u2026").endswith((" ", "\u00b7", ",", ";", ":", "-"))
+
+
+def test_make_excerpt_never_exceeds_the_limit_by_more_than_the_ellipsis():
+    out = svc.make_excerpt("word " * 200)
+    assert len(out) <= svc.EXCERPT_CHARS + 1 and out.endswith("\u2026")
+
+
+def test_the_list_carries_the_cleaned_excerpt(db_session):
+    add_recording(db_session, 1, summary="## Heading\n- **point** one\n- point two")
+    assert list_page(db_session).rows[0].excerpt == "Heading \u00b7 point one \u00b7 point two"

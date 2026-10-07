@@ -13,7 +13,7 @@ import datetime as dt
 from typing import Optional
 from sqlalchemy import (
     create_engine, Column, Integer, String, Float, DateTime,
-    Text, Boolean, ForeignKey, func, text as sqltext,
+    Text, Boolean, Date, ForeignKey, UniqueConstraint, func, text as sqltext,
 )
 from sqlalchemy.orm import DeclarativeBase, mapped_column, Mapped, Session
 
@@ -49,6 +49,7 @@ class Recording(Base):
     trashed_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     deleted_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     discarded_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    analyzed_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -66,6 +67,97 @@ class Segment(Base):
     start_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     end_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     text: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class Topic(Base):
+    """A subject that runs through several conversations (Thema)."""
+    __tablename__ = "topics"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(120), unique=True)
+    excluded: Mapped[bool] = mapped_column(Boolean, default=False, server_default=sqltext("false"))
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class Todo(Base):
+    """A task taken from the conversations (Aufgabe)."""
+    __tablename__ = "todos"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    title: Mapped[str] = mapped_column(String(300))
+    detail: Mapped[str] = mapped_column(Text, default="")
+    priority: Mapped[int] = mapped_column(Integer, default=3)
+    status: Mapped[str] = mapped_column(String(10), default="open", index=True)
+    due_date: Mapped[Optional[dt.date]] = mapped_column(Date, nullable=True)
+    topic_id: Mapped[Optional[int]] = mapped_column(ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True)
+    recording_id: Mapped[Optional[int]] = mapped_column(ForeignKey("recordings.id", ondelete="SET NULL"), nullable=True)
+    created_by: Mapped[str] = mapped_column(String(10), default="owner")
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    done_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class TodoEvent(Base):
+    """One change to a task: who, when, from which recording, and the old and new values."""
+    __tablename__ = "todo_events"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    todo_id: Mapped[int] = mapped_column(ForeignKey("todos.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(12))
+    actor: Mapped[str] = mapped_column(String(10))
+    recording_id: Mapped[Optional[int]] = mapped_column(ForeignKey("recordings.id", ondelete="SET NULL"), nullable=True)
+    note: Mapped[str] = mapped_column(Text, default="")
+    before_json: Mapped[str] = mapped_column(Text, default="{}")
+    after_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class TopicNote(Base):
+    """What one recording said about a topic (one note per topic and recording)."""
+    __tablename__ = "topic_notes"
+    __table_args__ = (UniqueConstraint("topic_id", "recording_id", name="uq_topic_notes_topic_recording"),)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    topic_id: Mapped[int] = mapped_column(ForeignKey("topics.id", ondelete="CASCADE"), index=True)
+    recording_id: Mapped[int] = mapped_column(ForeignKey("recordings.id", ondelete="CASCADE"), index=True)
+    note: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Digest(Base):
+    """The daily overview written by the routine (one per day, rewritten if it runs again)."""
+    __tablename__ = "digests"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    day: Mapped[dt.date] = mapped_column(Date, unique=True)
+    body: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class OAuthCode(Base):
+    """A one-time OAuth authorization code of the MCP server (stored as a hash, 60 s lifetime)."""
+    __tablename__ = "oauth_codes"
+    code_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    redirect_uri: Mapped[str] = mapped_column(Text)
+    code_challenge: Mapped[str] = mapped_column(String(128))
+    expires_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class OAuthToken(Base):
+    """An OAuth access or refresh token of the MCP server. Only the SHA-256 hash is stored."""
+    __tablename__ = "oauth_tokens"
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(10))
+    family_id: Mapped[str] = mapped_column(String(64), index=True)
+    expires_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -115,8 +207,26 @@ def _migrate_001_recordings_discarded_at(conn):
         ))
 
 
+def _migrate_002_recordings_analyzed_at(conn):
+    if conn.dialect.name == "postgresql":
+        conn.execute(sqltext(
+            "ALTER TABLE IF EXISTS recordings "
+            "ADD COLUMN IF NOT EXISTS analyzed_at TIMESTAMP WITH TIME ZONE;"
+        ))
+
+
+def _migrate_003_topics_excluded(conn):
+    if conn.dialect.name == "postgresql":
+        conn.execute(sqltext(
+            "ALTER TABLE IF EXISTS topics "
+            "ADD COLUMN IF NOT EXISTS excluded BOOLEAN NOT NULL DEFAULT FALSE;"
+        ))
+
+
 MIGRATIONS: list = [
     ("001_recordings_discarded_at", _migrate_001_recordings_discarded_at),
+    ("002_recordings_analyzed_at", _migrate_002_recordings_analyzed_at),
+    ("003_topics_excluded", _migrate_003_topics_excluded),
 ]
 
 # Advisory lock key: serialises schema setup when several replicas start at

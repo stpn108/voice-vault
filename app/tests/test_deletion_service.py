@@ -74,10 +74,10 @@ def test_zero_duration_recording_is_never_trashed_even_if_everything_else_holds(
     assert plaud.trashed == [] and stats.held_back == 1
 
 
-def test_default_minimum_age_is_one_day():
-    rec = make_recording(ended_at=NOW - dt.timedelta(hours=23))
+def test_default_minimum_age_is_seven_days():
+    rec = make_recording(ended_at=NOW - dt.timedelta(days=7, minutes=-1))
     assert "too_young" in unmet_trash_conditions(rec, NOW, load_config())
-    rec = make_recording(ended_at=NOW - dt.timedelta(hours=24))
+    rec = make_recording(ended_at=NOW - dt.timedelta(days=7))
     assert "too_young" not in unmet_trash_conditions(rec, NOW, load_config())
 
 
@@ -185,19 +185,62 @@ def test_may_delete_permanently_requires_trashed_state():
     assert may_delete_permanently(make_recording(), NOW, CFG) is False
 
 
-def test_req_002_discarded_recording_is_not_trashed_at_plaud_by_default(session_factory):
-    # Criterion 7 stays open: until the owner decides, a discard never triggers a Plaud deletion.
-    store(session_factory, discarded_at=NOW - dt.timedelta(hours=1))
+def test_req_002_discarded_recording_is_trashed_at_plaud_even_if_never_verified(session_factory):
+    # D-009: the owner discarded it; verification and stability gates do not apply.
+    store(session_factory, discarded_at=NOW - dt.timedelta(minutes=1), verified_at=None, verified_hash=None,
+          last_changed_at=NOW, is_plaud_processed=False)
     plaud = FakePlaud()
     stats = run_deletion(session_factory, plaud, CFG, lambda: NOW)
-    assert plaud.trashed == [] and stats.held_back == 0
+    assert plaud.trashed == ["r1"] and stats.trashed == 1
     with session_factory() as s:
-        assert s.scalar(select(Recording)).trashed_at is None
+        assert s.scalar(select(Recording)).trashed_at is not None
 
 
-def test_req_002_already_trashed_recording_is_still_deleted_permanently_after_a_discard(session_factory):
-    # It was verified before the discard; the pipeline's guarantee stands.
-    store(session_factory, trashed_at=NOW - dt.timedelta(hours=24), discarded_at=NOW - dt.timedelta(hours=1))
+@pytest.mark.parametrize("overrides,reason", [
+    (dict(ended_at=NOW - dt.timedelta(minutes=14)), "too_young"),
+    (dict(duration_ms=0), "duration_unknown"),
+])
+def test_req_002_discarded_recording_still_respects_age_and_duration(session_factory, overrides, reason):
+    store(session_factory, discarded_at=NOW, **overrides)
+    plaud = FakePlaud()
+    run_deletion(session_factory, plaud, CFG, lambda: NOW)
+    assert plaud.trashed == []
+    with session_factory() as s:
+        rec = s.scalar(select(Recording))
+    assert reason in unmet_trash_conditions(rec, NOW, CFG)
+
+
+def test_discarded_recording_has_no_other_unmet_conditions():
+    rec = make_recording(discarded_at=NOW, is_plaud_processed=False, verified_at=None, verified_hash=None,
+                         last_changed_at=NOW)
+    assert unmet_trash_conditions(rec, NOW, CFG) == []
+
+
+def test_req_002_discarded_recording_is_only_logged_in_shadow_mode(session_factory):
+    store(session_factory, discarded_at=NOW)
+    plaud = FakePlaud()
+    cfg = dataclasses.replace(CFG, delete_enabled=False)
+    stats = run_deletion(session_factory, plaud, cfg, lambda: NOW)
+    assert plaud.trashed == [] and stats.shadow == 1
+
+
+def test_req_002_trashed_discarded_recording_is_deleted_permanently_after_the_wait_without_verification(session_factory):
+    store(session_factory, trashed_at=NOW - dt.timedelta(hours=24), discarded_at=NOW - dt.timedelta(hours=25),
+          verified_at=None, verified_hash=None)
     plaud = FakePlaud()
     run_deletion(session_factory, plaud, CFG, lambda: NOW)
     assert plaud.deleted == ["r1"]
+
+
+def test_discarded_recording_waits_for_the_permanent_delete_period(session_factory):
+    store(session_factory, trashed_at=NOW - dt.timedelta(hours=23), discarded_at=NOW - dt.timedelta(hours=25))
+    plaud = FakePlaud()
+    run_deletion(session_factory, plaud, CFG, lambda: NOW)
+    assert plaud.deleted == []
+
+
+def test_not_discarded_recording_still_needs_verification_for_the_permanent_delete(session_factory):
+    store(session_factory, trashed_at=NOW - dt.timedelta(days=30), verified_hash="stale")
+    plaud = FakePlaud()
+    run_deletion(session_factory, plaud, CFG, lambda: NOW)
+    assert plaud.deleted == []

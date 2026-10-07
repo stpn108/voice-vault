@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}{{ t("ui_nav_topics") }}{% endblock %}
+{% block content %}
+<div class="head" style="margin-top:1.6rem"><h1>{{ t("ui_nav_topics") }}</h1></div>
+{% if topics %}
+<ul class="list">
+  {% for topic, open_count, notes, last in topics %}
+  <li><div class="item" style="cursor:default">
+    <div class="item-main">
+      <a class="item-title" href="/topics/{{ topic.name | urlencode }}" style="color:var(--text);text-decoration:none">{{ topic.name }}</a>
+      {% if topic.excluded %}<span class="pill" style="margin-left:.4rem">{{ t("ui_topic_excluded") }}</span>{% endif %}
+      <div class="item-meta">{{ t("ui_col_open") }}: {{ open_count }} · {{ t("ui_col_notes") }}: {{ notes }} · {{ last | localtime }}</div>
+    </div>
+    <form class="inline" method="post" action="/topics/exclude">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="name" value="{{ topic.name }}">
+      <input type="hidden" name="excluded" value="{{ '0' if topic.excluded else '1' }}">
+      <button class="small" type="submit">{{ t("ui_topic_allow") if topic.excluded else t("ui_topic_exclude") }}</button></form>
+  </div></li>
+  {% endfor %}
+</ul>
+{% else %}
+<div class="card empty">{{ t("ui_topics_empty") }}</div>
+{% endif %}
+<h2>{{ t("ui_topic_exclude") }}</h2>
+<form class="card quick" method="post" action="/topics/exclude">
+  <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="excluded" value="1">
+  <input type="text" name="name" placeholder="{{ t('ui_topic_exclude_name') }}" maxlength="120" required style="flex:1 1 14rem">
+  <button type="submit">{{ t("ui_topic_exclude") }}</button>
+  <span class="muted" style="flex-basis:100%;font-size:.85rem">{{ t("ui_topic_exclude_hint") }}</span>
+</form>
+{% endblock %}

@@ -107,7 +107,7 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **In plain words** | Nothing is deleted at Plaud before it is a day old, and never when Plaud has not reported how long the recording is. |
 | **Reasoning** | Owner decision. A longer wait leaves room for Plaud to finish or change summaries and for the owner to notice problems. Plaud may list a recording before its length is known, and then the age calculation would be wrong. |
 | **Rejected alternatives** | (A) keep 15 minutes: owner chose one day; (B) one day for the permanent delete only: the trash step is already reversible, the age gate protects against premature deletion of unfinished recordings; (C) block on duration only inside the import: the guard belongs where the decision is made. |
-| **Status** | **FINAL** |
+| **Status** | **FINAL**; the default values are amended by D-010, the duration guard stands |
 
 ### D-007: Database backups via Ofelia labels on the db service, no db-backup container (FINAL)
 
@@ -131,3 +131,79 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Rejected alternatives** | (A) UI inside the `app` process: shares credentials and restarts with the cycle; (B) login with a password: the SSH tunnel already authenticates, a second secret adds nothing now; (C) hard delete of the row: re-import; (D) JavaScript confirm dialogs: blocked by the CSP and not needed with a confirmation page; (E) offset paging: skips and duplicates while the import adds rows. |
 | **Status** | **FINAL** |
 
+### D-009: A discarded recording is also deleted at Plaud, under age and duration gates only (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-06 |
+| **Decision** | Amends D-008 on the Plaud side. A recording discarded in the UI stays in the deletion pipeline. Its trash conditions are reduced to the minimum age (`MIN_AGE_MINUTES`) and a known duration; the processing, verification and stability conditions are skipped, because the content was removed on purpose. The permanent delete follows after `PERMANENT_DELETE_AFTER_HOURS` and no longer needs a verified import for a discarded recording. `PLAUD_DELETE_ENABLED=false` still only logs. The UI's confirmation pages say whether Plaud deletion is on (with the age and wait hours) or off. `web` therefore reads `MIN_AGE_MINUTES`, `PERMANENT_DELETE_AFTER_HOURS` and `PLAUD_DELETE_ENABLED`. |
+| **In plain words** | When you throw a recording away in the page, it is also removed at Plaud on the normal schedule, so nothing of it is left anywhere. |
+| **Reasoning** | Owner decision. Leaving it at Plaud would keep conversation content there for good, against the purpose of the tool (D-004). The verification gate protects the only copy; after a deliberate discard there is no copy to protect. |
+| **Rejected alternatives** | (A) leave discarded recordings at Plaud: contradicts data minimisation, was the safe default only until the owner decided; (B) delete at Plaud immediately on discard: skips the age and duration protection against unfinished recordings and the Plaud trash step. |
+| **Status** | **FINAL** |
+
+### D-010: Defaults are 12 hours minimum age and 12 hours trash wait, about one day in total (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-07 |
+| **Decision** | Amends the default values of D-006. `MIN_AGE_MINUTES` defaults to 720 (12 hours) and `PERMANENT_DELETE_AFTER_HOURS` to 12, so a recording is gone at Plaud about one day after it ended: in the Plaud trash after 12 hours, deleted permanently 12 hours later. Both stay configurable and an explicit value in `.env` wins over the default. The duration guard of D-006 and the discard rules of D-009 are unchanged. |
+| **In plain words** | After about one day nothing of a recording is left at Plaud. Half a day passes before it goes into the Plaud trash, and half a day more before it is deleted for good. |
+| **Reasoning** | Owner decision: the owner wants the content gone at Plaud after one day in total, and keeps the Plaud trash as a half-day safety net. D-006's one day plus 24 hours meant about two days. |
+| **Rejected alternatives** | (A) 24 h plus 24 h (about two days at Plaud): longer than the owner wants; (B) 24 h plus 0 (no trash step): nothing restorable at Plaud. |
+| **Status** | **FINAL** |
+
+### D-011: MCP server as its own opt-in service with a static bearer token, hand-written minimal protocol (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-07 |
+| **Decision** | Claude reaches the recordings through `mcp_server.py` (adapter) and `mcp_tools.py` (tools), run as the Compose service `mcp` from the same image, on its own port `127.0.0.1:${PORTS_PREFIX}020`, behind the owner's reverse proxy. The service is opt-in (`profiles: [mcp]`, enabled by `COMPOSE_PROFILES=mcp`); `redeploy.sh` manages and health-checks it only then. Protocol: MCP over Streamable HTTP, stateless, one endpoint `POST /mcp` with JSON responses, notifications answered 202, GET and DELETE 405, no sessions, no server-initiated stream; protocol versions 2025-11-25, 2025-06-18, 2025-03-26 and 2024-11-05 are negotiated (the tools-only subset is identical). Authentication: every request needs `Authorization: Bearer <token>`; tokens come from `MCP_TOKENS` (one, or two during a rotation), at least 32 characters, compared in constant time; the service refuses to start without a valid token. Further checks: `Host` allowlist (`localhost`, `127.0.0.1`, `[::1]`, `MCP_ALLOWED_HOSTS`), `Origin` must be absent or in `MCP_ALLOWED_ORIGINS`, request body at most 64 KB. Two read-only tools: `list_recordings` (search, date filters, cursor) and `get_recording` (summary and transcript in slices). Tool descriptions state that recording text is untrusted data. Logging records tool, argument names and result size only, never text, search words or tokens; failed logins are logged with the client address. `GET /healthz` answers `ok` or 503 without detail for the container health check; the reverse proxy should forward only `/mcp`. No new dependency: the protocol subset is about 150 lines on top of FastAPI. |
+| **In plain words** | Claude gets its own small door to your recordings, on its own port and behind your reverse proxy. The door opens only for the secret token, and Claude can only look, never change or delete. |
+| **Reasoning** | Owner wants Claude to work on the recordings, kept on his own server (D-004). Claude Code accepts a bearer header, and claude.ai accepts a fixed header for organisations in a beta (documented by Anthropic); a static token is the simplest authentication that is safe if it is long and random and the proxy provides TLS. Only tools are needed, so a small hand-written server is easier to audit and test than a framework; it was checked against the official MCP Python client. A separate service keeps the internet-facing surface apart from the UI and from the Plaud credentials: it only needs database access. |
+| **Rejected alternatives** | (A) official MCP SDK server: pulls in a large dependency tree and its own web stack for a tools-only server (installing the SDK in a test environment already moved the pinned Starlette version); (B) same port as the UI behind path routing: mixes a public endpoint with the loopback-only UI; (C) no authentication ("No sign-in" connector): anyone with the URL could read every conversation; (D) OAuth now: much more code and state for a single user, and only needed for claude.ai accounts without the request-header beta; to be built if the owner needs it; (E) write tools (discard, delete) in MCP: a prompt injection in a transcript could then delete data; discarding stays in the UI. |
+| **Status** | **FINAL** |
+
+### D-012: OAuth 2.1 for the MCP server with one pre-registered client, owner password and rotating tokens (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-07 |
+| **Decision** | Amends D-011, which left OAuth out. The MCP service is its own authorization server for a single owner (`mcp_oauth_web.py` for the HTTP side, `mcp_oauth.py` for codes and tokens). Discovery: 401 with `resource_metadata`, protected-resource metadata (RFC 9728) at `/.well-known/oauth-protected-resource` and `…/mcp`, authorization-server metadata (RFC 8414) at `/.well-known/oauth-authorization-server`; issuer and resource come from `MCP_PUBLIC_URL`, never from the request. One pre-registered client (`MCP_OAUTH_CLIENT_ID`, optional `MCP_OAUTH_CLIENT_SECRET`); no dynamic client registration and no client ID metadata documents, so the server has no endpoint through which an anonymous caller can create state. PKCE with S256 is mandatory. Redirect addresses are matched exactly against `MCP_OAUTH_REDIRECT_URIS` (default Claude's fixed callback `https://claude.ai/api/mcp/auth_callback`); a listed loopback entry without a port matches any port. `/authorize` shows a login page; the owner proves identity with `MCP_OAUTH_PASSWORD` (at least 20 characters). The form carries the request in a signed, 10-minute blob (HMAC with a per-process key), so a hidden field cannot be changed. Failed logins are serialised and each takes twice as long as the one before (1 s up to 30 s), reset on success. Codes live 60 seconds and work once; access tokens 1 hour; refresh tokens 30 days and are replaced on every use. Tokens are random 256-bit values stored as SHA-256 hashes in `oauth_codes` and `oauth_tokens`. Codes and tokens form a family: reusing a code or a spent refresh token revokes the whole family. The `resource` parameter, if sent, must equal `<MCP_PUBLIC_URL>/mcp`. The `/mcp` endpoint accepts a static token from `MCP_TOKENS` or an OAuth access token. Any single OAuth setting switches OAuth on and demands a complete configuration, otherwise the service does not start. The service now writes to the two OAuth tables; recordings are still only read. `MCP_ALLOWED_HOSTS` takes host names; a pasted URL is reduced to its host. |
+| **In plain words** | claude.ai connects to your server like to any other service: it sends you to a page on your own server, you type a password once, and after that Claude renews its own access every hour for up to 30 days. Nobody else can sign in, and tokens that were stolen and replayed are shut down. |
+| **Reasoning** | claude.ai accepts a fixed header only for organisations in a beta, so OAuth is the dependable way for the web, desktop and mobile apps. One owner means one pre-registered client is enough, and "use your own OAuth client" is an option of Claude's connector dialog. Skipping dynamic registration removes the one endpoint that would be open to the internet. Hashed tokens mean a database copy is no login. Rotation with family revocation follows OAuth 2.1 for public clients, and Claude's documentation asks for it. |
+| **Rejected alternatives** | (A) dynamic client registration: an open endpoint that anyone can fill with registrations; (B) client ID metadata documents: the server would fetch URLs supplied by callers (SSRF surface); (C) a hosted identity provider: another service and account for one user; (D) JWT access tokens without a database: no revocation and no way to detect a replayed refresh token; (E) a long-lived token typed into the connector: only possible for organisations with the header beta; (F) approval without a password: anyone who finds the URL could grant themselves access. |
+| **Status** | **FINAL** |
+
+### D-013: Tasks, topics and digests in the voice-vault database; Claude writes only there, with log and undo (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-07 |
+| **Decision** | Amends D-011 and D-012, which said the MCP service only reads recordings. New tables `topics`, `todos`, `todo_events`, `topic_notes` and `digests`; all rules live in `todo_service.py`, used by the MCP tools (`mcp_todo_tools.py`) and the UI (`webapp.py`). Claude gets tools to list, add and update tasks (including status `done` and `dropped`), list topics, read a topic with its timeline, add a topic note, mark a recording analyzed, and save and read daily digests. The only write to `recordings` is the `analyzed_at` flag. There is no delete: neither a tool nor a UI route removes a task, topic, note, digest or recording, and a test enforces that no function in the service deletes. Every change writes a `todo_events` row with actor (`claude` or `owner`), kind, old and new values and the source recording. Undo applies the old values and is allowed only for the latest event of a task and only if the task is unchanged since. Similar open tasks (Jaccard 0.6 over words of three letters or more) are rejected for Claude so that a daily routine does not pile up duplicates. Write tools are annotated `readOnlyHint false, destructiveHint false`. Tool errors that the model can fix (duplicate, bad date, unknown id) are tool results with `isError`, type errors are -32602. The OAuth approval text tells the owner that Claude may maintain tasks. |
+| **In plain words** | Claude may write the to-do list, nothing else. Everything it writes is marked as Claude's, listed in the history of the task and can be undone with one click. It can mark a task as no longer relevant, but never delete it. |
+| **Reasoning** | The owner wants a routine that works without him and a list he only checks off. That needs write access. The risk is a prompt injection in a transcript; with no delete and an undo for each change, the worst case is a wrong or missing task. Recordings stay protected, which was the point of D-011. Keeping the list in the same database avoids a second system that holds the contents of the conversations. |
+| **Rejected alternatives** | (A) read-only MCP plus Google Tasks or a Markdown file: second storage place for the content, and no undo; (B) free-text list in one document: no priorities, no check-off, no history; (C) Claude may delete tasks: an injected instruction could wipe the list; (D) no duplicate check: the daily run would re-create tasks from every follow-up conversation; (E) undo of any past event: later changes make old values wrong. |
+| **Status** | **FINAL** |
+
+### D-014: Defaults are 7 days minimum age and 3 days trash wait, about ten days in total (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-07 |
+| **Decision** | Amends the default values of D-010. `MIN_AGE_MINUTES` defaults to 10080 (7 days) and `PERMANENT_DELETE_AFTER_HOURS` to 72 (3 days). A recording goes into the Plaud trash 7 days after it ended and is deleted permanently 3 days later. Both stay configurable, and an explicit value in `.env` wins over the default, so a `.env` that still sets the old values has to be changed. All other gates (processed, verified, stable, known duration) and the discard rules of D-009 are unchanged. |
+| **In plain words** | Plaud keeps a recording for a week, then it sits in the Plaud trash for three more days before it is gone for good. |
+| **Reasoning** | Owner decision. With the daily routine of REQ-006 and a first backup that only worked after a fix, a longer period gives time to notice a problem while the original is still at Plaud. Seven days also match the routine's look-back window. |
+| **Rejected alternatives** | (A) keep 12 h plus 12 h (D-010): little room to notice a failed import, backup or routine; (B) 7 days with no trash step: nothing restorable at Plaud. |
+| **Status** | **FINAL** |
+
+### D-015: Only the owner's own tasks; topics can be excluded by the owner (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-07 |
+| **Decision** | Amends D-013. The task list holds only what the owner himself has to do; commitments of other people are not tasks. This is enforced by the tool description and the routine prompt, not by code, because only the content of a conversation tells who has to act (the speaker labels from Plaud are unreliable). The owner can exclude topics in the UI (`topics.excluded`, set by name, also before the topic exists). For an excluded topic `add_todo`, `update_todo` (setting that topic) and `add_topic_note` are refused with a tool error, its open tasks are left out of `list_todos` and of the counts (the topic page still shows them), and `list_topics` marks it `EXCLUDED by owner`. Claude has no tool to set or clear the flag. Migration 003 adds the column. Claude still reads the recordings of an excluded topic; excluding stops storing derived data, not reading. |
+| **In plain words** | The checklist is yours only. What others promised you is not on it. Topics you do not want tracked get no tasks and no notes from Claude. |
+| **Reasoning** | Owner decision: the list to tick off must stay short and his own; follow-up on others is a different kind of tracking. A flag that only the owner can set keeps a prompt injection from lifting an exclusion. |
+| **Rejected alternatives** | (A) an assignee field on each task and a second list for others: the owner wants tracking of others elsewhere; (B) hiding excluded topics only in the UI: Claude would still file tasks and notes into them; (C) stopping Claude from reading such recordings: the topic is only known after reading, and a transcript can touch several topics; (D) a Claude tool to exclude topics: weakens the guarantee. |
+| **Status** | **FINAL** |

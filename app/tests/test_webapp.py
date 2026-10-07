@@ -239,3 +239,20 @@ def test_req_002_list_and_search_over_5000_recordings_respond_within_one_second(
     assert client.get("/").status_code == 200
     assert client.get("/", params={"q": "Meeting 4999"}).status_code == 200
     assert time.perf_counter() - began < 1.0
+
+
+@pytest.mark.parametrize("enabled,expected,unexpected", [
+    (True, "Bei Plaud wird die Aufnahme ebenfalls gelöscht", "derzeit ausgeschaltet"),
+    (False, "derzeit ausgeschaltet", "ebenfalls gelöscht"),
+])
+def test_req_002_confirmation_tells_what_happens_at_plaud(client, seed, enabled, expected, unexpected):
+    import dataclasses
+    from config import load_config
+    webapp.app.dependency_overrides[webapp.get_config] = lambda: dataclasses.replace(
+        load_config(), delete_enabled=enabled, min_age_minutes=1440, permanent_delete_after_hours=24)
+    rec_id = seed(index=1)
+    for path in (f"/recordings/{rec_id}/discard", "/cleanup?days=1"):
+        html = client.get(path).text
+        assert expected in html and unexpected not in html
+    assert "24 Stunden" in client.get(f"/recordings/{rec_id}/discard").text if enabled else True
+    webapp.app.dependency_overrides.pop(webapp.get_config)

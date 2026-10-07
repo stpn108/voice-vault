@@ -1,30 +1,28 @@
 {% extends "base.html" %}
 {% block content %}
-<form method="get" action="/">
-  <input type="text" name="q" value="{{ q }}" placeholder="{{ t('ui_search_placeholder') }}" size="40" maxlength="200">
-  <button type="submit">{{ t("ui_search") }}</button>
-</form>
+<div class="head" style="margin-top:1.6rem">
+  <h1>{{ t("ui_nav_recordings") }}</h1>
+  <form class="searchbar" method="get" action="/">
+    <input type="text" name="q" value="{{ q }}" placeholder="{{ t('ui_search_placeholder') }}" maxlength="200">
+    <button class="primary" type="submit">{{ t("ui_search") }}</button>
+  </form>
+</div>
 {% if page.rows %}
-<table>
-  <thead><tr>
-    <th>{{ t("ui_col_date") }}</th><th>{{ t("ui_col_title") }}</th>
-    <th class="hide-small">{{ t("ui_col_duration") }}</th><th>{{ t("ui_col_state") }}</th>
-  </tr></thead>
-  <tbody>
+<div class="list">
   {% for row in page.rows %}
-  <tr>
-    <td>{{ row.started_at | localtime }}</td>
-    <td><a href="/recordings/{{ row.id }}">{{ row.title or t("ui_untitled") }}</a></td>
-    <td class="hide-small">{{ row.duration_ms | hms }}</td>
-    <td><span class="state state-{{ row.state }}">{{ t("state_" ~ row.state) }}</span></td>
-  </tr>
+  <a class="item" href="/recordings/{{ row.id }}">
+    <div class="item-main">
+      <div class="item-title">{{ row.title or t("ui_untitled") }}</div>
+      <div class="item-meta">{{ row.started_at | localtime }} · {{ row.duration_ms | hms }}{% if row.excerpt %} · {{ row.excerpt }}{% endif %}</div>
+    </div>
+    <span class="pill state-{{ row.state }}">{{ t("state_" ~ row.state) }}</span>
+  </a>
   {% endfor %}
-  </tbody>
-</table>
+</div>
 {% if page.next_cursor %}
-<p><a href="/?cursor={{ page.next_cursor | urlencode }}{% if q %}&amp;q={{ q | urlencode }}{% endif %}">{{ t("ui_next") }}</a></p>
+<p><a class="btn" href="/?cursor={{ page.next_cursor | urlencode }}{% if q %}&amp;q={{ q | urlencode }}{% endif %}">{{ t("ui_next") }}</a></p>
 {% endif %}
 {% else %}
-<p class="muted">{{ t("ui_empty") }}</p>
+<div class="card empty">{{ t("ui_empty") }}</div>
 {% endif %}
 {% endblock %}

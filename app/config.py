@@ -1,10 +1,33 @@
 """All environment configuration, read in one place (.claude/architecture.md §3)."""
 import os
 from dataclasses import dataclass
+from urllib.parse import urlparse
 
 
 def _bool(name: str, default: bool) -> bool:
     return os.getenv(name, str(default)).strip().lower() in ("1", "true", "yes", "on")
+
+
+class ConfigError(RuntimeError):
+    """The configuration is not safe or complete enough to start a service."""
+
+
+def _csv(name: str, default: str = "") -> tuple:
+    raw = os.getenv(name) or default  # compose passes unset variables on as empty strings
+    return tuple(v.strip() for v in raw.split(",") if v.strip())
+
+
+def host_name(value: str) -> str:
+    """A bare lowercase host name from a host, host:port or full URL (a pasted https://host/path works)."""
+    value = value.strip().lower()
+    if "://" in value:
+        value = urlparse(value).netloc
+    value = value.split("/")[0]
+    return value.rsplit(":", 1)[0] if value.count(":") == 1 else value
+
+
+def _hosts(name: str) -> tuple:
+    return tuple(h for h in (host_name(v) for v in _csv(name)) if h)
 
 
 @dataclass(frozen=True)
@@ -27,6 +50,14 @@ class Config:
     mail_to: str
     ui_lang: str
     ui_allowed_hosts: tuple
+    mcp_tokens: tuple
+    mcp_allowed_hosts: tuple
+    mcp_allowed_origins: tuple
+    mcp_public_url: str
+    mcp_oauth_client_id: str
+    mcp_oauth_client_secret: str
+    mcp_oauth_password: str
+    mcp_oauth_redirect_uris: tuple
 
 
 def load_config() -> Config:
@@ -35,9 +66,9 @@ def load_config() -> Config:
         plaud_refresh_token=os.getenv("PLAUD_REFRESH_TOKEN", "").strip(),
         plaud_api_base=os.getenv("PLAUD_API_BASE", "https://api-euc1.plaud.ai").rstrip("/"),
         import_interval_minutes=int(os.getenv("IMPORT_INTERVAL_MINUTES", "10")),
-        min_age_minutes=int(os.getenv("MIN_AGE_MINUTES", "1440")),
+        min_age_minutes=int(os.getenv("MIN_AGE_MINUTES", "10080")),
         stability_minutes=int(os.getenv("STABILITY_MINUTES", "10")),
-        permanent_delete_after_hours=int(os.getenv("PERMANENT_DELETE_AFTER_HOURS", "24")),
+        permanent_delete_after_hours=int(os.getenv("PERMANENT_DELETE_AFTER_HOURS", "72")),
         delete_enabled=_bool("PLAUD_DELETE_ENABLED", False),
         store_audio=_bool("STORE_AUDIO", False),
         token_warn_days=int(os.getenv("TOKEN_WARN_DAYS", "5")),
@@ -49,4 +80,12 @@ def load_config() -> Config:
         mail_to=os.getenv("MAIL_TO", ""),
         ui_lang=os.getenv("UI_LANG", "de").strip() or "de",
         ui_allowed_hosts=tuple(h.strip() for h in os.getenv("UI_ALLOWED_HOSTS", "").split(",") if h.strip()),
+        mcp_tokens=_csv("MCP_TOKENS"),
+        mcp_allowed_hosts=_hosts("MCP_ALLOWED_HOSTS"),
+        mcp_allowed_origins=_csv("MCP_ALLOWED_ORIGINS"),
+        mcp_public_url=os.getenv("MCP_PUBLIC_URL", "").strip().rstrip("/"),
+        mcp_oauth_client_id=os.getenv("MCP_OAUTH_CLIENT_ID", "").strip(),
+        mcp_oauth_client_secret=os.getenv("MCP_OAUTH_CLIENT_SECRET", "").strip(),
+        mcp_oauth_password=os.getenv("MCP_OAUTH_PASSWORD", ""),
+        mcp_oauth_redirect_uris=_csv("MCP_OAUTH_REDIRECT_URIS", "https://claude.ai/api/mcp/auth_callback"),
     )

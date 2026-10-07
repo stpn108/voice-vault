@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}{{ t("ui_nav_todos") }}{% endblock %}
+{% block content %}
+<div class="head" style="margin-top:1.6rem">
+  <h1>{{ t("ui_nav_todos") }}</h1>
+  <div class="seg">
+  {% for s in statuses %}<a href="/todos?status={{ s }}{% if topic %}&amp;topic={{ topic | urlencode }}{% endif %}" {% if s == status %}class="current"{% endif %}>{{ t("todo_status_" ~ s) }}<small>{{ counts[s] }}</small></a>{% endfor %}
+  </div>
+</div>
+{% if topic %}<p class="sub" style="margin:-.5rem 0 1rem">{{ t("ui_topic") }}: <strong>{{ topic }}</strong> · <a href="/todos?status={{ status }}">{{ t("ui_filter_clear") }}</a></p>{% endif %}
+<form class="card quick" method="post" action="/todos">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <input type="text" name="title" placeholder="{{ t('ui_todo_new') }}" maxlength="300" required>
+  <select name="priority" aria-label="{{ t('ui_col_prio') }}">{% for p in priorities %}<option value="{{ p }}" {% if p == 3 %}selected{% endif %}>{{ t("todo_prio_" ~ p) }}</option>{% endfor %}</select>
+  <input type="date" name="due" aria-label="{{ t('ui_col_due') }}">
+  <input type="text" name="topic" placeholder="{{ t('ui_topic') }}" maxlength="120">
+  <button class="primary" type="submit">{{ t("ui_todo_add") }}</button>
+</form>
+{% if rows %}
+{% set groups = rows | groupby("priority") if status == "open" else [("", rows)] %}
+{% for prio, items in groups %}
+{% if status == "open" %}<h2 class="group-title"><span class="dot p{{ prio }}"></span>{{ t("todo_prio_" ~ prio) }}<span class="count">{{ items | length }}</span></h2>{% endif %}
+<ul class="list">
+  {% for row in items %}
+  <li class="task {% if row.status != 'open' %}finished{% endif %}">
+    <form class="check" method="post" action="/todos/{{ row.id }}/status">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="list">
+      {% if row.status == "open" %}<button class="check" type="submit" name="status" value="done" title="{{ t('ui_todo_check') }}" aria-label="{{ t('ui_todo_check') }}">✓</button>
+      {% else %}<button class="check" type="submit" name="status" value="open" title="{{ t('ui_todo_reopen') }}" aria-label="{{ t('ui_todo_reopen') }}" style="color:var(--ok);border-color:var(--ok)">✓</button>{% endif %}
+    </form>
+    <div class="task-main">
+      <a class="task-title" href="/todos/{{ row.id }}">{{ row.title }}</a>
+      <div class="task-meta">
+        {% if row.due_date %}<span class="due {% if row.status == 'open' and row.due_date < today %}overdue{% endif %}">{{ t("ui_overdue") if row.status == 'open' and row.due_date < today else t("ui_due") }} {{ row.due_date.strftime("%d.%m.") }}</span>{% endif %}
+        {% if row.topic %}<a href="/todos?status={{ status }}&amp;topic={{ row.topic | urlencode }}">{{ row.topic }}</a>{% endif %}
+        {% if row.created_by == "claude" %}<span class="by">Claude</span>{% endif %}
+        <span>{{ row.age_days }} {{ t("ui_days") }}</span>
+      </div>
+    </div>
+    {% if row.status == "open" %}
+    <form class="task-actions" method="post" action="/todos/{{ row.id }}/status">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="list">
+      <button class="ghost" type="submit" name="status" value="dropped" title="{{ t('ui_todo_drop') }}">{{ t("ui_todo_drop_short") }}</button>
+    </form>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% endfor %}
+{% if truncated %}<p class="muted">{{ t("ui_todo_truncated") }}</p>{% endif %}
+{% else %}
+<div class="card empty">{{ t("ui_todo_empty") }}</div>
+{% endif %}
+{% endblock %}

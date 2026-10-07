@@ -35,8 +35,8 @@ The owner opens a small web page on the server (reached through his SSH tunnel),
    Given a stored recording, when the owner confirms the discard, then summary, segments and title are removed from the database, the row stays as a tombstone (`plaud_id`, `discarded_at`) and the import never fetches that `plaud_id` again.
 6. **Discard older than N days.**
    Given 30 recordings of which 12 are older than 90 days, when the owner enters 90 and confirms the shown count "12", then exactly those 12 are discarded as in criterion 5.
-7. **Discarding and Plaud (default until the owner decides).**
-   Given a discarded recording that is still at Plaud, then the cycle does not touch it at Plaud and the import never fetches it again. Given a discarded recording that was already in the Plaud trash, then the permanent delete after the usual wait still happens, because its import had been verified before the discard. Whether a discard should also remove a still-listed recording at Plaud is an open decision (see open questions).
+7. **Discarding also deletes at Plaud (owner decision 2026-10-06, D-009).**
+   Given a discarded recording that is still at Plaud, when `PLAUD_DELETE_ENABLED=true` and the minimum age has passed and its duration is known, then the cycle moves it to the Plaud trash and deletes it permanently after the usual wait, without the processing, verification and stability conditions. In shadow mode it is only logged. The import never fetches it again. The confirmation page says which of the two cases applies.
 8. **Discard needs POST with a CSRF token.**
    Given a request without a valid token, or from another origin, then nothing is discarded (HTTP 403). A GET request only shows the confirmation page and changes nothing.
 9. **Only the expected host.**
@@ -61,7 +61,7 @@ The list page and a search over 5,000 recordings respond in under 1 second on th
 
 | Date | Question | Answer |
 |------|----------|--------|
-| 2026-10-06 | Criterion 7: should discarding also move a still-listed recording to the Plaud trash and delete it there after the wait (content then gone from both places)? Today it stays at Plaud untouched. | open, owner decides |
+| 2026-10-06 | Criterion 7: should discarding also delete at Plaud? | yes (owner, 2026-10-06), see D-009 |
 | 2026-10-06 | Should the UI also offer a button to restore a discarded recording? Not possible once the content is removed; this requirement says no. | open |
 | 2026-10-06 | Which `PORTS_PREFIX` is free on the server and on the laptop (the tunnel maps the same port numbers)? | open, owner chooses at deploy |
 
@@ -77,7 +77,7 @@ Written, status stays APPROVED until merged and deployed.
 | 4 Search | `test_recording_service.py::test_req_002_search_is_case_insensitive_over_transcript`, `test_search_covers_title_summary_and_segments`, `test_search_treats_wildcards_literally`, `test_search_with_sql_metacharacters_is_harmless`; `test_webapp.py::test_req_002_search_via_query_string` |
 | 5 Discard one | `test_recording_service.py::test_req_002_discard_removes_content_and_keeps_a_tombstone`; `test_webapp.py::test_req_002_discard_post_with_token_removes_content_and_redirects`; `test_import_service.py::test_req_002_discarded_recording_is_never_fetched_or_stored_again` |
 | 6 Discard older than N days | `test_recording_service.py::test_req_002_discard_older_than_n_days_discards_exactly_those`; `test_webapp.py::test_req_002_cleanup_with_the_shown_count_discards_exactly_those`, `test_cleanup_with_a_changed_count_discards_nothing` |
-| 7 Plaud default | `test_deletion_service.py::test_req_002_discarded_recording_is_not_trashed_at_plaud_by_default`, `test_req_002_already_trashed_recording_is_still_deleted_permanently_after_a_discard` |
+| 7 Plaud deletion | `test_deletion_service.py::test_req_002_discarded_recording_is_trashed_at_plaud_even_if_never_verified`, `test_req_002_discarded_recording_still_respects_age_and_duration`, `test_req_002_discarded_recording_is_only_logged_in_shadow_mode`, `test_req_002_trashed_discarded_recording_is_deleted_permanently_after_the_wait_without_verification`; `test_webapp.py::test_req_002_confirmation_tells_what_happens_at_plaud` |
 | 8 CSRF | `test_webapp.py::test_req_002_discard_without_a_valid_token_is_rejected`, `test_req_002_discard_from_another_origin_is_rejected_even_with_a_token`, `test_req_002_confirm_page_changes_nothing`, `test_cleanup_needs_the_token` |
 | 9 Host check | `test_webapp.py::test_req_002_host_header_is_checked` |
 | 10 GET is side-effect free | `test_webapp.py::test_req_002_get_requests_never_change_rows`, `test_recording_service.py::test_req_002_reading_does_not_change_rows` |

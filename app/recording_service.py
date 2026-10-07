@@ -5,6 +5,7 @@ All queries are parameterised through SQLAlchemy; the UI never builds SQL.
 import base64
 import datetime as dt
 import logging
+import re
 from dataclasses import dataclass
 from typing import Optional
 
@@ -32,6 +33,8 @@ class RecordingRow:
     started_at: dt.datetime
     duration_ms: int
     state: str
+    excerpt: str = ""
+    analyzed: bool = False
 
 
 @dataclass
@@ -78,10 +81,46 @@ def _visible():
     return Recording.discarded_at.is_(None)
 
 
+EXCERPT_CHARS = 240
+_MARKDOWN_PREFIX = re.compile(r"^\s*(?:#{1,6}\s+|>+\s*|[-*+]\s+|\d+[.)]\s+)+(?:\[[ xX]\]\s*)?")
+_MARKDOWN_LINK = re.compile(r"\[([^\]]+)\]\([^)]*\)")
+_MARKDOWN_MARKS = re.compile(r"\*\*|__|`")
+
+
+def make_excerpt(text: str, max_chars: int = EXCERPT_CHARS) -> str:
+    """The start of a summary as plain text: markdown marks removed, lines joined, cut at a word."""
+    parts = []
+    for line in text.splitlines():
+        line = _MARKDOWN_LINK.sub(r"\1", line)
+        line = _MARKDOWN_PREFIX.sub("", line)
+        line = " ".join(_MARKDOWN_MARKS.sub("", line).split())
+        if line:
+            parts.append(line)
+    cleaned = " \u00b7 ".join(parts)
+    if len(cleaned) <= max_chars:
+        return cleaned
+    cut = cleaned[:max_chars].rstrip()
+    if " " in cut and cleaned[max_chars] != " ":  # do not stop in the middle of a word
+        cut = cut.rsplit(" ", 1)[0]
+    return cut.rstrip(" \u00b7,;:-") + "\u2026"
+
+
 def list_recordings(session: Session, now: dt.datetime, stability_minutes: int,
-                    query: str = "", cursor: Optional[str] = None) -> Page:
-    """Newest first, keyset paging (no offset), optional case-insensitive search."""
+                    query: str = "", cursor: Optional[str] = None, limit: int = PAGE_SIZE,
+                    since: Optional[dt.datetime] = None, until: Optional[dt.datetime] = None,
+                    unanalyzed_only: bool = False) -> Page:
+    """Newest first, keyset paging (no offset), optional case-insensitive search.
+
+    `since` is inclusive, `until` exclusive, both compared with the start of the recording.
+    """
+    limit = min(max(limit, 1), PAGE_SIZE)
     stmt = select(Recording).where(_visible())
+    if unanalyzed_only:
+        stmt = stmt.where(Recording.analyzed_at.is_(None))
+    if since is not None:
+        stmt = stmt.where(Recording.started_at >= as_utc(since))
+    if until is not None:
+        stmt = stmt.where(Recording.started_at < as_utc(until))
     query = query.strip()
     if query:
         pattern = _like_pattern(query)
@@ -99,13 +138,13 @@ def list_recordings(session: Session, now: dt.datetime, stability_minutes: int,
             Recording.started_at < started_at,
             and_(Recording.started_at == started_at, Recording.id < rec_id),
         ))
-    stmt = stmt.order_by(Recording.started_at.desc(), Recording.id.desc()).limit(PAGE_SIZE + 1)
+    stmt = stmt.order_by(Recording.started_at.desc(), Recording.id.desc()).limit(limit + 1)
     found = session.scalars(stmt).all()
-    page = found[:PAGE_SIZE]
-    next_cursor = encode_cursor(page[-1].started_at, page[-1].id) if len(found) > PAGE_SIZE else None
+    page = found[:limit]
+    next_cursor = encode_cursor(page[-1].started_at, page[-1].id) if len(found) > limit else None
     rows = [
         RecordingRow(r.id, r.title, as_utc(r.started_at), r.duration_ms,
-                     recording_state(r, now, stability_minutes))
+                     recording_state(r, now, stability_minutes), make_excerpt(r.summary), r.analyzed_at is not None)
         for r in page
     ]
     return Page(rows, next_cursor)
@@ -120,6 +159,14 @@ def get_detail(session: Session, recording_id: int):
         select(Segment).where(Segment.recording_id == rec.id).order_by(Segment.idx)
     ).all()
     return rec, segments
+
+
+def get_segments(session: Session, recording_id: int, offset: int, limit: int) -> list:
+    """A slice of one recording's transcript, in order."""
+    return session.scalars(
+        select(Segment).where(Segment.recording_id == recording_id)
+        .order_by(Segment.idx).offset(offset).limit(limit)
+    ).all()
 
 
 def discard(session: Session, recording_id: int, now: dt.datetime) -> bool:

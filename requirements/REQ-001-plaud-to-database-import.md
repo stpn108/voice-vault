@@ -28,7 +28,7 @@ Every 10 minutes the tool fetches new Plaud recordings and stores transcript (sp
 2. **Audio is off by default.**
    Given `STORE_AUDIO` unset, when an import runs, then no audio is downloaded or stored.
 3. **Trash only if all conditions hold.**
-   Given a recording, when any of these is false: transcript and summary completed at Plaud, age at least `MIN_AGE_MINUTES` (default 1440 = one day since 2026-10-06, D-006; from end of recording), duration known (greater than 0), import verified (row read back from the database, not empty, hash and segment count match the API response), then it is not trashed and is checked again in the next run.
+   Given a recording, when any of these is false: transcript and summary completed at Plaud, age at least `MIN_AGE_MINUTES` (default 720 = 12 hours since 2026-10-07, D-010; from end of recording), duration known (greater than 0), import verified (row read back from the database, not empty, hash and segment count match the API response), then it is not trashed and is checked again in the next run.
 4. **Permanent delete only after the wait and only if verified.**
    Given a trashed recording with a verified import, when `PERMANENT_DELETE_AFTER_HOURS` have passed, then it is deleted permanently. Without a verified import it is never deleted.
 5. **Changed summary is re-imported.**
