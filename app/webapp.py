@@ -13,9 +13,11 @@ import os
 import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Iterator
+from typing import Annotated, Iterator
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Query, Request
+from fastapi import Path as PathParam
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -40,6 +42,7 @@ LOCAL_HOSTS = ["localhost", "127.0.0.1", "[::1]"]
 CSP = ("default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; "
        "frame-ancestors 'none'; base-uri 'none'")
 TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
+MAX_ID = svc.MAX_ID  # ids beyond the database column are rejected before they reach a query
 
 
 def csrf_token() -> str:
@@ -53,6 +56,10 @@ def get_session() -> Iterator[Session]:
 
 def get_config() -> Config:
     return load_config()
+
+
+def cfg_lang() -> str:
+    return load_config().ui_lang
 
 
 @asynccontextmanager
@@ -86,9 +93,7 @@ def _mmss(ms) -> str:
 templates.env.filters.update(localtime=_localtime, hms=_hms, mmss=_mmss, md=render_markdown)
 
 
-@app.middleware("http")
-async def security_headers(request: Request, call_next):
-    response = await call_next(request)
+def secure(response):
     response.headers["Content-Security-Policy"] = CSP
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
@@ -97,13 +102,32 @@ async def security_headers(request: Request, call_next):
     return response
 
 
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    return secure(await call_next(request))
+
+
 @app.exception_handler(StarletteHTTPException)
 async def error_page(request: Request, exc: StarletteHTTPException) -> HTMLResponse:
     """A readable page instead of bare JSON; the status code stays."""
     cfg = load_config()
     key = {403: "ui_error_forbidden", 404: "ui_error_not_found"}.get(exc.status_code, "ui_error_invalid")
     return render(request, cfg, "error.html", status_code=exc.status_code, headline=get_text(key, cfg.ui_lang),
-                  detail=str(exc.detail) if exc.status_code == 400 else "")
+                  detail=str(exc.detail) if exc.status_code in (400, 409) else "")
+
+
+@app.exception_handler(RequestValidationError)
+async def invalid_input_page(request: Request, exc: RequestValidationError) -> HTMLResponse:
+    cfg = load_config()
+    return render(request, cfg, "error.html", status_code=400, headline=get_text("ui_error_invalid", cfg.ui_lang),
+                  detail="")
+
+
+@app.exception_handler(Exception)
+async def unexpected_error_page(request: Request, exc: Exception) -> HTMLResponse:
+    """The outermost handler sits outside the middleware, so the security headers are set here too."""
+    log.error("Unhandled error on %s %s: %s", request.method, request.url.path, type(exc).__name__)
+    return secure(HTMLResponse("<!doctype html><title>Error</title><p>Internal Server Error</p>", status_code=500))
 
 
 def render(request: Request, cfg: Config, name: str, status_code: int = 200, **context) -> HTMLResponse:
@@ -122,8 +146,10 @@ def require_csrf(request: Request, token: str) -> None:
     if not hmac.compare_digest(token or "", csrf_token()):
         raise HTTPException(status_code=403, detail="invalid csrf token")
     origin = request.headers.get("origin")
-    if origin and origin.split("://", 1)[-1] != request.headers.get("host"):
+    if origin and origin != f"{request.url.scheme}://{request.headers.get('host')}":
         raise HTTPException(status_code=403, detail="origin mismatch")
+    if request.headers.get("sec-fetch-site") == "cross-site":
+        raise HTTPException(status_code=403, detail="cross-site request")
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -137,7 +163,7 @@ def index(request: Request, q: str = Query("", max_length=200), cursor: str = Qu
 
 
 @app.get("/recordings/{recording_id}", response_class=HTMLResponse)
-def detail(request: Request, recording_id: int, session: Session = Depends(get_session),
+def detail(request: Request, recording_id: Annotated[int, PathParam(ge=1, le=MAX_ID)], session: Session = Depends(get_session),
            cfg: Config = Depends(get_config)):
     found = svc.get_detail(session, recording_id)
     if found is None:
@@ -148,7 +174,7 @@ def detail(request: Request, recording_id: int, session: Session = Depends(get_s
 
 
 @app.post("/recordings/{recording_id}/unanalyze")
-def recording_unanalyze(request: Request, recording_id: int, csrf: str = Form(""),
+def recording_unanalyze(request: Request, recording_id: Annotated[int, PathParam(ge=1, le=MAX_ID)], csrf: str = Form(""),
                         session: Session = Depends(get_session)):
     """Let the routine read the recording again."""
     require_csrf(request, csrf)
@@ -160,7 +186,7 @@ def recording_unanalyze(request: Request, recording_id: int, csrf: str = Form(""
 
 
 @app.get("/recordings/{recording_id}/discard", response_class=HTMLResponse)
-def discard_confirm(request: Request, recording_id: int, session: Session = Depends(get_session),
+def discard_confirm(request: Request, recording_id: Annotated[int, PathParam(ge=1, le=MAX_ID)], session: Session = Depends(get_session),
                     cfg: Config = Depends(get_config)):
     found = svc.get_detail(session, recording_id)
     if found is None:
@@ -169,7 +195,7 @@ def discard_confirm(request: Request, recording_id: int, session: Session = Depe
 
 
 @app.post("/recordings/{recording_id}/discard")
-def discard_one(request: Request, recording_id: int, csrf: str = Form(""),
+def discard_one(request: Request, recording_id: Annotated[int, PathParam(ge=1, le=MAX_ID)], csrf: str = Form(""),
                 session: Session = Depends(get_session)):
     require_csrf(request, csrf)
     if not svc.discard(session, recording_id, now_utc()):
@@ -180,21 +206,23 @@ def discard_one(request: Request, recording_id: int, csrf: str = Form(""),
 @app.get("/cleanup", response_class=HTMLResponse)
 def cleanup_preview(request: Request, days: int = Query(90, ge=1, le=3650),
                     session: Session = Depends(get_session), cfg: Config = Depends(get_config)):
-    count = svc.count_older_than(session, days, now_utc())
-    return render(request, cfg, "cleanup.html", days=days, count=count, changed=False)
+    ids = svc.older_than_ids(session, days, now_utc())
+    return render(request, cfg, "cleanup.html", days=days, count=len(ids), fingerprint=svc.ids_fingerprint(ids),
+                  changed=False)
 
 
 @app.post("/cleanup")
 def cleanup_run(request: Request, days: int = Form(..., ge=1, le=3650), expected_count: int = Form(...),
-                csrf: str = Form(""), session: Session = Depends(get_session),
-                cfg: Config = Depends(get_config)):
+                fingerprint: str = Form(..., max_length=32), csrf: str = Form(""),
+                session: Session = Depends(get_session), cfg: Config = Depends(get_config)):
     require_csrf(request, csrf)
     now = now_utc()
-    count = svc.count_older_than(session, days, now)
-    if count != expected_count:
-        # The set changed since the owner looked at it: show the new count, discard nothing.
-        return render(request, cfg, "cleanup.html", status_code=409, days=days, count=count, changed=True)
-    svc.discard_older_than(session, days, now)
+    ids = svc.older_than_ids(session, days, now)
+    if len(ids) != expected_count or not hmac.compare_digest(svc.ids_fingerprint(ids), fingerprint):
+        # The set changed since the owner looked at it (not just its size): show it again, discard nothing.
+        return render(request, cfg, "cleanup.html", status_code=409, days=days, count=len(ids),
+                      fingerprint=svc.ids_fingerprint(ids), changed=True)
+    svc.discard_ids(session, ids, now)
     return RedirectResponse("/", status_code=303)
 
 
@@ -233,7 +261,7 @@ def todo_add(request: Request, title: str = Form("", max_length=todos.TITLE_MAX)
 
 
 @app.get("/todos/{todo_id}", response_class=HTMLResponse)
-def todo_detail(request: Request, todo_id: int, session: Session = Depends(get_session),
+def todo_detail(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX_ID)], session: Session = Depends(get_session),
                 cfg: Config = Depends(get_config)):
     found = todos.get_todo(session, now_utc(), todo_id)
     if found is None:
@@ -245,7 +273,7 @@ def todo_detail(request: Request, todo_id: int, session: Session = Depends(get_s
 
 
 @app.post("/todos/{todo_id}")
-def todo_edit(request: Request, todo_id: int, title: str = Form("", max_length=todos.TITLE_MAX),
+def todo_edit(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX_ID)], title: str = Form("", max_length=todos.TITLE_MAX),
               detail: str = Form("", max_length=todos.DETAIL_MAX), priority: int = Form(3),
               due: str = Form("", max_length=10), topic: str = Form("", max_length=todos.TOPIC_MAX),
               status: str = Form("open", max_length=10), csrf: str = Form(""),
@@ -262,7 +290,7 @@ def todo_edit(request: Request, todo_id: int, title: str = Form("", max_length=t
 
 
 @app.post("/todos/{todo_id}/status")
-def todo_status(request: Request, todo_id: int, status: str = Form("", max_length=10), csrf: str = Form(""),
+def todo_status(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX_ID)], status: str = Form("", max_length=10), csrf: str = Form(""),
                 back: str = Form("", max_length=20), session: Session = Depends(get_session)):
     """One-click check-off from the list."""
     require_csrf(request, csrf)
@@ -276,7 +304,7 @@ def todo_status(request: Request, todo_id: int, status: str = Form("", max_lengt
 
 
 @app.post("/todos/events/{event_id}/undo")
-def todo_undo(request: Request, event_id: int, csrf: str = Form(""), session: Session = Depends(get_session)):
+def todo_undo(request: Request, event_id: Annotated[int, PathParam(ge=1, le=MAX_ID)], csrf: str = Form(""), session: Session = Depends(get_session)):
     require_csrf(request, csrf)
     try:
         todo = todos.undo_event(session, now_utc(), event_id, actor="owner")
@@ -304,7 +332,7 @@ def topic_exclude(request: Request, name: str = Form("", max_length=todos.TOPIC_
 
 
 @app.post("/topics/{topic_id}/rename")
-def topic_rename(request: Request, topic_id: int, name: str = Form("", max_length=todos.TOPIC_MAX),
+def topic_rename(request: Request, topic_id: Annotated[int, PathParam(ge=1, le=MAX_ID)], name: str = Form("", max_length=todos.TOPIC_MAX),
                  csrf: str = Form(""), session: Session = Depends(get_session)):
     require_csrf(request, csrf)
     try:
@@ -317,7 +345,7 @@ def topic_rename(request: Request, topic_id: int, name: str = Form("", max_lengt
 
 
 @app.get("/topics/{topic_id}/delete", response_class=HTMLResponse)
-def topic_delete_confirm(request: Request, topic_id: int, session: Session = Depends(get_session),
+def topic_delete_confirm(request: Request, topic_id: Annotated[int, PathParam(ge=1, le=MAX_ID)], session: Session = Depends(get_session),
                          cfg: Config = Depends(get_config)):
     found = topic_admin.topic_counts(session, topic_id)
     if found is None:
@@ -328,16 +356,22 @@ def topic_delete_confirm(request: Request, topic_id: int, session: Session = Dep
 
 
 @app.post("/topics/delete")
-def topic_delete(request: Request, topic_id: int = Form(...), exclude: str = Form(""),
+def topic_delete(request: Request, topic_id: int = Form(..., ge=1, le=MAX_ID), expected_notes: int = Form(..., ge=0),
+                 expected_tasks: int = Form(..., ge=0), exclude: str = Form(""),
                  csrf: str = Form(""), session: Session = Depends(get_session)):
     require_csrf(request, csrf)
-    if topic_admin.delete_topic(session, now_utc(), topic_id, keep_excluded=exclude == "1") is None:
+    found = topic_admin.topic_counts(session, topic_id)
+    if found is None:
         raise HTTPException(status_code=404, detail="topic not found")
+    if (found[3], found[2]) != (expected_notes, expected_tasks):
+        # Something was added since the owner looked at the page: nothing is deleted.
+        raise HTTPException(status_code=409, detail=get_text("ui_changed_since", cfg_lang()))
+    topic_admin.delete_topic(session, now_utc(), topic_id, keep_excluded=exclude == "1")
     return RedirectResponse("/topics", status_code=303)
 
 
 @app.get("/topics/{topic_id}", response_class=HTMLResponse)
-def topic_detail(request: Request, topic_id: int, session: Session = Depends(get_session),
+def topic_detail(request: Request, topic_id: Annotated[int, PathParam(ge=1, le=MAX_ID)], session: Session = Depends(get_session),
                  cfg: Config = Depends(get_config)):
     found = todos.topic_timeline_by_id(session, topic_id)
     if found is None:

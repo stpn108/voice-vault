@@ -3,6 +3,7 @@ Reading and discarding stored recordings for the web UI (REQ-002).
 All queries are parameterised through SQLAlchemy; the UI never builds SQL.
 """
 import base64
+import hashlib
 import datetime as dt
 import logging
 import re
@@ -57,6 +58,9 @@ def recording_state(rec: Recording, now: dt.datetime, stability_minutes: int) ->
     return STATE_IMPORTED
 
 
+MAX_ID = 2**31 - 1
+
+
 def encode_cursor(started_at: dt.datetime, recording_id: int) -> str:
     raw = f"{as_utc(started_at).isoformat()}|{recording_id}"
     return base64.urlsafe_b64encode(raw.encode()).decode()
@@ -67,8 +71,11 @@ def decode_cursor(cursor: str) -> tuple:
     try:
         raw = base64.urlsafe_b64decode(cursor.encode()).decode()
         stamp, rec_id = raw.split("|")
-        return as_utc(dt.datetime.fromisoformat(stamp)), int(rec_id)
-    except (ValueError, TypeError, UnicodeError) as exc:
+        started_at, rec_id = as_utc(dt.datetime.fromisoformat(stamp)), int(rec_id)
+        if not 0 < rec_id < MAX_ID:
+            raise ValueError("id out of range")
+        return started_at, rec_id
+    except (ValueError, TypeError, UnicodeError, OverflowError) as exc:
         raise ValueError("invalid cursor") from exc
 
 
@@ -192,10 +199,18 @@ def _older_than(days: int, now: dt.datetime):
     return and_(_visible(), Recording.started_at < now - dt.timedelta(days=days))
 
 
+def older_than_ids(session: Session, days: int, now: dt.datetime) -> list:
+    return sorted(session.scalars(select(Recording.id).where(_older_than(days, now))).all())
+
+
 def count_older_than(session: Session, days: int, now: dt.datetime) -> int:
-    return len(session.scalars(select(Recording.id).where(_older_than(days, now))).all())
+    return len(older_than_ids(session, days, now))
 
 
-def discard_older_than(session: Session, days: int, now: dt.datetime) -> int:
-    ids = session.scalars(select(Recording.id).where(_older_than(days, now))).all()
+def ids_fingerprint(ids: list) -> str:
+    """Names the exact set the owner looked at, not only how many it had."""
+    return hashlib.sha256(",".join(str(i) for i in ids).encode()).hexdigest()[:16]
+
+
+def discard_ids(session: Session, ids: list, now: dt.datetime) -> int:
     return sum(1 for rec_id in ids if discard(session, rec_id, now))

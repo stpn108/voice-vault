@@ -147,6 +147,7 @@ TEXTS = {
     "ui_error_invalid": {"de": "Das hat nicht geklappt", "en": "That did not work"},
     "ui_digest_versions": {"de": "Frühere Fassungen dieses Tages ({count})", "en": "Earlier versions of this day ({count})"},
     "ui_unanalyze": {"de": "Routine erneut lesen lassen", "en": "Let the routine read it again"},
+    "ui_changed_since": {"de": "Seit der Anzeige hat sich etwas geändert. Es wurde nichts gelöscht. Bitte die Seite neu öffnen und prüfen.", "en": "Something changed since the page was shown. Nothing was deleted. Please reopen the page and check."},
     "ui_cleanup_confirm": {"de": "{count} Aufnahme(n) endgültig verwerfen", "en": "Discard {count} recording(s) for good"},
 }
 

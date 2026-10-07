@@ -16,6 +16,7 @@
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <input type="hidden" name="days" value="{{ days }}">
   <input type="hidden" name="expected_count" value="{{ count }}">
+  <input type="hidden" name="fingerprint" value="{{ fingerprint }}">
   <button class="danger" type="submit">{{ t("ui_cleanup_confirm", count=count) }}</button>
 </form>
 {% endif %}

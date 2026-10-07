@@ -166,6 +166,11 @@ def test_confirm_form_carries_a_token_that_the_post_accepts(client, seed):
                        follow_redirects=False).status_code == 303
 
 
+def _fingerprint(client):
+    import re
+    return re.search(r'name="fingerprint" value="([0-9a-f]+)"', client.get("/cleanup", params={"days": 90}).text).group(1)
+
+
 def _seed_aged(seed, old=12, young=18):
     now = dt.datetime.now(dt.timezone.utc)
     for i in range(old + young):
@@ -181,8 +186,8 @@ def test_req_002_cleanup_preview_shows_the_count(client, seed):
 
 def test_req_002_cleanup_with_the_shown_count_discards_exactly_those(client, seed, session_factory):
     _seed_aged(seed)
-    response = client.post("/cleanup", data={"days": 90, "expected_count": 12, "csrf": token()},
-                           follow_redirects=False)
+    response = client.post("/cleanup", data={"days": 90, "expected_count": 12, "csrf": token(),
+                                             "fingerprint": _fingerprint(client)}, follow_redirects=False)
     assert response.status_code == 303
     with session_factory() as s:
         discarded = s.scalars(select(Recording).where(Recording.discarded_at.is_not(None))).all()
@@ -191,7 +196,8 @@ def test_req_002_cleanup_with_the_shown_count_discards_exactly_those(client, see
 
 def test_cleanup_with_a_changed_count_discards_nothing(client, seed, session_factory):
     _seed_aged(seed)
-    response = client.post("/cleanup", data={"days": 90, "expected_count": 11, "csrf": token()})
+    response = client.post("/cleanup", data={"days": 90, "expected_count": 11, "csrf": token(),
+                                             "fingerprint": _fingerprint(client)})
     assert response.status_code == 409 and "Die Anzahl hat sich geändert" in response.text
     with session_factory() as s:
         assert s.scalars(select(Recording).where(Recording.discarded_at.is_not(None))).all() == []
@@ -199,15 +205,16 @@ def test_cleanup_with_a_changed_count_discards_nothing(client, seed, session_fac
 
 def test_cleanup_needs_the_token(client, seed, session_factory):
     _seed_aged(seed)
-    assert client.post("/cleanup", data={"days": 90, "expected_count": 12}).status_code == 403
+    assert client.post("/cleanup", data={"days": 90, "expected_count": 12, "fingerprint": "x"}).status_code == 403
     with session_factory() as s:
         assert s.scalars(select(Recording).where(Recording.discarded_at.is_not(None))).all() == []
 
 
 @pytest.mark.parametrize("days", [0, -1, 100000, "abc"])
 def test_cleanup_rejects_invalid_days(client, days):
-    assert client.get("/cleanup", params={"days": days}).status_code == 422
-    assert client.post("/cleanup", data={"days": days, "expected_count": 0, "csrf": token()}).status_code == 422
+    assert client.get("/cleanup", params={"days": days}).status_code == 400
+    assert client.post("/cleanup", data={"days": days, "expected_count": 0, "csrf": token(),
+                                         "fingerprint": "x"}).status_code == 400
 
 
 @pytest.mark.parametrize("path", ["/", "/cleanup", "/recordings/1"])
@@ -256,3 +263,68 @@ def test_req_002_confirmation_tells_what_happens_at_plaud(client, seed, enabled,
         assert expected in html and unexpected not in html
     assert "24 Stunden" in client.get(f"/recordings/{rec_id}/discard").text if enabled else True
     webapp.app.dependency_overrides.pop(webapp.get_config)
+
+
+# --- findings of the security review (D-020) --------------------------------------------------------
+def test_review_cleanup_with_the_same_count_but_another_set_discards_nothing(client, seed, session_factory):
+    _seed_aged(seed)
+    shown = _fingerprint(client)
+    with session_factory() as s:  # one old recording goes, another one becomes eligible: the count stays 12
+        old = s.scalars(select(Recording).where(Recording.started_at < dt.datetime.now(dt.timezone.utc)
+                                                - dt.timedelta(days=90))).first()
+        old.started_at = dt.datetime.now(dt.timezone.utc)
+        young = s.scalars(select(Recording).where(Recording.started_at > dt.datetime.now(dt.timezone.utc)
+                                                  - dt.timedelta(days=20))).all()[-1]
+        young.started_at = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=200)
+        s.commit()
+    response = client.post("/cleanup", data={"days": 90, "expected_count": 12, "csrf": token(), "fingerprint": shown})
+    assert response.status_code == 409
+    with session_factory() as s:
+        assert s.scalars(select(Recording).where(Recording.discarded_at.is_not(None))).all() == []
+
+
+@pytest.mark.parametrize("url", ["/recordings/99999999999999999999999", "/todos/99999999999999999999",
+                                 "/topics/99999999999999999999", "/recordings/0", "/todos/-1"])
+def test_review_ids_beyond_the_column_are_a_clean_error_not_a_crash(client, url):
+    assert client.get(url).status_code in (400, 404)
+
+
+@pytest.mark.parametrize("url,data", [
+    ("/todos/events/99999999999999999999/undo", {}), ("/recordings/99999999999999999999/discard", {}),
+    ("/topics/delete", {"topic_id": "99999999999999999999", "expected_notes": 0, "expected_tasks": 0}),
+])
+def test_review_posts_with_huge_ids_are_a_clean_error(client, url, data):
+    assert client.post(url, data={"csrf": token(), **data}).status_code in (400, 404)
+
+
+@pytest.mark.parametrize("cursor", ["!!!", "MjAyNi0wMS0wMVQwMDowMDowMCswMDowMHw5OTk5OTk5OTk5OTk5OTk5OTk5OTk5",
+                                    "MDAwMS0wMS0wMVQwMDowMDowMCsxNDowMHwx", "OTk5OS0xMi0zMVQyMzo1OTo1OS0xNDowMHwx"])
+def test_review_odd_cursors_are_a_clean_error(client, cursor):
+    assert client.get("/", params={"cursor": cursor}).status_code == 400
+
+
+def test_review_an_unexpected_error_still_gets_the_security_headers(session_factory, monkeypatch):
+    def override():
+        with session_factory() as session:
+            yield session
+    webapp.app.dependency_overrides[webapp.get_session] = override
+    monkeypatch.setattr(webapp.svc, "list_recordings", lambda *a, **k: 1 / 0)
+    try:
+        response = TestClient(webapp.app, base_url="http://localhost", raise_server_exceptions=False).get("/")
+    finally:
+        webapp.app.dependency_overrides.clear()
+    assert response.status_code == 500 and "Internal Server Error" in response.text
+    assert "default-src 'none'" in response.headers["content-security-policy"]
+    assert response.headers["x-frame-options"] == "DENY" and response.headers["cache-control"] == "no-store"
+
+
+@pytest.mark.parametrize("headers,expected", [
+    ({"origin": "http://localhost"}, 303), ({"origin": "evil://localhost"}, 403), ({"origin": "https://localhost"}, 403),
+    ({"origin": "http://localhost.evil.com"}, 403), ({"origin": "null"}, 403),
+    ({"sec-fetch-site": "cross-site"}, 403), ({"sec-fetch-site": "same-origin"}, 303), ({}, 303),
+])
+def test_review_the_origin_must_match_exactly_and_cross_site_requests_are_refused(client, seed, headers, expected):
+    rec_id = seed(index=1)
+    response = client.post(f"/recordings/{rec_id}/discard", data={"csrf": token()}, headers=headers,
+                           follow_redirects=False)
+    assert response.status_code == expected

@@ -128,14 +128,16 @@ def test_req_006_deleting_through_the_ui_needs_the_csrf_token_and_confirmation(c
     with session_factory() as s:
         make(s, "Plan trip", topic="Travel")
     tid = topic_id(session_factory, "Travel")
-    assert client.post("/topics/delete", data={"topic_id": tid, "csrf": "bad"}).status_code == 403
+    counts = {"expected_notes": 0, "expected_tasks": 1}
+    assert client.post("/topics/delete", data={"topic_id": tid, "csrf": "bad", **counts}).status_code == 403
     assert client.get(f"/topics/{tid}").status_code == 200
-    assert post(client, "/topics/delete", topic_id=tid, exclude="1").status_code == 303
+    assert post(client, "/topics/delete", topic_id=tid, exclude="1", **counts).status_code == 303
     page = client.get("/topics").text
     assert "Travel" in page and "ausgeschlossen" in page
-    assert post(client, "/topics/delete", topic_id=tid).status_code == 303
+    after = {"expected_notes": 0, "expected_tasks": 0}  # the task left the topic when it was deleted
+    assert post(client, "/topics/delete", topic_id=tid, **after).status_code == 303
     assert client.get(f"/topics/{tid}").status_code == 404
-    assert post(client, "/topics/delete", topic_id=tid).status_code == 404
+    assert post(client, "/topics/delete", topic_id=tid, **after).status_code == 404
     with session_factory() as s:
         assert s.scalars(select(Todo)).one().topic_id is None
 
@@ -151,7 +153,7 @@ def test_req_006_topics_with_any_characters_have_working_pages(client, session_f
     with session_factory() as s:
         task_id = s.scalar(select(Todo.id))
     assert f'href="/topics/{topic}"' in client.get(f"/todos/{task_id}").text
-    assert post(client, "/topics/delete", topic_id=topic).status_code == 303
+    assert post(client, "/topics/delete", topic_id=topic, expected_notes=0, expected_tasks=1).status_code == 303
     assert topic_id(session_factory, name) is None
 
 
@@ -215,3 +217,19 @@ def test_req_006_renaming_through_the_ui(client, session_factory):
 def test_req_006_errors_show_a_readable_page(client):
     page = client.get("/topics/9999")
     assert page.status_code == 404 and "Nicht gefunden" in page.text and "<html" in page.text
+
+
+def test_review_deleting_a_topic_stops_when_something_was_added_since_the_page_was_shown(client, session_factory):
+    with session_factory() as s:
+        rec = add_recording(s, 1)
+        make(s, "Plan trip", topic="Travel")
+        rec_id = rec.id
+    topic = topic_id(session_factory, "Travel")
+    assert 'name="expected_notes" value="0"' in client.get(f"/topics/{topic}/delete").text
+    with session_factory() as s:  # Claude adds a note after the owner opened the page
+        svc.add_topic_note(s, NOW, topic="Travel", recording_id=rec_id, note="new note")
+    response = post(client, "/topics/delete", topic_id=topic, expected_notes=0, expected_tasks=1)
+    assert response.status_code == 409 and "Es wurde nichts gelöscht" in response.text
+    with session_factory() as s:
+        assert s.scalar(select(Topic).where(Topic.id == topic)) is not None
+        assert len(s.scalars(select(TopicNote)).all()) == 1

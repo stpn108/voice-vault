@@ -148,7 +148,7 @@ def test_req_002_discard_older_than_n_days_discards_exactly_those(db_session):
         age_days = 100 if i < 12 else 10
         add_recording(db_session, i, started=NOW - dt.timedelta(days=age_days, minutes=i), segments=0)
     assert svc.count_older_than(db_session, 90, NOW) == 12
-    assert svc.discard_older_than(db_session, 90, NOW) == 12
+    assert svc.discard_ids(db_session, svc.older_than_ids(db_session, 90, NOW), NOW) == 12
     assert len(list_page(db_session).rows) == 18
     assert svc.count_older_than(db_session, 90, NOW) == 0
 
