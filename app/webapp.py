@@ -309,4 +309,6 @@ def digest_page(request: Request, day: str = "", session: Session = Depends(get_
         if digest is None:
             raise HTTPException(status_code=404, detail="overview not found")
     older, newer = todos.digest_neighbours(session, digest.day) if digest else (None, None)
-    return render(request, cfg, "digests.html", digest=digest, recent=recent, older=older, newer=newer)
+    day_recordings = todos.recordings_of_day(session, digest.day) if digest else []
+    return render(request, cfg, "digests.html", digest=digest, recent=recent, older=older, newer=newer,
+                  day_recordings=day_recordings)

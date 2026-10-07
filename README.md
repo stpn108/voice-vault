@@ -143,7 +143,9 @@ Prompt for the daily routine (connector `Dennis_Voice-Vault`):
 > due date only if one is spoken) or `update_todo` for an existing task. Complete a task only when
 > the conversation clearly says it is done, with a note. Add one `add_topic_note` per topic and
 > recording. Skip topics that `list_topics` marks EXCLUDED. Call `mark_recording_analyzed` when a recording is handled. Finish with `save_digest`
-> for today: what is new, what changed, what is most urgent.
+> for the day of the conversations, not for today (local date of the recording, a day runs from 04:00 to
+> 04:00; one call per recording day, and read `list_digests` for that day first so you extend it): what is
+> new, what changed, what is most urgent.
 
 ## Operations
 

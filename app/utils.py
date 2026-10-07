@@ -64,6 +64,17 @@ def local_today(user_tz: Optional[str] = None) -> dt.date:
     return now.date()
 
 
+def local_day(value: dt.datetime) -> dt.date:
+    """The day a point in time belongs to: local time with the 04:00 day boundary."""
+    return (as_utc(value).astimezone(LOCAL_TZ) - dt.timedelta(hours=4)).date()
+
+
+def day_bounds(day: dt.date) -> tuple:
+    """[start, end) of a local day in UTC, from 04:00 to 04:00."""
+    start = dt.datetime.combine(day, dt.time(4), tzinfo=LOCAL_TZ)
+    return start.astimezone(dt.timezone.utc), (start + dt.timedelta(days=1)).astimezone(dt.timezone.utc)
+
+
 def today_str(user_tz: Optional[str] = None) -> str:
     """Today's date as ISO string (YYYY-MM-DD)."""
     return local_today(user_tz).isoformat()

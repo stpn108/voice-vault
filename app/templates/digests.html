@@ -15,6 +15,15 @@
   <h3 class="digest-day">{{ digest.day.strftime("%d.%m.%Y") }}</h3>
   <div class="prose">{{ digest.body | md }}</div>
 </section>
+{% if day_recordings %}
+<h2>{{ t("ui_day_recordings") }}</h2>
+<div class="list">
+  {% for r in day_recordings %}
+  <a class="item" href="/recordings/{{ r.id }}"><div class="item-main"><div class="item-title">{{ r.title or t("ui_untitled") }}</div>
+    <div class="item-meta">{{ r.started_at | localtime }} · {{ r.duration_ms | hms }}</div></div></a>
+  {% endfor %}
+</div>
+{% endif %}
 {% else %}
 <div class="card empty">{{ t("ui_digests_empty") }}</div>
 {% endif %}

@@ -8,7 +8,7 @@ from sqlalchemy import select
 
 import todo_service as svc
 from database import Digest, Recording, Todo, TodoEvent, Topic
-from tests.helpers import add_recording
+from tests.helpers import add_recording, add_recording_on
 from todo_service import UNSET, DuplicateTodoError, TodoError
 
 NOW = dt.datetime(2026, 10, 7, 12, 0, tzinfo=dt.timezone.utc)
@@ -386,6 +386,7 @@ def test_topics_are_listed_with_open_counts_busiest_first(db_session):
 
 # --- digests ----------------------------------------------------------------------------------
 def test_req_006_a_digest_is_rewritten_when_saved_again_for_the_same_day(db_session):
+    add_recording_on(db_session, "2026-10-07")
     svc.save_digest(db_session, NOW, "2026-10-07", "first version")
     svc.save_digest(db_session, LATER, "2026-10-07", "second version")
     assert db_session.query(Digest).count() == 1
@@ -393,6 +394,7 @@ def test_req_006_a_digest_is_rewritten_when_saved_again_for_the_same_day(db_sess
 
 
 def test_digests_are_listed_newest_day_first_with_a_limit(db_session):
+    add_recording_on(db_session, "2026-10-05", "2026-10-06", "2026-10-07")
     for day in ("2026-10-05", "2026-10-07", "2026-10-06"):
         svc.save_digest(db_session, NOW, day, f"body {day}")
     assert [d.day.isoformat() for d in svc.list_digests(db_session)] == ["2026-10-07", "2026-10-06", "2026-10-05"]
@@ -405,8 +407,33 @@ def test_digests_are_listed_newest_day_first_with_a_limit(db_session):
     ("2026-10-07", "", "must not be empty"), ("2026-10-07", "x" * 20001, "at most 20000"),
 ])
 def test_invalid_digests_are_rejected(db_session, day, body, message):
+    add_recording_on(db_session, "2026-10-07")
     with pytest.raises(TodoError, match=message):
         svc.save_digest(db_session, NOW, day, body)
+
+
+def test_req_006_a_digest_needs_recordings_of_that_day(db_session):
+    add_recording_on(db_session, "2026-10-06")
+    with pytest.raises(TodoError, match=r"no recording started on 2026-10-07.*2026-10-06"):
+        svc.save_digest(db_session, NOW, "2026-10-07", "run date, not conversation date")
+    svc.save_digest(db_session, NOW, "2026-10-06", "right day")
+
+
+def test_req_006_a_discarded_recording_does_not_open_a_day(db_session):
+    rec_id, = add_recording_on(db_session, "2026-10-06")
+    db_session.get(Recording, rec_id).discarded_at = NOW
+    db_session.commit()
+    with pytest.raises(TodoError, match="no recording started"):
+        svc.save_digest(db_session, NOW, "2026-10-06", "text")
+
+
+def test_req_006_the_day_runs_from_four_to_four_local_time(db_session):
+    # 01:30 local on 7 Oct (23:30 UTC on 6 Oct in summer time) still belongs to 6 Oct.
+    add_recording(db_session, 1, started=dt.datetime(2026, 10, 6, 23, 30, tzinfo=dt.timezone.utc))
+    svc.save_digest(db_session, NOW, "2026-10-06", "late night")
+    with pytest.raises(TodoError):
+        svc.save_digest(db_session, NOW, "2026-10-07", "not this day")
+    assert [r.id for r in svc.recordings_of_day(db_session, dt.date(2026, 10, 6))]
 
 
 # --- analysis marker --------------------------------------------------------------------------

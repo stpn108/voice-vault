@@ -67,3 +67,14 @@ def add_recording(session, index=0, started=None, segments=3, **overrides):
     )
     session.commit()
     return rec
+
+
+def add_recording_on(session, *days, hour=10):
+    """One recording per given local day (a date or ISO string), starting at `hour` UTC. Returns the ids."""
+    import datetime as dt
+    ids = []
+    for i, day in enumerate(days):
+        day = dt.date.fromisoformat(day) if isinstance(day, str) else day
+        started = dt.datetime.combine(day, dt.time(hour), tzinfo=dt.timezone.utc)
+        ids.append(add_recording(session, index=100 + i, started=started).id)
+    return ids

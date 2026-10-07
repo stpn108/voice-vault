@@ -9,7 +9,7 @@ import todo_service as svc
 import webapp
 from database import Todo, TodoEvent
 from utils import now_utc
-from tests.helpers import add_recording
+from tests.helpers import add_recording, add_recording_on
 
 
 @pytest.fixture
@@ -105,6 +105,7 @@ def test_req_006_unknown_ids_are_404(client, url):
 def test_req_006_topics_timeline_and_digests_render(client, make_todo, session_factory):
     with session_factory() as s:
         rec_id = add_recording(s, index=1).id
+        add_recording_on(s, dt.date(2026, 10, 5))
     make_todo(title="Prepare budget", topic="Budget", recording_id=rec_id)
     with session_factory() as s:
         svc.add_topic_note(s, now_utc(), topic="Budget", recording_id=rec_id, note="Estimate 12k")
@@ -137,6 +138,7 @@ def test_req_006_excluding_needs_the_csrf_token(client):
 
 def test_req_006_digests_can_be_paged_through_by_day(client, session_factory):
     with session_factory() as s:
+        add_recording_on(s, "2026-10-01", "2026-10-03", "2026-10-07")
         for day, body in ((dt.date(2026, 10, 1), "first day"), (dt.date(2026, 10, 3), "third day"),
                           (dt.date(2026, 10, 7), "last day")):
             svc.save_digest(s, now_utc(), day, body)
@@ -146,6 +148,7 @@ def test_req_006_digests_can_be_paged_through_by_day(client, session_factory):
     middle = client.get("/digests/2026-10-03").text
     assert "third day" in middle and 'href="/digests/2026-10-01"' in middle and 'href="/digests/2026-10-07"' in middle
     assert "first day" in client.get("/digests/2026-10-01").text
+    assert "Title 100" in client.get("/digests/2026-10-01").text
 
 
 @pytest.mark.parametrize("day", ["2026-10-02", "nonsense", "2026-13-40"])

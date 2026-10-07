@@ -31,8 +31,8 @@ Once a day Claude reads the recordings that are new since its last run, adds the
    Given the UI list, when the owner presses the check mark, then the task is `done` with a timestamp, logged as `owner`. Claude can do the same with `update_todo`.
 5. **Topics.**
    Given a topic, then `add_topic_note` stores one note per topic and recording (a second call replaces it). `get_topic` and the UI page show open tasks and a timeline of notes and task events, newest first.
-6. **Daily digest.**
-   Given a day, then `save_digest` stores a Markdown overview, replacing an earlier one of the same day. The UI shows the latest ones.
+6. **Daily digest, dated by the conversations.**
+   Given a day, then `save_digest` stores a Markdown overview, replacing an earlier one of the same day. The day is the day of the conversations (Plaud's start time, local time, a day runs from 04:00 to 04:00), not the day the routine runs. A day without a stored recording is refused with the days that have recordings. A run that covers several days saves one overview per day. The UI shows one day at a time with older/newer links, day chips and the recordings of that day.
 7. **Which recordings are new.**
    Given `mark_recording_analyzed`, then `list_recordings` with `unanalyzed_only` skips that recording and shows `analyzed` in the others.
 8. **UI.**

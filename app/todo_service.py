@@ -17,7 +17,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from database import Digest, Recording, Todo, TodoEvent, Topic, TopicNote
-from utils import as_utc
+from utils import as_utc, day_bounds, local_day
 
 log = logging.getLogger(__name__)
 
@@ -425,11 +425,27 @@ def topic_timeline(session: Session, name: str):
 
 
 # --- daily overviews ---------------------------------------------------------------------------
+def recordings_of_day(session: Session, day: dt.date) -> list:
+    """The stored recordings that started on this local day (04:00 boundary), oldest first."""
+    start, end = day_bounds(day)
+    return session.scalars(select(Recording).where(
+        Recording.discarded_at.is_(None), Recording.started_at >= start, Recording.started_at < end,
+    ).order_by(Recording.started_at)).all()
+
+
 def save_digest(session: Session, now: dt.datetime, day, body: str) -> Digest:
+    """Save the overview of the day the conversations took place (Plaud's date), not the run date."""
     day = _date(day, "day")
     if day is None:
         raise TodoError("day must be a date like 2026-10-31")
     body = _text(body, "body", DIGEST_MAX, required=True)
+    if not recordings_of_day(session, day):
+        recent = session.scalars(select(Recording.started_at).where(Recording.discarded_at.is_(None))
+                                 .order_by(Recording.started_at.desc()).limit(30)).all()
+        days = sorted({local_day(s) for s in recent}, reverse=True)[:7]
+        known = ", ".join(d.isoformat() for d in days) or "none"
+        raise TodoError(f"no recording started on {day.isoformat()}. The day is the day of the conversations "
+                        f"(local time, a day runs from 04:00 to 04:00). Days with recordings: {known}")
     digest = session.scalar(select(Digest).where(Digest.day == day))
     if digest is None:
         digest = Digest(day=day, body=body, created_at=now, updated_at=now)
