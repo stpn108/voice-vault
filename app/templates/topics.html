@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}{{ t("ui_nav_topics") }}{% endblock %}
+{% block content %}
+{% if topics %}
+<table>
+  <thead><tr><th>{{ t("ui_topic") }}</th><th>{{ t("ui_col_open") }}</th><th class="hide-small">{{ t("ui_col_notes") }}</th><th>{{ t("ui_col_activity") }}</th></tr></thead>
+  <tbody>
+  {% for topic, open_count, notes, last in topics %}
+  <tr><td><a href="/topics/{{ topic.name | urlencode }}">{{ topic.name }}</a></td><td>{{ open_count }}</td>
+    <td class="hide-small">{{ notes }}</td><td>{{ last | localtime }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">{{ t("ui_topics_empty") }}</p>
+{% endif %}
+{% endblock %}

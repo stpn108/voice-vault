@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{{ topic.name }}{% endblock %}
+{% block content %}
+<p><a href="/topics">{{ t("ui_back_topics") }}</a></p>
+<h2>{{ topic.name }}</h2>
+<h3>{{ t("ui_open_tasks") }}</h3>
+{% if rows %}
+<ul>{% for row in rows %}<li><span class="prio-{{ row.priority }}">{{ t("todo_prio_" ~ row.priority) }}</span> <a href="/todos/{{ row.id }}">{{ row.title }}</a></li>{% endfor %}</ul>
+{% else %}<p class="muted">{{ t("ui_todo_empty") }}</p>{% endif %}
+<h3>{{ t("ui_timeline") }}</h3>
+<table>
+  <tbody>
+  {% for e in entries %}
+  <tr>
+    <td>{{ e.at | localtime }}</td>
+    <td>{{ t("todo_event_" ~ e.kind) if e.kind != "note" else t("ui_note") }}</td>
+    <td>{% if e.todo_id %}<a href="/todos/{{ e.todo_id }}">{{ e.text }}</a>{% else %}{{ e.text }}{% endif %}</td>
+    <td>{% if e.recording_id %}<a href="/recordings/{{ e.recording_id }}">#{{ e.recording_id }}</a>{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 import recording_service as svc
+import todo_service as todos
 from config import Config, load_config
 from database import engine, migrate_schema
 from strings import get_text
@@ -175,3 +176,106 @@ def cleanup_run(request: Request, days: int = Form(..., ge=1, le=3650), expected
 
 def _stability(cfg: Config) -> int:
     return cfg.stability_minutes
+
+
+# --- tasks, topics and overviews (REQ-006, D-013) -------------------------------------------
+def _todo_error(exc: todos.TodoError) -> HTTPException:
+    return HTTPException(status_code=400, detail=str(exc))
+
+
+@app.get("/todos", response_class=HTMLResponse)
+def todo_list(request: Request, status: str = Query("open", max_length=10), topic: str = Query("", max_length=120),
+              session: Session = Depends(get_session), cfg: Config = Depends(get_config)):
+    if status not in todos.STATUSES:
+        raise HTTPException(status_code=400, detail="invalid status")
+    rows, truncated = todos.list_todos(session, now_utc(), status=status, topic=topic or None,
+                                       limit=todos.LIST_LIMIT_MAX)
+    return render(request, cfg, "todos.html", rows=rows, truncated=truncated, status=status, topic=topic,
+                  counts=todos.counts(session), statuses=todos.STATUSES, priorities=todos.PRIORITIES)
+
+
+@app.post("/todos")
+def todo_add(request: Request, title: str = Form("", max_length=todos.TITLE_MAX), priority: int = Form(3),
+             due: str = Form("", max_length=10), topic: str = Form("", max_length=todos.TOPIC_MAX),
+             csrf: str = Form(""), session: Session = Depends(get_session)):
+    require_csrf(request, csrf)
+    try:
+        todo = todos.create_todo(session, now_utc(), title=title, actor="owner", priority=priority,
+                                 due=due or None, topic=topic or None, allow_similar=True)
+    except todos.TodoError as exc:
+        raise _todo_error(exc)
+    return RedirectResponse(f"/todos/{todo.id}", status_code=303)
+
+
+@app.get("/todos/{todo_id}", response_class=HTMLResponse)
+def todo_detail(request: Request, todo_id: int, session: Session = Depends(get_session),
+                cfg: Config = Depends(get_config)):
+    found = todos.get_todo(session, now_utc(), todo_id)
+    if found is None:
+        raise HTTPException(status_code=404, detail="task not found")
+    row, events = found
+    undoable = events[0].id if events and events[0].kind in todos.UNDOABLE_KINDS else None
+    return render(request, cfg, "todo.html", row=row, events=events, undoable=undoable,
+                  statuses=todos.STATUSES, priorities=todos.PRIORITIES)
+
+
+@app.post("/todos/{todo_id}")
+def todo_edit(request: Request, todo_id: int, title: str = Form("", max_length=todos.TITLE_MAX),
+              detail: str = Form("", max_length=todos.DETAIL_MAX), priority: int = Form(3),
+              due: str = Form("", max_length=10), topic: str = Form("", max_length=todos.TOPIC_MAX),
+              status: str = Form("open", max_length=10), csrf: str = Form(""),
+              back: str = Form("", max_length=20), session: Session = Depends(get_session)):
+    require_csrf(request, csrf)
+    try:
+        todos.update_todo(session, now_utc(), todo_id, actor="owner", title=title, detail=detail,
+                          priority=priority, due=due, topic=topic, status=status)
+    except todos.TodoError as exc:
+        if "no task" in str(exc):
+            raise HTTPException(status_code=404, detail=str(exc))
+        raise _todo_error(exc)
+    return RedirectResponse("/todos" if back == "list" else f"/todos/{todo_id}", status_code=303)
+
+
+@app.post("/todos/{todo_id}/status")
+def todo_status(request: Request, todo_id: int, status: str = Form("", max_length=10), csrf: str = Form(""),
+                back: str = Form("", max_length=20), session: Session = Depends(get_session)):
+    """One-click check-off from the list."""
+    require_csrf(request, csrf)
+    try:
+        todos.update_todo(session, now_utc(), todo_id, actor="owner", status=status)
+    except todos.TodoError as exc:
+        if "no task" in str(exc):
+            raise HTTPException(status_code=404, detail=str(exc))
+        raise _todo_error(exc)
+    return RedirectResponse("/todos" if back == "list" else f"/todos/{todo_id}", status_code=303)
+
+
+@app.post("/todos/events/{event_id}/undo")
+def todo_undo(request: Request, event_id: int, csrf: str = Form(""), session: Session = Depends(get_session)):
+    require_csrf(request, csrf)
+    try:
+        todo = todos.undo_event(session, now_utc(), event_id, actor="owner")
+    except todos.TodoError as exc:
+        raise _todo_error(exc)
+    return RedirectResponse(f"/todos/{todo.id}", status_code=303)
+
+
+@app.get("/topics", response_class=HTMLResponse)
+def topic_list(request: Request, session: Session = Depends(get_session), cfg: Config = Depends(get_config)):
+    return render(request, cfg, "topics.html", topics=todos.list_topics(session))
+
+
+@app.get("/topics/{name}", response_class=HTMLResponse)
+def topic_detail(request: Request, name: str, session: Session = Depends(get_session),
+                 cfg: Config = Depends(get_config)):
+    found = todos.topic_timeline(session, name)
+    if found is None:
+        raise HTTPException(status_code=404, detail="topic not found")
+    topic, entries = found
+    rows, _ = todos.list_todos(session, now_utc(), status="open", topic=topic.name, limit=todos.LIST_LIMIT_MAX)
+    return render(request, cfg, "topic.html", topic=topic, entries=entries, rows=rows)
+
+
+@app.get("/digests", response_class=HTMLResponse)
+def digest_list(request: Request, session: Session = Depends(get_session), cfg: Config = Depends(get_config)):
+    return render(request, cfg, "digests.html", digests=todos.list_digests(session, 14))

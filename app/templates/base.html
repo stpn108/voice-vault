@@ -24,12 +24,21 @@
   pre.text { white-space: pre-wrap; word-wrap: break-word; font: inherit; margin: 0; }
   .segment { display: grid; grid-template-columns: 4.5rem 9rem 1fr; gap: .5rem; padding: .3rem 0; border-bottom: 1px solid var(--line); }
   .notice { border: 1px solid #d97706; padding: .5rem .8rem; border-radius: .35rem; margin-bottom: 1rem; }
+  .prio-1 { color: var(--danger); font-weight: 700; } .prio-2 { font-weight: 600; } .prio-4 { color: var(--muted); }
+  .done { text-decoration: line-through; color: var(--muted); }
+  .tabs a { margin-right: .8rem; } .tabs a.current { font-weight: 700; text-decoration: none; color: inherit; }
+  textarea, select, input[type=date] { font: inherit; padding: .35rem .5rem; border: 1px solid var(--line); border-radius: .35rem; background: transparent; color: inherit; }
+  form.add { display: flex; gap: .5rem; flex-wrap: wrap; margin: 1rem 0; }
+  .digest { border-bottom: 1px solid var(--line); padding-bottom: 1rem; margin-bottom: 1rem; }
   @media (max-width: 40rem) { .segment { grid-template-columns: 1fr; } .hide-small { display: none; } }
 </style>
 </head>
 <body>
 <header>
   <a class="brand" href="/">voice-vault</a>
+  <a href="/todos">{{ t("ui_nav_todos") }}</a>
+  <a href="/topics">{{ t("ui_nav_topics") }}</a>
+  <a href="/digests">{{ t("ui_nav_digests") }}</a>
   <a href="/cleanup">{{ t("ui_cleanup") }}</a>
 </header>
 <main>

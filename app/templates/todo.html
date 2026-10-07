@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}{{ row.title }}{% endblock %}
+{% block content %}
+<p><a href="/todos">{{ t("ui_back_todos") }}</a></p>
+<h2 {% if row.status != "open" %}class="done"{% endif %}>{{ row.title }}</h2>
+<p class="muted">{{ t("todo_status_" ~ row.status) }} · {{ t("ui_created_by") }} {{ row.created_by }}, {{ row.created_at | localtime }}
+{% if row.recording_id %} · <a href="/recordings/{{ row.recording_id }}">{{ t("ui_recording") }} {{ row.recording_id }}</a>{% endif %}</p>
+<form method="post" action="/todos/{{ row.id }}">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <p><input type="text" name="title" value="{{ row.title }}" size="60" maxlength="300" required></p>
+  <p><textarea name="detail" rows="5" cols="60" maxlength="4000">{{ row.detail }}</textarea></p>
+  <p>
+    <select name="priority">{% for p in priorities %}<option value="{{ p }}" {% if p == row.priority %}selected{% endif %}>{{ t("todo_prio_" ~ p) }}</option>{% endfor %}</select>
+    <input type="date" name="due" value="{{ row.due_date.isoformat() if row.due_date else '' }}">
+    <input type="text" name="topic" value="{{ row.topic or '' }}" placeholder="{{ t('ui_topic') }}" maxlength="120">
+    <select name="status">{% for s in statuses %}<option value="{{ s }}" {% if s == row.status %}selected{% endif %}>{{ t("todo_status_" ~ s) }}</option>{% endfor %}</select>
+    <button type="submit">{{ t("ui_save") }}</button>
+  </p>
+</form>
+<h3>{{ t("ui_history") }}</h3>
+<table>
+  <tbody>
+  {% for e in events %}
+  <tr>
+    <td>{{ e.created_at | localtime }}</td><td>{{ e.actor }}</td><td>{{ t("todo_event_" ~ e.kind) }}</td>
+    <td>{{ e.note }}{% if e.recording_id %} <a href="/recordings/{{ e.recording_id }}">#{{ e.recording_id }}</a>{% endif %}</td>
+    <td>{% if e.id == undoable %}
+      <form class="inline" method="post" action="/todos/events/{{ e.id }}/undo">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><button type="submit">{{ t("ui_undo") }}</button>
+      </form>{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
