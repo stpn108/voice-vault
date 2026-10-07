@@ -26,6 +26,21 @@ def host_name(value: str) -> str:
     return value.rsplit(":", 1)[0] if value.count(":") == 1 else value
 
 
+def _int(name: str, default: int, minimum: int) -> int:
+    """A whole number of at least `minimum`. Empty means the default. A 0 or negative value would
+    silently switch a safety gate off, so it stops the start instead."""
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        raise ConfigError(f"{name} must be a whole number, got '{raw[:20]}'") from None
+    if value < minimum:
+        raise ConfigError(f"{name} must be at least {minimum}, got {value}")
+    return value
+
+
 def _hosts(name: str) -> tuple:
     return tuple(h for h in (host_name(v) for v in _csv(name)) if h)
 
@@ -42,6 +57,7 @@ class Config:
     delete_enabled: bool
     store_audio: bool
     token_warn_days: int
+    max_trash_per_cycle: int
     smtp_host: str
     smtp_port: int
     smtp_user: str
@@ -65,13 +81,14 @@ def load_config() -> Config:
         plaud_token=os.getenv("PLAUD_TOKEN", "").strip(),
         plaud_refresh_token=os.getenv("PLAUD_REFRESH_TOKEN", "").strip(),
         plaud_api_base=os.getenv("PLAUD_API_BASE", "https://api-euc1.plaud.ai").rstrip("/"),
-        import_interval_minutes=int(os.getenv("IMPORT_INTERVAL_MINUTES", "10")),
-        min_age_minutes=int(os.getenv("MIN_AGE_MINUTES", "10080")),
-        stability_minutes=int(os.getenv("STABILITY_MINUTES", "10")),
-        permanent_delete_after_hours=int(os.getenv("PERMANENT_DELETE_AFTER_HOURS", "72")),
+        import_interval_minutes=_int("IMPORT_INTERVAL_MINUTES", 10, 1),
+        min_age_minutes=_int("MIN_AGE_MINUTES", 10080, 1),
+        stability_minutes=_int("STABILITY_MINUTES", 10, 1),
+        permanent_delete_after_hours=_int("PERMANENT_DELETE_AFTER_HOURS", 72, 1),
         delete_enabled=_bool("PLAUD_DELETE_ENABLED", False),
         store_audio=_bool("STORE_AUDIO", False),
-        token_warn_days=int(os.getenv("TOKEN_WARN_DAYS", "5")),
+        token_warn_days=_int("TOKEN_WARN_DAYS", 5, 0),
+        max_trash_per_cycle=_int("MAX_TRASH_PER_CYCLE", 20, 1),
         smtp_host=os.getenv("SMTP_HOST", ""),
         smtp_port=int(os.getenv("SMTP_PORT", "587")),
         smtp_user=os.getenv("SMTP_USER", ""),

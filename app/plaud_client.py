@@ -5,12 +5,15 @@ Only what voice-vault needs: list, detail (transcript + summary), trash and
 permanent delete. Endpoints and payload shapes were taken from reading the
 plaud-tools and plaud-api sources; they are not documented by Plaud.
 """
-import gzip
+import ipaddress
 import json
 import logging
+import re
 import time
+import zlib
 from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
+from urllib.parse import quote, urlparse
 
 import httpx
 from sqlalchemy.orm import Session
@@ -30,6 +33,11 @@ MAX_PAGES = 100
 MAX_ATTEMPTS = 3
 BACKOFF_SECONDS = 1.0
 TIMEOUT_SECONDS = 30.0
+MAX_DOWNLOAD_BYTES = 50 * 1024 * 1024
+ID_RE = re.compile(r"[A-Za-z0-9_-]{1,64}")
+# Recordings before 2015 do not exist; a start time of 0 or garbage means the API changed shape.
+MIN_PLAUSIBLE_START_MS = 1_420_070_400_000
+ERROR_BODY_PREFIXES = ("<?xml", "<error", "<html", "<!doctype")
 
 
 @dataclass
@@ -67,7 +75,7 @@ def _summary_from_obj(obj: Any) -> Optional[str]:
                 return _summary_from_obj(json.loads(stripped)) or obj
             except ValueError:
                 return obj
-        return obj or None
+        return obj if stripped else None
     if isinstance(obj, dict):
         for key in ("ai_content", "markdown", "content", "text", "summary"):
             val = obj.get(key)
@@ -75,6 +83,26 @@ def _summary_from_obj(obj: Any) -> Optional[str]:
             if found:
                 return found
     return None
+
+
+def _check_id(plaud_id: str) -> None:
+    if not isinstance(plaud_id, str) or not ID_RE.fullmatch(plaud_id):
+        raise PlaudError("a Plaud id has an unusable form")
+
+
+def _check_download_url(url: str) -> None:
+    """Presigned links: https and a real host name, never an address or a bare internal name."""
+    parsed = urlparse(url)
+    host = parsed.hostname or ""
+    if parsed.scheme != "https":
+        raise PlaudError("refusing to download from a non-https link")
+    try:
+        ipaddress.ip_address(host)
+        literal = True
+    except ValueError:
+        literal = False
+    if literal or "." not in host or host.endswith(".local") or host.endswith(".internal") or parsed.username:
+        raise PlaudError("refusing to download from this host")
 
 
 class PlaudClient:
@@ -188,21 +216,34 @@ class PlaudClient:
 
     def _download(self, url: str) -> Any:
         """Fetch a presigned link (no auth header) and parse it as JSON or text."""
-        if not url.startswith("https://"):
-            raise PlaudError("refusing to download from a non-https link")
+        _check_download_url(url)
         try:
-            resp = self._http.get(url, headers={"User-Agent": USER_AGENT})
+            with self._http.stream("GET", url, headers={"User-Agent": USER_AGENT}) as resp:
+                # Only a plain 200 is content: a 3xx or an error page must never be stored as a transcript.
+                if resp.status_code != 200:
+                    raise PlaudError(f"download returned HTTP {resp.status_code}")
+                body = bytearray()
+                for chunk in resp.iter_bytes():
+                    body.extend(chunk)
+                    if len(body) > MAX_DOWNLOAD_BYTES:
+                        raise PlaudError("download is larger than the allowed size")
         except httpx.HTTPError as exc:
             raise PlaudError(f"download failed: {type(exc).__name__}: {exc}") from exc
-        if resp.status_code >= 400:
-            raise PlaudError(f"download returned HTTP {resp.status_code}")
-        body = resp.content
-        if body[:2] == b"\x1f\x8b":
-            body = gzip.decompress(body)
-        text = body.decode("utf-8")
+        data = bytes(body)
+        try:
+            if data[:2] == b"\x1f\x8b":
+                inflater = zlib.decompressobj(16 + zlib.MAX_WBITS)
+                data = inflater.decompress(data, MAX_DOWNLOAD_BYTES + 1)
+                if len(data) > MAX_DOWNLOAD_BYTES or not inflater.eof:
+                    raise PlaudError("download is larger than the allowed size or truncated")
+            text = data.decode("utf-8")
+        except (zlib.error, UnicodeDecodeError) as exc:
+            raise PlaudError(f"download is not valid text: {type(exc).__name__}") from exc
         try:
             return json.loads(text)
-        except ValueError:
+        except (ValueError, RecursionError):
+            if text.lstrip().lower().startswith(ERROR_BODY_PREFIXES):
+                raise PlaudError("download is an error page, not content") from None
             return text
 
     # -- endpoints ----------------------------------------------------
@@ -216,28 +257,40 @@ class PlaudClient:
             })
             items = data.get("data_file_list") or data.get("data") or []
             for item in items:
-                if item.get("is_trash"):
-                    continue
-                result.append(PlaudRecording(
-                    plaud_id=str(item.get("id") or item.get("file_id") or ""),
-                    title=str(item.get("filename") or item.get("file_name") or ""),
-                    start_ms=int(item.get("start_time") or 0),
-                    duration_ms=int(item.get("duration") or 0),
-                ))
+                try:
+                    if item.get("is_trash"):
+                        continue
+                    plaud_id = str(item.get("id") or item.get("file_id") or "")
+                    if not ID_RE.fullmatch(plaud_id):
+                        log.warning("Skipping a listed recording with an unusable id")
+                        continue
+                    result.append(PlaudRecording(
+                        plaud_id=plaud_id,
+                        title=str(item.get("filename") or item.get("file_name") or ""),
+                        start_ms=int(item.get("start_time") or 0),
+                        duration_ms=int(item.get("duration") or 0),
+                    ))
+                except (AttributeError, TypeError, ValueError, OverflowError):
+                    log.warning("Skipping a listed recording with an unexpected shape")
             if len(items) < PAGE_SIZE:
                 break
         return [r for r in result if r.plaud_id]
 
     def get_detail(self, plaud_id: str) -> PlaudDetail:
-        payload = self._request("GET", f"/file/detail/{plaud_id}")
+        _check_id(plaud_id)
+        payload = self._request("GET", f"/file/detail/{quote(plaud_id, safe='')}")
         raw = payload.get("data", payload)
         if not isinstance(raw, dict):
             raise PlaudError(f"detail for {plaud_id} has an unexpected shape")
+        try:
+            start_ms, duration_ms = int(raw.get("start_time") or 0), int(raw.get("duration") or 0)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise PlaudError(f"detail for {plaud_id} has an unreadable start time or duration") from exc
         return PlaudDetail(
             plaud_id=plaud_id,
             title=str(raw.get("file_name") or raw.get("filename") or ""),
-            start_ms=int(raw.get("start_time") or 0),
-            duration_ms=int(raw.get("duration") or 0),
+            start_ms=start_ms,
+            duration_ms=duration_ms,
             is_processed=self.is_processed(raw),
             raw=raw,
         )
@@ -276,17 +329,24 @@ class PlaudClient:
                 if found:
                     return found
         if item.get("data_link"):
-            return _summary_from_obj(self._download(str(item["data_link"]))) or ""
+            try:
+                return _summary_from_obj(self._download(str(item["data_link"]))) or ""
+            except RecursionError as exc:
+                raise PlaudError("summary is nested too deeply") from exc
         return ""
 
     def trash(self, plaud_ids: list[str]) -> None:
         if not plaud_ids:
             raise ValueError("plaud_ids must not be empty")
+        for plaud_id in plaud_ids:
+            _check_id(plaud_id)
         self._request("POST", "/file/trash/", body=plaud_ids)
 
     def delete_permanently(self, plaud_ids: list[str]) -> None:
         if not plaud_ids:
             raise ValueError("plaud_ids must not be empty")
+        for plaud_id in plaud_ids:
+            _check_id(plaud_id)
         self._request("DELETE", "/file/", body=plaud_ids)
 
 

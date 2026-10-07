@@ -6,6 +6,7 @@ import pytest
 
 import main
 from config import load_config
+from import_service import ImportStats
 from plaud_client import PlaudAuthError, PlaudError
 from sync_job import SyncJob
 
@@ -39,7 +40,7 @@ def make_job(client, notifier=None, session_factory=None):
 @pytest.fixture
 def stubs(monkeypatch):
     calls = []
-    monkeypatch.setattr("sync_job.run_import", lambda *a, **k: calls.append("import"))
+    monkeypatch.setattr("sync_job.run_import", lambda *a, **k: calls.append("import") or ImportStats())
     monkeypatch.setattr("sync_job.run_deletion", lambda *a, **k: calls.append("delete"))
     return calls
 

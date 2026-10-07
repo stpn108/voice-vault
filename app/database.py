@@ -244,6 +244,9 @@ def migrate_schema(db_engine=None):
     with db_engine.begin() as conn:
         if db_engine.dialect.name == "postgresql":
             conn.execute(sqltext("SELECT pg_advisory_xact_lock(:k)"), {"k": _SCHEMA_LOCK_KEY})
+            # A migration must not freeze the other services behind an open transaction: give up
+            # after a few seconds and let the container restart retry.
+            conn.execute(sqltext("SET LOCAL lock_timeout = '10s'"))
 
         Base.metadata.create_all(conn)
         conn.execute(sqltext(

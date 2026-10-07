@@ -12,6 +12,7 @@ import datetime as dt
 import hashlib
 import json
 import logging
+import time
 from dataclasses import dataclass
 from typing import Callable, Optional, Protocol
 from urllib.parse import urlparse
@@ -23,6 +24,9 @@ from database import PlaudSession
 from utils import now_utc
 
 log = logging.getLogger(__name__)
+
+SAVE_ATTEMPTS = 3
+SAVE_RETRY_SECONDS = 1.0
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -149,16 +153,26 @@ class DbTokenStore:
             return StoredTokens(row.access_token, row.refresh_token, row.seed_fingerprint)
 
     def save(self, tokens: StoredTokens) -> None:
-        with self._session_factory() as session:
-            row = session.get(PlaudSession, 1)
-            if row is None:
-                row = PlaudSession(id=1)
-                session.add(row)
-            row.access_token = tokens.access_token
-            row.refresh_token = tokens.refresh_token
-            row.seed_fingerprint = tokens.seed_fingerprint
-            row.refreshed_at = now_utc()
-            session.commit()
+        """Persist the pair. A rotated refresh token that is lost locks the owner out, so retry."""
+        for attempt in range(1, SAVE_ATTEMPTS + 1):
+            try:
+                with self._session_factory() as session:
+                    row = session.get(PlaudSession, 1)
+                    if row is None:
+                        row = PlaudSession(id=1)
+                        session.add(row)
+                    row.access_token = tokens.access_token
+                    row.refresh_token = tokens.refresh_token
+                    row.seed_fingerprint = tokens.seed_fingerprint
+                    row.refreshed_at = now_utc()
+                    session.commit()
+                return
+            except Exception as exc:  # noqa: BLE001
+                log.error("Saving the Plaud token pair failed attempt=%d/%d reason=%s", attempt, SAVE_ATTEMPTS,
+                          type(exc).__name__)
+                if attempt == SAVE_ATTEMPTS:
+                    raise
+                time.sleep(SAVE_RETRY_SECONDS * attempt)
 
 
 def _cookie(resp: httpx.Response, name: str) -> Optional[str]:

@@ -17,6 +17,8 @@ from utils import now_utc
 
 log = logging.getLogger(__name__)
 
+FAILED_CYCLES_BEFORE_MAIL = 3
+
 
 class SyncJob:
     def __init__(self, cfg: Config, client: PlaudClient, session_factory: Callable[[], Session],
@@ -28,6 +30,7 @@ class SyncJob:
         self._notifier = notifier
         self._now_fn = now_fn
         self._last_mail_date: dt.date | None = None
+        self._failed_cycles = 0
 
     def _notify_once_a_day(self, subject: str, body: str) -> None:
         today = self._now_fn().date()
@@ -61,12 +64,26 @@ class SyncJob:
         log.info("Cycle start delete_enabled=%s", self._cfg.delete_enabled)
         try:
             self.check_token()
-            run_import(self._session_factory, self._client, self._now_fn)
-            run_deletion(self._session_factory, self._client, self._cfg, self._now_fn)
+            imported = run_import(self._session_factory, self._client, self._now_fn)
+            self._count_failures(imported.failed > 0)
+            run_deletion(self._session_factory, self._client, self._cfg, self._now_fn, imported)
         except PlaudAuthError as exc:
             # Nothing is deleted after an auth failure: the run stops here.
             log.error("Cycle aborted: Plaud authentication failed (%s)", exc)
             self._notify_once_a_day("voice-vault: Plaud authentication failed", str(exc))
         except PlaudError as exc:
             log.error("Cycle aborted: Plaud error (%s)", exc)
+            self._count_failures(True)
+        except Exception as exc:  # noqa: BLE001 - the scheduler would only log it; count it and tell the owner
+            log.error("Cycle aborted: unexpected %s", type(exc).__name__)
+            self._count_failures(True)
         log.info("Cycle end")
+
+    def _count_failures(self, failed: bool) -> None:
+        """Mail once a day when several cycles in a row had a problem; a log line alone goes unnoticed."""
+        self._failed_cycles = self._failed_cycles + 1 if failed else 0
+        if self._failed_cycles >= FAILED_CYCLES_BEFORE_MAIL:
+            self._notify_once_a_day(
+                "voice-vault: imports keep failing",
+                f"{self._failed_cycles} cycles in a row had errors. Look at the logs of the app service.",
+            )
