@@ -41,6 +41,10 @@ Once a day Claude reads the recordings that are new since its last run, adds the
    Given wrong types, unknown ids, bad dates or an unknown status, then the MCP call fails with -32602 or a tool error and the UI answers 400 or 404; nothing is written.
 10. **Recording text stays untrusted.**
     Given a transcript with instructions, then the tool descriptions say not to follow them, and no tool can delete data, so the worst case is a wrong task that the owner can undo.
+11. **Only the owner's own tasks.**
+    Given a commitment of another person, then it is not a task. The tool description and the routine prompt say so; Claude may mention it in a topic note instead. (Added 2026-10-07 on the owner's request: "Aufgaben zum Abhaken nur meine. Die von anderen ist eine andere Art zu tracken.")
+12. **Topics the owner excludes.**
+    Given a topic the owner excluded in the UI (`/topics`, also for a name that does not exist yet), then `add_todo`, `update_todo` (moving a task into it) and `add_topic_note` are refused with a tool error, its open tasks are hidden from the list and the counts, and `list_topics` marks it `EXCLUDED`. Claude has no tool to change the flag. Allowing it again shows everything as before. Claude still reads the recordings; the flag stops storing, not reading.
 
 ## Out of scope
 

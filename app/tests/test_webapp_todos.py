@@ -119,3 +119,17 @@ def test_req_006_topics_timeline_and_digests_render(client, make_todo, session_f
 def test_req_006_empty_pages_render(client):
     for url in ("/todos", "/topics", "/digests"):
         assert client.get(url).status_code == 200
+
+
+def test_req_006_owner_excludes_and_allows_a_topic(client, make_todo, session_factory):
+    make_todo(title="Family trip", topic="Family")
+    assert post(client, "/topics/exclude", name="Family", excluded="1").status_code == 303
+    assert "Family trip" not in client.get("/todos").text
+    assert "ausgeschlossen" in client.get("/topics").text
+    assert post(client, "/topics/exclude", name="NotYetThere", excluded="1").status_code == 303
+    assert post(client, "/topics/exclude", name="Family", excluded="0").status_code == 303
+    assert "Family trip" in client.get("/todos").text
+
+
+def test_req_006_excluding_needs_the_csrf_token(client):
+    assert client.post("/topics/exclude", data={"name": "X", "csrf": "bad"}).status_code == 403

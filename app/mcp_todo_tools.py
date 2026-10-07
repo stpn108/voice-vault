@@ -29,8 +29,10 @@ TOOLS = [
     },
     {
         "name": "add_todo",
-        "description": "Create a task from a recording. Rejected if a similar open task exists "
-                       "(update that one instead, or pass allow_similar). " + PRIORITY_HELP,
+        "description": "Create a task for the OWNER from a recording: something he himself must do. Never add "
+                       "commitments of other people; the owner tracks those elsewhere. Rejected if a similar open "
+                       "task exists (update that one instead, or pass allow_similar) or if the topic is excluded "
+                       "by the owner. " + PRIORITY_HELP,
         "inputSchema": {**_props(
             title={"type": "string", "maxLength": svc.TITLE_MAX},
             priority={"type": "integer", "minimum": 1, "maximum": 4, "default": svc.DEFAULT_PRIORITY},
@@ -62,7 +64,8 @@ TOOLS = [
     },
     {
         "name": "list_topics",
-        "description": "List all topics with open task count, note count and last activity.",
+        "description": "List all topics with open task count, note count and last activity. Topics marked "
+                       "EXCLUDED must get no tasks and no notes.",
         "inputSchema": _props(),
         "annotations": READ,
     },
@@ -202,6 +205,7 @@ def list_topics_tool(session, arguments, now, stability_minutes):
         return text_result("No topics yet.")
     return text_result("\n".join(
         f"{t.name} | open tasks {open_count} | notes {notes} | last activity {_day(last)}"
+        + (" | EXCLUDED by owner" if t.excluded else "")
         for t, open_count, notes, last in topics))
 
 
@@ -213,6 +217,8 @@ def get_topic_tool(session, arguments, now, stability_minutes):
     if found is None:
         return text_result(f"Unknown topic '{name}'.", is_error=True)
     topic, entries = found
+    if topic.excluded:
+        return text_result(f"The topic '{topic.name}' is excluded by the owner.", is_error=True)
     rows, _ = svc.list_todos(session, now, status="open", topic=topic.name, limit=svc.LIST_LIMIT_MAX)
     lines = [f"Topic: {topic.name}", "", "Open tasks:"] + ([_line(r) for r in rows] or ["(none)"])
     lines += ["", "Timeline (newest first):"]

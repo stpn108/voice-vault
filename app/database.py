@@ -77,6 +77,7 @@ class Topic(Base):
     __tablename__ = "topics"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(120), unique=True)
+    excluded: Mapped[bool] = mapped_column(Boolean, default=False, server_default=sqltext("false"))
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -214,9 +215,18 @@ def _migrate_002_recordings_analyzed_at(conn):
         ))
 
 
+def _migrate_003_topics_excluded(conn):
+    if conn.dialect.name == "postgresql":
+        conn.execute(sqltext(
+            "ALTER TABLE IF EXISTS topics "
+            "ADD COLUMN IF NOT EXISTS excluded BOOLEAN NOT NULL DEFAULT FALSE;"
+        ))
+
+
 MIGRATIONS: list = [
     ("001_recordings_discarded_at", _migrate_001_recordings_discarded_at),
     ("002_recordings_analyzed_at", _migrate_002_recordings_analyzed_at),
+    ("003_topics_excluded", _migrate_003_topics_excluded),
 ]
 
 # Advisory lock key: serialises schema setup when several replicas start at

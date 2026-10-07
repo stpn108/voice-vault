@@ -113,6 +113,11 @@ TEXTS = {
     "todo_event_reopened": {"de": "wieder geöffnet", "en": "reopened"},
     "todo_event_dropped": {"de": "verworfen", "en": "dropped"},
     "todo_event_undone": {"de": "rückgängig gemacht", "en": "undone"},
+    "ui_topic_excluded": {"de": "ausgeschlossen", "en": "excluded"},
+    "ui_topic_exclude": {"de": "Ausschließen", "en": "Exclude"},
+    "ui_topic_allow": {"de": "Wieder zulassen", "en": "Allow again"},
+    "ui_topic_exclude_hint": {"de": "Ausgeschlossene Themen bekommen keine neuen Aufgaben und Notizen. Ihre Aufgaben erscheinen nicht in der Liste. Claude liest die Aufnahmen trotzdem.", "en": "Excluded topics get no new tasks or notes. Their tasks are hidden from the list. Claude still reads the recordings."},
+    "ui_topic_exclude_name": {"de": "Thema ausschließen (Name)", "en": "Exclude a topic (name)"},
     "ui_cleanup_confirm": {"de": "{count} Aufnahme(n) endgültig verwerfen", "en": "Discard {count} recording(s) for good"},
 }
 

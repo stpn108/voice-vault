@@ -125,6 +125,27 @@ def get_or_create_topic(session: Session, name: str) -> Topic:
     return topic
 
 
+def _writable_topic(session: Session, name: str) -> Topic:
+    """The topic for a new write. Topics the owner excluded take nothing new."""
+    topic = get_or_create_topic(session, name)
+    if topic.excluded:
+        raise TodoError(f"the topic '{topic.name}' is excluded by the owner: record nothing about it")
+    return topic
+
+
+def set_topic_excluded(session: Session, name: str, excluded: bool) -> Topic:
+    """Owner only (no MCP tool). Excluding keeps what exists but stops new tasks and notes."""
+    topic = get_or_create_topic(session, name)
+    topic.excluded = bool(excluded)
+    session.commit()
+    log.info("Topic %s id=%s", "excluded" if topic.excluded else "allowed again", topic.id)
+    return topic
+
+
+def _excluded_ids(session: Session) -> list:
+    return list(session.scalars(select(Topic.id).where(Topic.excluded.is_(True))))
+
+
 def _topic_name(session: Session, topic_id: Optional[int]) -> Optional[str]:
     return session.get(Topic, topic_id).name if topic_id else None
 
@@ -205,7 +226,7 @@ def create_todo(session: Session, now: dt.datetime, *, title: str, actor: str, p
         similar = similar_open(session, title)
         if similar:
             raise DuplicateTodoError(similar)
-    topic_row = get_or_create_topic(session, topic) if topic else None
+    topic_row = _writable_topic(session, topic) if topic else None
     todo = Todo(title=title, detail=detail, priority=priority, status="open", due_date=due_date,
                 topic_id=topic_row.id if topic_row else None, recording_id=recording_id, created_by=actor,
                 created_at=now, updated_at=now)
@@ -259,6 +280,8 @@ def update_todo(session: Session, now: dt.datetime, todo_id: int, *, actor: str,
     changes = {k: v for k, v in wanted.items() if _differs(k, v, current[k])}
     if not changes:
         return todo, False
+    if changes.get("topic"):
+        _writable_topic(session, changes["topic"])
 
     kind = "updated"
     if "status" in changes:
@@ -309,10 +332,14 @@ def _rows(session: Session, todos: list, now: dt.datetime) -> list:
 
 
 def list_todos(session: Session, now: dt.datetime, *, status: str = "open", topic: Optional[str] = None,
-               limit: int = 50) -> tuple:
-    """Most urgent first. Returns (rows, truncated)."""
+               limit: int = 50, include_excluded: bool = False) -> tuple:
+    """Most urgent first, without tasks of excluded topics. Returns (rows, truncated)."""
     limit = min(max(limit, 1), LIST_LIMIT_MAX)
     stmt = select(Todo)
+    if not include_excluded:
+        hidden = _excluded_ids(session)
+        if hidden:
+            stmt = stmt.where(Todo.topic_id.is_(None) | Todo.topic_id.not_in(hidden))
     if status != "all":
         stmt = stmt.where(Todo.status == _status(status))
     if topic:
@@ -337,7 +364,11 @@ def get_todo(session: Session, now: dt.datetime, todo_id: int):
 
 def counts(session: Session) -> dict:
     result = {s: 0 for s in STATUSES}
-    for status, number in session.execute(select(Todo.status, func.count()).group_by(Todo.status)):
+    stmt = select(Todo.status, func.count()).group_by(Todo.status)
+    hidden = _excluded_ids(session)
+    if hidden:
+        stmt = stmt.where(Todo.topic_id.is_(None) | Todo.topic_id.not_in(hidden))
+    for status, number in session.execute(stmt):
         result[status] = number
     return result
 
@@ -348,7 +379,7 @@ def add_topic_note(session: Session, now: dt.datetime, *, topic: str, recording_
     recording_id = _visible_recording(session, recording_id)
     if recording_id is None:
         raise TodoError("recording_id is required")
-    topic_row = get_or_create_topic(session, topic)
+    topic_row = _writable_topic(session, topic)
     existing = session.scalar(select(TopicNote).where(TopicNote.topic_id == topic_row.id,
                                                       TopicNote.recording_id == recording_id))
     if existing is None:

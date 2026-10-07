@@ -442,3 +442,28 @@ def test_recording_content_is_never_modified_by_the_routine_functions(db_session
     make(db_session, recording_id=rec.id)
     db_session.refresh(rec)
     assert (rec.title, rec.summary, rec.segment_count, rec.content_hash) == before
+
+
+# --- excluded topics (REQ-006 criterion 11) -------------------------------------------------
+def test_req_006_excluded_topic_takes_no_new_tasks_or_notes(db_session):
+    rec = add_recording(db_session, 1)
+    svc.set_topic_excluded(db_session, "Private", True)
+    with pytest.raises(TodoError, match="excluded"):
+        make(db_session, title="Secret thing", topic="private")
+    with pytest.raises(TodoError, match="excluded"):
+        svc.add_topic_note(db_session, NOW, topic="Private", recording_id=rec.id, note="x")
+    todo = make(db_session, title="Plain thing")
+    with pytest.raises(TodoError, match="excluded"):
+        svc.update_todo(db_session, NOW, todo.id, actor="claude", topic="PRIVATE")
+
+
+def test_req_006_tasks_of_an_excluded_topic_are_hidden_but_come_back(db_session):
+    make(db_session, title="Family trip", actor="owner", topic="Family")
+    make(db_session, title="Send offer", actor="owner", topic="Sales")
+    svc.set_topic_excluded(db_session, "Family", True)
+    assert [r.title for r in svc.list_todos(db_session, NOW)[0]] == ["Send offer"]
+    assert svc.counts(db_session)["open"] == 1
+    hidden = svc.list_todos(db_session, NOW, topic="Family", include_excluded=True)[0]
+    assert [r.title for r in hidden] == ["Family trip"]
+    svc.set_topic_excluded(db_session, "Family", False)
+    assert len(svc.list_todos(db_session, NOW)[0]) == 2

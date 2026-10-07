@@ -121,3 +121,14 @@ def test_req_006_analyzed_flag_filters_recordings(client, session_factory):
     assert "verified, analyzed" in text_of(call(client, "list_recordings"))
     with session_factory() as s:
         assert s.get(Recording, first).analyzed_at is not None
+
+
+def test_req_006_excluded_topic_is_refused_and_flagged_for_claude(client, session_factory):
+    import todo_service as svc
+    with session_factory() as s:
+        svc.set_topic_excluded(s, "Private", True)
+    refused = call(client, "add_todo", {"title": "Secret", "topic": "private"})
+    assert is_error(refused) and "excluded by the owner" in text_of(refused)
+    assert "Private | open tasks 0 | notes 0" in text_of(call(client, "list_topics"))
+    assert "EXCLUDED by owner" in text_of(call(client, "list_topics"))
+    assert is_error(call(client, "get_topic", {"name": "Private"}))

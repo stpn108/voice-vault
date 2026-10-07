@@ -14,6 +14,7 @@ import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Iterator
+from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -265,6 +266,19 @@ def topic_list(request: Request, session: Session = Depends(get_session), cfg: C
     return render(request, cfg, "topics.html", topics=todos.list_topics(session))
 
 
+@app.post("/topics/exclude")
+def topic_exclude(request: Request, name: str = Form("", max_length=todos.TOPIC_MAX), excluded: str = Form("1"),
+                  csrf: str = Form(""), back: str = Form("", max_length=20),
+                  session: Session = Depends(get_session)):
+    """Owner decision: no new tasks or notes for this topic (also for topics that do not exist yet)."""
+    require_csrf(request, csrf)
+    try:
+        topic = todos.set_topic_excluded(session, name, excluded == "1")
+    except todos.TodoError as exc:
+        raise _todo_error(exc)
+    return RedirectResponse(f"/topics/{quote(topic.name)}" if back == "topic" else "/topics", status_code=303)
+
+
 @app.get("/topics/{name}", response_class=HTMLResponse)
 def topic_detail(request: Request, name: str, session: Session = Depends(get_session),
                  cfg: Config = Depends(get_config)):
@@ -272,7 +286,8 @@ def topic_detail(request: Request, name: str, session: Session = Depends(get_ses
     if found is None:
         raise HTTPException(status_code=404, detail="topic not found")
     topic, entries = found
-    rows, _ = todos.list_todos(session, now_utc(), status="open", topic=topic.name, limit=todos.LIST_LIMIT_MAX)
+    rows, _ = todos.list_todos(session, now_utc(), status="open", topic=topic.name, limit=todos.LIST_LIMIT_MAX,
+                               include_excluded=True)
     return render(request, cfg, "topic.html", topic=topic, entries=entries, rows=rows)
 
 

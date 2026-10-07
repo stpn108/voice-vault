@@ -196,3 +196,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner decision. With the daily routine of REQ-006 and a first backup that only worked after a fix, a longer period gives time to notice a problem while the original is still at Plaud. Seven days also match the routine's look-back window. |
 | **Rejected alternatives** | (A) keep 12 h plus 12 h (D-010): little room to notice a failed import, backup or routine; (B) 7 days with no trash step: nothing restorable at Plaud. |
 | **Status** | **FINAL** |
+
+### D-015: Only the owner's own tasks; topics can be excluded by the owner (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-07 |
+| **Decision** | Amends D-013. The task list holds only what the owner himself has to do; commitments of other people are not tasks. This is enforced by the tool description and the routine prompt, not by code, because only the content of a conversation tells who has to act (the speaker labels from Plaud are unreliable). The owner can exclude topics in the UI (`topics.excluded`, set by name, also before the topic exists). For an excluded topic `add_todo`, `update_todo` (setting that topic) and `add_topic_note` are refused with a tool error, its open tasks are left out of `list_todos` and of the counts (the topic page still shows them), and `list_topics` marks it `EXCLUDED by owner`. Claude has no tool to set or clear the flag. Migration 003 adds the column. Claude still reads the recordings of an excluded topic; excluding stops storing derived data, not reading. |
+| **In plain words** | The checklist is yours only. What others promised you is not on it. Topics you do not want tracked get no tasks and no notes from Claude. |
+| **Reasoning** | Owner decision: the list to tick off must stay short and his own; follow-up on others is a different kind of tracking. A flag that only the owner can set keeps a prompt injection from lifting an exclusion. |
+| **Rejected alternatives** | (A) an assignee field on each task and a second list for others: the owner wants tracking of others elsewhere; (B) hiding excluded topics only in the UI: Claude would still file tasks and notes into them; (C) stopping Claude from reading such recordings: the topic is only known after reading, and a transcript can touch several topics; (D) a Claude tool to exclude topics: weakens the guarantee. |
+| **Status** | **FINAL** |
