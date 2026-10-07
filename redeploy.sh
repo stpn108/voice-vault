@@ -84,8 +84,9 @@ fi
 # --- STEP 1b: CHECKS BEFORE ANYTHING IS STOPPED ---
 # Everything that can be checked is checked here, so a failed deploy does not leave the services down.
 if grep -Eq '^POSTGRES_PASSWORD=(change-me|changeme|password)?[[:space:]]*$' .env 2>/dev/null; then
-    err "POSTGRES_PASSWORD in .env is empty or the example value. Set a random one (openssl rand -hex 24)."
-    exit 1
+    # Only a warning: changing it later needs ALTER USER inside the database as well, and the deploy
+    # of a running installation must not be blocked by it. For a new project, set a random one at once.
+    warn "POSTGRES_PASSWORD in .env is empty or the example value (the database port is not published, but set a random one for new projects: openssl rand -hex 24)."
 fi
 if ! docker compose config -q 2>/tmp/compose-config.err; then
     err "docker compose config is invalid (a missing variable in .env?):"
