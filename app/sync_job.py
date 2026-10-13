@@ -64,7 +64,8 @@ class SyncJob:
         log.info("Cycle start delete_enabled=%s", self._cfg.delete_enabled)
         try:
             self.check_token()
-            imported = run_import(self._session_factory, self._client, self._now_fn)
+            imported = run_import(self._session_factory, self._client, self._now_fn,
+                                  self._cfg.min_speakers_named_percent)
             self._count_failures(imported.failed > 0)
             run_deletion(self._session_factory, self._client, self._cfg, self._now_fn, imported)
         except PlaudAuthError as exc:

@@ -45,6 +45,10 @@ TEXTS = {
         "de": "Bei Plaud wird die Aufnahme ebenfalls gelöscht: zuerst in den Papierkorb (frühestens {min_age_hours} Stunden nach der Aufnahme), nach {wait_hours} Stunden endgültig.",
         "en": "The recording is deleted at Plaud as well: first into the trash (no earlier than {min_age_hours} hours after the recording), permanently after {wait_hours} hours.",
     },
+    "ui_discard_plaud_now": {
+        "de": "Bei Plaud wird die Aufnahme ebenfalls gelöscht: sofort in den Papierkorb und gleich danach endgültig.",
+        "en": "The recording is deleted at Plaud as well: into the trash at once and for good right after.",
+    },
     "ui_discard_plaud_off": {
         "de": "Das Löschen bei Plaud ist derzeit ausgeschaltet. Die Aufnahme bleibt dort liegen, wird hier aber nicht erneut importiert.",
         "en": "Deleting at Plaud is currently switched off. The recording stays there but is not imported again here.",

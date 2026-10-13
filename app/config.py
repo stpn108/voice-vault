@@ -26,9 +26,9 @@ def host_name(value: str) -> str:
     return value.rsplit(":", 1)[0] if value.count(":") == 1 else value
 
 
-def _int(name: str, default: int, minimum: int) -> int:
-    """A whole number of at least `minimum`. Empty means the default. A 0 or negative value would
-    silently switch a safety gate off, so it stops the start instead."""
+def _int(name: str, default: int, minimum: int, maximum: int = None) -> int:
+    """A whole number of at least `minimum` (and at most `maximum`). Empty means the default. A value
+    outside the range stops the start instead of silently changing a safety gate."""
     raw = os.getenv(name, "").strip()
     if not raw:
         return default
@@ -38,6 +38,8 @@ def _int(name: str, default: int, minimum: int) -> int:
         raise ConfigError(f"{name} must be a whole number, got '{raw[:20]}'") from None
     if value < minimum:
         raise ConfigError(f"{name} must be at least {minimum}, got {value}")
+    if maximum is not None and value > maximum:
+        raise ConfigError(f"{name} must be at most {maximum}, got {value}")
     return value
 
 
@@ -54,6 +56,7 @@ class Config:
     min_age_minutes: int
     stability_minutes: int
     permanent_delete_after_hours: int
+    min_speakers_named_percent: int
     delete_enabled: bool
     store_audio: bool
     token_warn_days: int
@@ -83,9 +86,10 @@ def load_config() -> Config:
         plaud_refresh_token=os.getenv("PLAUD_REFRESH_TOKEN", "").strip(),
         plaud_api_base=os.getenv("PLAUD_API_BASE", "https://api-euc1.plaud.ai").rstrip("/"),
         import_interval_minutes=_int("IMPORT_INTERVAL_MINUTES", 10, 1),
-        min_age_minutes=_int("MIN_AGE_MINUTES", 10080, 1),
+        min_age_minutes=_int("MIN_AGE_MINUTES", 1, 1),
         stability_minutes=_int("STABILITY_MINUTES", 10, 1),
-        permanent_delete_after_hours=_int("PERMANENT_DELETE_AFTER_HOURS", 72, 1),
+        permanent_delete_after_hours=_int("PERMANENT_DELETE_AFTER_HOURS", 0, 0),
+        min_speakers_named_percent=_int("MIN_SPEAKERS_NAMED_PERCENT", 80, 0, 100),
         delete_enabled=_bool("PLAUD_DELETE_ENABLED", False),
         store_audio=_bool("STORE_AUDIO", False),
         token_warn_days=_int("TOKEN_WARN_DAYS", 5, 0),

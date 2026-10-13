@@ -283,8 +283,8 @@ def test_review_unreadable_detail_numbers_are_a_plaud_error():
 # --- configuration -------------------------------------------------------------------------------------
 @pytest.mark.parametrize("name,value", [
     ("MIN_AGE_MINUTES", "0"), ("MIN_AGE_MINUTES", "-5"), ("STABILITY_MINUTES", "0"),
-    ("PERMANENT_DELETE_AFTER_HOURS", "0"), ("IMPORT_INTERVAL_MINUTES", "0"), ("MAX_TRASH_PER_CYCLE", "0"),
-    ("MIN_AGE_MINUTES", "seven"),
+    ("PERMANENT_DELETE_AFTER_HOURS", "-1"), ("IMPORT_INTERVAL_MINUTES", "0"), ("MAX_TRASH_PER_CYCLE", "0"),
+    ("MIN_AGE_MINUTES", "seven"), ("MIN_SPEAKERS_NAMED_PERCENT", "101"), ("MIN_SPEAKERS_NAMED_PERCENT", "-1"),
 ])
 def test_review_gate_settings_that_would_switch_a_gate_off_stop_the_start(monkeypatch, name, value):
     monkeypatch.setenv(name, value)
@@ -294,4 +294,97 @@ def test_review_gate_settings_that_would_switch_a_gate_off_stop_the_start(monkey
 
 def test_review_an_empty_setting_means_the_default(monkeypatch):
     monkeypatch.setenv("MIN_AGE_MINUTES", "")
-    assert load_config().min_age_minutes == 10080 and load_config().max_trash_per_cycle == 20
+    assert load_config().min_age_minutes == 1 and load_config().max_trash_per_cycle == 20
+
+
+@pytest.mark.parametrize("name,value", [("PERMANENT_DELETE_AFTER_HOURS", "0"), ("MIN_SPEAKERS_NAMED_PERCENT", "0"),
+                                        ("MIN_SPEAKERS_NAMED_PERCENT", "100")])
+def test_d022_the_ends_of_the_allowed_ranges_are_accepted(monkeypatch, name, value):
+    monkeypatch.setenv(name, value)
+    load_config()
+
+
+# --- immediate deletion (D-022) and speaker names (D-023) -------------------------------------------------
+def test_d022_with_the_defaults_a_confirmed_recording_is_trashed_and_deleted_in_one_cycle(session_factory):
+    defaults = dataclasses.replace(load_config(), delete_enabled=True)
+    assert (defaults.min_age_minutes, defaults.permanent_delete_after_hours) == (1, 0)
+    imported = ImportStats(seen={"r1"}, confirmed={"r1"})
+    with session_factory() as s:
+        s.add(make_recording(ended_at=NOW - dt.timedelta(minutes=30)))
+        s.commit()
+    plaud = FakePlaud()
+    stats = run_deletion(session_factory, plaud, defaults, lambda: NOW, imported)
+    assert (plaud.trashed, plaud.deleted) == (["r1"], ["r1"]) and (stats.trashed, stats.deleted) == (1, 1)
+    rec = stored(session_factory)[0]
+    assert rec.trashed_at is not None and rec.deleted_at is not None
+
+
+@pytest.mark.parametrize("overrides", [
+    dict(is_plaud_processed=False), dict(verified_at=None, verified_hash=None), dict(duration_ms=0),
+    dict(last_changed_at=NOW - dt.timedelta(minutes=3)),
+])
+def test_d022_immediate_deletion_still_needs_every_other_gate(session_factory, overrides):
+    defaults = dataclasses.replace(load_config(), delete_enabled=True)
+    imported = ImportStats(seen={"r1"}, confirmed={"r1"})
+    with session_factory() as s:
+        s.add(make_recording(ended_at=NOW - dt.timedelta(minutes=30), **overrides))
+        s.commit()
+    plaud = FakePlaud()
+    run_deletion(session_factory, plaud, defaults, lambda: NOW, imported)
+    assert plaud.trashed == [] and plaud.deleted == []
+
+
+@pytest.mark.parametrize("labels,percent,expected", [
+    (["Dennis", "Anna", "Markus Blinzinger", "Speaker 4"], 80, False),   # 3 of 4 = 75 %
+    (["Dennis", "Anna", "Markus", "Jochen", "Speaker 5"], 80, True),     # 4 of 5 = 80 %
+    (["Dennis", "Anna"], 80, True),
+    (["Speaker 1", "Speaker 2"], 80, False),
+    (["Sprecher 1", "Sprecherin 2", "Dennis"], 80, False),
+    (["", "Dennis"], 80, False),
+    (["Dennis"], 80, True),
+    (["Speaker 1"], 80, False),
+    (["Speaker 1", "Dennis"], 50, True),
+    (["Speaker 1", "Speaker 2"], 0, True),                               # 0 switches the check off
+    (["Speaker 1", "Dennis"], 100, False),
+    (["SPEAKER 3", "dennis", "Unbekannt", "Redner 2"], 25, True),
+])
+def test_d023_the_share_of_named_speakers(labels, percent, expected):
+    segments = [{"speaker": label, "start_ms": 0, "end_ms": 1, "text": "x"} for label in labels]
+    assert import_service.speakers_named_enough(segments, percent) is expected
+
+
+def named_client(speakers):
+    client = FakeClient()
+    client.add(segments=[raw_seg(s, f"text {i}", i * 1000, i * 1000 + 900) for i, s in enumerate(speakers)])
+    return client
+
+
+def test_d023_a_recording_with_too_few_named_speakers_is_not_imported_and_not_confirmed(session_factory):
+    stats = run_import(session_factory, named_client(["Speaker 1", "Speaker 2", "Dennis"]), lambda: OLD_NOW,
+                       min_named_percent=80)
+    assert stored(session_factory) == [] and stats.waiting_for_names == 1
+    assert stats.confirmed == set() and stats.seen == {"r1"}
+
+
+def test_d023_once_the_speakers_are_named_in_plaud_the_next_cycle_imports_it(session_factory):
+    run_import(session_factory, named_client(["Speaker 1", "Dennis"]), lambda: OLD_NOW, min_named_percent=80)
+    assert stored(session_factory) == []
+    stats = run_import(session_factory, named_client(["Anna", "Dennis"]), lambda: OLD_NOW, min_named_percent=80)
+    assert stats.imported == 1 and stats.confirmed == {"r1"} and stats.waiting_for_names == 0
+
+
+def test_d023_a_stored_recording_whose_names_vanish_is_not_confirmed_for_deletion(session_factory):
+    run_import(session_factory, named_client(["Anna", "Dennis"]), lambda: OLD_NOW, min_named_percent=80)
+    stats = run_import(session_factory, named_client(["Speaker 1", "Speaker 2"]), lambda: OLD_NOW, min_named_percent=80)
+    assert stats.confirmed == set() and stats.waiting_for_names == 1
+    assert len(stored(session_factory)) == 1
+
+
+def test_d023_the_cycle_passes_the_configured_share_to_the_import(session_factory, monkeypatch):
+    seen = {}
+    monkeypatch.setattr("sync_job.run_import", lambda *a, **k: seen.setdefault("args", a) and ImportStats())
+    monkeypatch.setattr("sync_job.run_deletion", lambda *a, **k: None)
+    client = type("C", (), {"ensure_fresh_token": lambda s, n: None, "credential_seconds_left": lambda s, n: 10**9})()
+    cfg = dataclasses.replace(CFG, min_speakers_named_percent=70)
+    SyncJob(cfg, client, session_factory, notifier=lambda *a: True, now_fn=lambda: NOW).run()
+    assert seen["args"][3] == 70

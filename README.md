@@ -14,16 +14,20 @@ Requirements: `requirements/`. Decisions: `DECISIONS.md` (D-001 to D-004).
    log and, if SMTP is set, one mail per day. Expired or rejected (HTTP 401):
    the cycle stops and nothing is deleted.
 2. Import every recording still at Plaud whose transcript and summary Plaud
-   reports as finished. Segments (speaker, start/end in ms, text), summary
+   reports as finished and in which at least `MIN_SPEAKERS_NAMED_PERCENT` (default 80)
+   of the speakers carry a real name instead of "Speaker 2". Name the speakers in Plaud; until then
+   nothing is stored and nothing is deleted (the log says `Waiting for speaker names`). Segments (speaker, start/end in ms, text), summary
    and metadata go to `recordings` / `segments`. The rows are read back and
    compared by content hash and segment count (verified import). A changed
    summary or transcript is re-imported.
 3. Move to the Plaud trash only if: Plaud reports both tasks done, the
-   recording ended at least `MIN_AGE_MINUTES` ago (default 7 days) and has a known duration, the import is verified
+   recording ended at least `MIN_AGE_MINUTES` ago (default 1 minute, so right away) and has a known duration, the import is verified
    and the content was unchanged for `STABILITY_MINUTES`. Otherwise it is
    checked again next cycle.
-4. Delete permanently `PERMANENT_DELETE_AFTER_HOURS` after trashing, only
-   for a verified import.
+4. Delete permanently `PERMANENT_DELETE_AFTER_HOURS` after trashing (default 0: right after, in the
+   same cycle), only for a verified import. With the defaults a recording is gone at Plaud about
+   `STABILITY_MINUTES` after it arrived here. There is no restore at Plaud then: the database and
+   its backups are the only copy.
 
 `PLAUD_DELETE_ENABLED=false` (default) is shadow mode: steps 3 and 4 only log
 `SHADOW would ...`. Doubt always means no deletion.

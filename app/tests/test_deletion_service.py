@@ -74,10 +74,11 @@ def test_zero_duration_recording_is_never_trashed_even_if_everything_else_holds(
     assert plaud.trashed == [] and stats.held_back == 1
 
 
-def test_default_minimum_age_is_seven_days():
-    rec = make_recording(ended_at=NOW - dt.timedelta(days=7, minutes=-1))
+def test_default_minimum_age_is_one_minute():
+    # D-022: right away; the other gates (processed, verified, stable) are what holds a recording back.
+    rec = make_recording(ended_at=NOW - dt.timedelta(seconds=59))
     assert "too_young" in unmet_trash_conditions(rec, NOW, load_config())
-    rec = make_recording(ended_at=NOW - dt.timedelta(days=7))
+    rec = make_recording(ended_at=NOW - dt.timedelta(minutes=1))
     assert "too_young" not in unmet_trash_conditions(rec, NOW, load_config())
 
 

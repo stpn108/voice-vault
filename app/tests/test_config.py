@@ -4,7 +4,7 @@ import pytest
 from config import load_config
 
 ENV_KEYS = ["PLAUD_DELETE_ENABLED", "STORE_AUDIO", "MIN_AGE_MINUTES", "IMPORT_INTERVAL_MINUTES",
-            "PERMANENT_DELETE_AFTER_HOURS", "TOKEN_WARN_DAYS"]
+            "PERMANENT_DELETE_AFTER_HOURS", "TOKEN_WARN_DAYS", "MIN_SPEAKERS_NAMED_PERCENT"]
 
 
 @pytest.fixture(autouse=True)
@@ -16,8 +16,9 @@ def clean_env(monkeypatch):
 @pytest.mark.parametrize("field,expected", [
     ("delete_enabled", False),   # shadow mode until switched on
     ("store_audio", False),      # REQ-001 criterion 2
-    ("min_age_minutes", 10080),  # D-014: 7 days
-    ("permanent_delete_after_hours", 72),  # D-014: 3 days
+    ("min_age_minutes", 1),  # D-022: right away
+    ("permanent_delete_after_hours", 0),  # D-022: right after the trash step
+    ("min_speakers_named_percent", 80),  # D-023
     ("import_interval_minutes", 10),
     ("token_warn_days", 5),
 ])

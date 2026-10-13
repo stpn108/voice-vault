@@ -337,3 +337,14 @@ def test_review_the_origin_must_match_exactly_and_cross_site_requests_are_refuse
 def test_review_the_pages_send_a_referrer_policy_that_keeps_form_origins_intact(client):
     # With "no-referrer" browsers post `Origin: null` and every form would be refused.
     assert client.get("/").headers["referrer-policy"] == "same-origin"
+
+
+def test_d022_the_confirmation_says_so_when_plaud_deletes_right_away(client, seed):
+    import dataclasses
+    from config import load_config
+    webapp.app.dependency_overrides[webapp.get_config] = lambda: dataclasses.replace(
+        load_config(), delete_enabled=True, min_age_minutes=1, permanent_delete_after_hours=0)
+    rec_id = seed(index=1)
+    html = client.get(f"/recordings/{rec_id}/discard").text
+    webapp.app.dependency_overrides.pop(webapp.get_config)
+    assert "sofort in den Papierkorb und gleich danach endgültig" in html and "0 Stunden" not in html

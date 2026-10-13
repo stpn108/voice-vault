@@ -6,6 +6,7 @@ import datetime as dt
 import hashlib
 import json
 import logging
+import re
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -28,8 +29,9 @@ class ImportStats:
     failed: int = 0
     verified: int = 0
     # What this cycle saw at Plaud and verified; the deletion step trashes nothing else (D-019).
-    seen: set = field(default_factory=set)
-    confirmed: set = field(default_factory=set)
+    waiting_for_names: int = 0
+    seen: set = field(default_factory=set, repr=False)
+    confirmed: set = field(default_factory=set, repr=False)
 
 
 def clean_text(value) -> str:
@@ -58,6 +60,23 @@ def _int_or_none(value):
         return None
     number = int(value)
     return number if 0 <= number < 2**31 else None
+
+
+# What Plaud calls a speaker before the owner has given a name: "Speaker 2", "Sprecher 1", or nothing.
+UNNAMED_SPEAKER = re.compile(r"^\s*(speaker|sprecher(in)?|redner(in)?|spk|teilnehmer(in)?|unknown|unbekannt)?[\s_\-#]*\d*\s*$",
+                             re.IGNORECASE)
+
+
+def speaker_counts(segments: list[dict]) -> tuple:
+    """(named, total) over the different speaker labels of a transcript."""
+    labels = {s["speaker"] for s in segments}
+    return sum(1 for label in labels if not UNNAMED_SPEAKER.match(label)), len(labels)
+
+
+def speakers_named_enough(segments: list[dict], percent: int) -> bool:
+    """At least `percent` of the speakers carry a real name (0 switches the check off)."""
+    named, total = speaker_counts(segments)
+    return percent <= 0 or (total > 0 and named * 100 >= percent * total)
 
 
 def has_content(summary: str, segments: list[dict]) -> bool:
@@ -111,7 +130,7 @@ def verify_import(session: Session, plaud_id: str, expected_hash: str, expected_
 
 
 def import_recording(session: Session, client: PlaudClient, item: PlaudRecording,
-                     now: dt.datetime, stats: ImportStats) -> None:
+                     now: dt.datetime, stats: ImportStats, min_named_percent: int = 0) -> None:
     existing = session.scalar(select(Recording).where(Recording.plaud_id == item.plaud_id))
     if existing is not None and existing.trashed_at is not None and existing.deleted_at is None:
         # Listed outside the Plaud trash again: the owner restored it there. It must not be deleted for good.
@@ -143,6 +162,16 @@ def import_recording(session: Session, client: PlaudClient, item: PlaudRecording
             "Recording processed but transcript or summary has no text plaud_id=%s segments=%d summary_chars=%d",
             item.plaud_id, len(segments), len(summary.strip()),
         )
+        return
+
+    if not speakers_named_enough(segments, min_named_percent):
+        # The owner names the speakers in Plaud. After the import the recording is deleted there, so the
+        # names have to be in place first. Nothing is stored and nothing is deleted until they are.
+        named, total = speaker_counts(segments)
+        stats.waiting_for_names += 1
+        stats.skipped += 1
+        log.info("Waiting for speaker names plaud_id=%s named=%d of %d, need %d%%",
+                 item.plaud_id, named, total, min_named_percent)
         return
 
     start_ms = detail.start_ms or item.start_ms
@@ -203,7 +232,7 @@ def _replace_segments(session: Session, recording_id: int, segments: list[dict])
 
 
 def run_import(session_factory: Callable[[], Session], client: PlaudClient,
-               now_fn: Callable[[], dt.datetime] = now_utc) -> ImportStats:
+               now_fn: Callable[[], dt.datetime] = now_utc, min_named_percent: int = 0) -> ImportStats:
     """Import every recording still at Plaud. A PlaudAuthError aborts the run."""
     stats = ImportStats()
     items = client.list_recordings()
@@ -212,7 +241,7 @@ def run_import(session_factory: Callable[[], Session], client: PlaudClient,
     for item in items:
         with session_factory() as session:
             try:
-                import_recording(session, client, item, now_fn(), stats)
+                import_recording(session, client, item, now_fn(), stats, min_named_percent)
             except PlaudAuthError:
                 raise
             except PlaudError as exc:

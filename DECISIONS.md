@@ -274,3 +274,25 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Reported by the owner. The tests used a client that sets the headers by hand and so never saw the browser's behaviour; it was reproduced in Chromium (old policy: `Origin: null`, refused; new policy: real origin, accepted). |
 | **Rejected alternatives** | (A) drop the origin check: the CSRF token alone protects, but the origin check is a second layer that costs nothing; (B) accept `Origin: null` always: a sandboxed page of another site sends `null` too; (C) keep `no-referrer` and rely on the token only: same as A. |
 | **Status** | **FINAL** |
+
+### D-022: Deleting at Plaud right after the import, trash included (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-13 |
+| **Decision** | Amends D-014. The defaults become `MIN_AGE_MINUTES=1` and `PERMANENT_DELETE_AFTER_HOURS=0` (0 is allowed now; `STABILITY_MINUTES` stays 10). A recording that arrived here, was read in full and verified goes into the Plaud trash and is deleted from it in the same cycle once its content has been unchanged for the stability time, so about one cycle (10 minutes) after the import. The other gates stay: Plaud reports both tasks done, duration known, verified read-back, listed and verified in this very cycle (D-019), at most `MAX_TRASH_PER_CYCLE` per cycle. `PLAUD_DELETE_ENABLED` stays the master switch and is `false` by default; a value in `.env` overrides every default above. The confirmation page of a discard says "right away" when both values are at these defaults. |
+| **In plain words** | As soon as a conversation is safely here, it is gone at Plaud, from the trash as well. |
+| **Reasoning** | Owner decision: the point of the tool is to keep as little as possible at Plaud. The 10 minutes of stability stay on purpose: Plaud sometimes still changes a summary or the speaker names right after processing, and a change inside that window restarts the clock instead of deleting a stale copy. |
+| **Rejected alternatives** | (A) delete in the same cycle as the import (stability 0): no second look at Plaud's content before deleting; (B) keep the trash step for a day as a safety net (D-006, D-010, D-014): the owner does not want it; (C) delete without the trash step: the unofficial API needs the trash first. **Consequence the owner accepted:** nothing can be restored at Plaud any more; between two backups (every 4 hours by default) the live database is the only copy. |
+| **Status** | **FINAL** |
+
+### D-023: A recording is imported only when most speakers have names (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-13 |
+| **Decision** | New gate in the import. After the transcript has been read, the different speaker labels are counted. A label is unnamed if it is empty or looks like Plaud's own ("Speaker 2", "Sprecher 1", "Redner", "Unbekannt", with or without a number). If fewer than `MIN_SPEAKERS_NAMED_PERCENT` (default 80, range 0 to 100, 0 switches it off) of the labels are named, the recording is skipped: nothing is stored, nothing is deleted, the log says `Waiting for speaker names` with the counts. The check is repeated every cycle, so naming the speakers in Plaud is enough; the next cycle imports. It applies to stored recordings too: one whose names are gone again is not confirmed for deletion. Titles and texts are not logged. |
+| **In plain words** | A new conversation is checked for speaker names first. Too few names: it stays at Plaud and is looked at again in ten minutes. Enough names: it is downloaded and then deleted at Plaud. |
+| **Reasoning** | Owner decision. The speakers are named in Plaud, and after the deletion that is no longer possible, so the names have to be there first. |
+| **Rejected alternatives** | (A) import first, name later here: the names would not be in the stored copy, and the Plaud original is gone; (B) count the share of utterances instead of speakers: a name for the one who speaks most would be enough and hide unnamed others; (C) skip for good after one try: the owner names speakers after the recording. **Open point:** a recording whose speakers are never named stays at Plaud and is not visible here; the log is the only trace. |
+| **Status** | **FINAL** |
