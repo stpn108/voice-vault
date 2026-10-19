@@ -340,6 +340,8 @@ class PlaudClient:
                       == plaud_id), None) if isinstance(files, list) else None
         segments = match.get("trans_result") if match else None
         if not isinstance(segments, list) or not segments:
+            log.warning("Current transcript missing in the file list, using the download link plaud_id=%s "
+                        "file_found=%s", plaud_id, match is not None)
             return []
         return [s for s in segments if isinstance(s, dict)]
 

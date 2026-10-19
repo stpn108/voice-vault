@@ -428,3 +428,26 @@ def test_d025_without_a_current_transcript_the_download_link_is_the_fallback(res
     client, calls = transcript_client(response)
     assert [s["speaker"] for s in client.fetch_segments(detail())] == ["Dennis", "Speaker 2"]
     assert calls[0] == ("POST", "/file/list") and calls[-1][0] == "GET"
+
+
+def test_d025_a_silent_fallback_is_logged(caplog):
+    client, _ = transcript_client(ok(data_file_list=[{"id": "abc123"}]))
+    with caplog.at_level("WARNING"):
+        client.fetch_segments(detail())
+    assert "Current transcript missing in the file list" in caplog.text
+
+
+def test_live_check_speaker_report_prints_labels_from_every_source(capsys):
+    import plaud_live_check
+
+    def handler(request):
+        if request.url.path == "/file/list":
+            return ok(data_file_list=[{"id": "abc123", "trans_result": CURRENT, "speaker_map": {"Speaker 2": "Jochen Rill"}}])
+        if request.url.path.startswith("/file/detail/"):
+            return ok({**detail_raw(), "extra_data": {"speaker_names": ["Dennis"]}})
+        return httpx.Response(200, json={"trans_result": STALE})
+    plaud_live_check.show_speakers(make_client(handler), "abc123")
+    out = capsys.readouterr().out
+    assert "speaker='Jochen Rill' original='Speaker 2'" in out and "speaker='Speaker 2' original=None" in out
+    assert "extra_data.speaker_names" in out and "field: speaker_map" in out
+    assert "content': 'a'" not in out and "'b'" not in out
