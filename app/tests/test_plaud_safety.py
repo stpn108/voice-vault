@@ -412,3 +412,11 @@ def test_d024_a_wait_of_zero_days_imports_at_once(session_factory):
     stats = run_import(session_factory, named_client(["Speaker 1"]), lambda: FRESH, min_named_percent=50,
                        naming_wait_days=0)
     assert stats.imported == 1
+
+
+def test_d024_the_log_names_the_unnamed_labels_but_never_a_real_name(session_factory, caplog):
+    with caplog.at_level("INFO"):
+        run_import(session_factory, named_client(["Speaker 2", "Speaker 3", "Dennis"]), lambda: FRESH,
+                   min_named_percent=50)
+    line = next(r.getMessage() for r in caplog.records if "Waiting for speaker names" in r.getMessage())
+    assert "named=1 of 3" in line and "unnamed: Speaker 2, Speaker 3" in line and "Dennis" not in line

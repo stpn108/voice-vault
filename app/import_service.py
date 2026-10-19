@@ -73,6 +73,11 @@ def speaker_counts(segments: list[dict]) -> tuple:
     return sum(1 for label in labels if not UNNAMED_SPEAKER.match(label)), len(labels)
 
 
+def unnamed_labels(segments: list[dict]) -> list:
+    """The labels that do not count as a name ("Speaker 2"), for the log. Real names are never logged."""
+    return sorted({s["speaker"] or "(empty)" for s in segments if UNNAMED_SPEAKER.match(s["speaker"])})[:10]
+
+
 def speakers_named_enough(segments: list[dict], percent: int) -> bool:
     """At least `percent` of the speakers carry a real name (0 switches the check off)."""
     named, total = speaker_counts(segments)
@@ -180,8 +185,9 @@ def import_recording(session: Session, client: PlaudClient, item: PlaudRecording
             # the names should be in place first. Nothing is stored and nothing is deleted while waiting.
             stats.waiting_for_names += 1
             stats.skipped += 1
-            log.info("Waiting for speaker names plaud_id=%s named=%d of %d, need %d%%, waiting at most %d days",
-                     item.plaud_id, named, total, min_named_percent, naming_wait_days)
+            log.info("Waiting for speaker names plaud_id=%s named=%d of %d, need %d%%, waiting at most %d days, "
+                     "unnamed: %s", item.plaud_id, named, total, min_named_percent, naming_wait_days,
+                     ", ".join(unnamed_labels(segments)))
             return
         # Waited long enough (D-024): import with the names there are; the deletion follows as usual.
         log.warning("Speaker naming time is over, importing anyway plaud_id=%s named=%d of %d",
