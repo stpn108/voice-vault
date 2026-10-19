@@ -386,3 +386,45 @@ def test_credential_seconds_left_falls_back_to_the_access_token():
 
 def never_called(request):
     raise AssertionError("no request expected")
+
+
+# --- speaker names live in the current transcript (D-025) ---------------------------------------------
+from plaud_client import PlaudDetail  # noqa: E402
+
+STALE = [{"speaker": "Dennis", "content": "a", "start_time": 0, "end_time": 1},
+         {"speaker": "Speaker 2", "content": "b", "start_time": 1, "end_time": 2}]
+CURRENT = [{"speaker": "Dennis", "original_speaker": "Speaker 1", "content": "a", "start_time": 0, "end_time": 1},
+           {"speaker": "Jochen Rill", "original_speaker": "Speaker 2", "content": "b", "start_time": 1, "end_time": 2}]
+
+
+def transcript_client(file_list_response):
+    calls = []
+
+    def handler(request):
+        calls.append((request.method, request.url.path))
+        if request.url.path == "/file/list":
+            assert request.method == "POST" and json.loads(request.content) == ["abc123"]
+            return file_list_response
+        return httpx.Response(200, json={"trans_result": STALE})  # the download link
+    return make_client(handler), calls
+
+
+def detail():
+    return PlaudDetail("abc123", "t", 1_760_000_000_000, 60_000, True, detail_raw())
+
+
+def test_d025_the_current_transcript_with_the_owners_speaker_names_is_used():
+    client, calls = transcript_client(ok(data_file_list=[{"id": "abc123", "trans_result": CURRENT}]))
+    assert [s["speaker"] for s in client.fetch_segments(detail())] == ["Dennis", "Jochen Rill"]
+    assert calls == [("POST", "/file/list")]
+
+
+@pytest.mark.parametrize("response", [
+    ok(data_file_list=[]), ok(data_file_list=[{"id": "abc123"}]), ok(data_file_list=[{"id": "abc123", "trans_result": []}]),
+    ok(data_file_list=[{"id": "other", "trans_result": CURRENT}]), ok(), httpx.Response(200, json={"status": -1, "msg": "no"}),
+    httpx.Response(500, text="boom"),
+])
+def test_d025_without_a_current_transcript_the_download_link_is_the_fallback(response):
+    client, calls = transcript_client(response)
+    assert [s["speaker"] for s in client.fetch_segments(detail())] == ["Dennis", "Speaker 2"]
+    assert calls[0] == ("POST", "/file/list") and calls[-1][0] == "GET"

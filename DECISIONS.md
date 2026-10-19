@@ -307,3 +307,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner decision: the speakers are usually named, 80 percent held back too much, and a recording must not stay at Plaud forever only because nobody named the speakers. |
 | **Rejected alternatives** | (A) delete at Plaud after seven days without downloading: the conversation would be lost; (B) no time limit (D-023): unnamed recordings stay at Plaud for good and are invisible here. |
 | **Status** | **FINAL** |
+
+### D-025: The transcript is read from Plaud's current version, not from the download link (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-19 |
+| **Decision** | `PlaudClient.fetch_segments` first asks `POST /file/list` with the recording id and takes `trans_result` of that file: the transcript as it is now, with the speaker names the owner gave in Plaud and his text corrections. Only if that answer has no transcript (or the call fails, which is logged) does it fall back to the file behind the transcript's `data_link`. That file is the state right after transcription and knows only the voices Plaud recognised itself. Stored recordings whose names changed are re-imported and verified again through the existing content hash. |
+| **In plain words** | voice-vault now sees the speaker names you set in Plaud. Before, it saw only the first automatic version of the transcript. |
+| **Reasoning** | Reported by the owner: a recording with all speakers named in Plaud was held back as "1 of 3 named". The reference client `plaud-api` reads and writes speaker names through `/file/list` and `PATCH /file/{id}`, `plaud-tools` writes renames into `trans_result` as well. The download link is not updated by those edits. Not yet confirmed against the live API; the fallback keeps the import working if the call is refused. |
+| **Rejected alternatives** | (A) count names from the summary's participant line: AI text, it repeats or invents names; (B) map `original_speaker` through Plaud's global speaker list (`/speaker/list`): voice profiles, not the names given in one recording. |
+| **Status** | **FINAL** |

@@ -305,7 +305,15 @@ class PlaudClient:
         return bool(summary and summary.get("task_status") == TASK_DONE)
 
     def fetch_segments(self, detail: PlaudDetail) -> list[dict]:
-        """Transcript utterances: speaker, content, start_time/end_time in ms."""
+        """Transcript utterances: speaker, content, start_time/end_time in ms.
+
+        The current transcript comes from `POST /file/list`: it holds the owner's edits, above all the
+        speaker names given in Plaud (D-025). The file behind the transcript's download link is the state
+        right after transcription and only knows the voices Plaud recognised itself, so it is the fallback.
+        """
+        live = self._current_transcript(detail.plaud_id)
+        if live:
+            return live
         item = _content_item(detail.raw, TRANSCRIPT_TYPE)
         if not item or not item.get("data_link"):
             raise PlaudError(f"recording {detail.plaud_id} has no transcript link")
@@ -315,6 +323,25 @@ class PlaudClient:
         if not isinstance(body, list):
             raise PlaudError(f"transcript of {detail.plaud_id} has an unexpected shape")
         return [s for s in body if isinstance(s, dict)]
+
+    def _current_transcript(self, plaud_id: str) -> list[dict]:
+        """The edited transcript (`trans_result`), or [] if Plaud does not send one."""
+        _check_id(plaud_id)
+        try:
+            payload = self._request("POST", "/file/list", body=[plaud_id])
+        except PlaudAuthError:
+            raise
+        except PlaudError as exc:
+            log.warning("Current transcript not available, using the download link plaud_id=%s reason=%s",
+                        plaud_id, exc)
+            return []
+        files = payload.get("data_file_list")
+        match = next((f for f in files if isinstance(f, dict) and str(f.get("id") or f.get("file_id") or plaud_id)
+                      == plaud_id), None) if isinstance(files, list) else None
+        segments = match.get("trans_result") if match else None
+        if not isinstance(segments, list) or not segments:
+            return []
+        return [s for s in segments if isinstance(s, dict)]
 
     def fetch_summary(self, detail: PlaudDetail) -> str:
         """AI summary as markdown text. Empty string if Plaud sent none."""
