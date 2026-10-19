@@ -130,7 +130,8 @@ def verify_import(session: Session, plaud_id: str, expected_hash: str, expected_
 
 
 def import_recording(session: Session, client: PlaudClient, item: PlaudRecording,
-                     now: dt.datetime, stats: ImportStats, min_named_percent: int = 0) -> None:
+                     now: dt.datetime, stats: ImportStats, min_named_percent: int = 0,
+                     naming_wait_days: int = 7) -> None:
     existing = session.scalar(select(Recording).where(Recording.plaud_id == item.plaud_id))
     if existing is not None and existing.trashed_at is not None and existing.deleted_at is None:
         # Listed outside the Plaud trash again: the owner restored it there. It must not be deleted for good.
@@ -164,24 +165,29 @@ def import_recording(session: Session, client: PlaudClient, item: PlaudRecording
         )
         return
 
-    if not speakers_named_enough(segments, min_named_percent):
-        # The owner names the speakers in Plaud. After the import the recording is deleted there, so the
-        # names have to be in place first. Nothing is stored and nothing is deleted until they are.
-        named, total = speaker_counts(segments)
-        stats.waiting_for_names += 1
-        stats.skipped += 1
-        log.info("Waiting for speaker names plaud_id=%s named=%d of %d, need %d%%",
-                 item.plaud_id, named, total, min_named_percent)
-        return
-
     start_ms = detail.start_ms or item.start_ms
     if start_ms < MIN_PLAUSIBLE_START_MS or start_ms > (now.timestamp() + 86400) * 1000:
         # 0 or garbage would make the recording look decades old and pass the age gate at once.
         raise PlaudError(f"implausible start time for {item.plaud_id}")
-    content_hash = compute_content_hash(summary, segments)
     started = from_epoch_ms(start_ms)
     duration = detail.duration_ms or item.duration_ms
     ended = started + dt.timedelta(milliseconds=duration)
+
+    if not speakers_named_enough(segments, min_named_percent):
+        named, total = speaker_counts(segments)
+        if now - ended < dt.timedelta(days=naming_wait_days):
+            # The owner names the speakers in Plaud. After the import the recording is deleted there, so
+            # the names should be in place first. Nothing is stored and nothing is deleted while waiting.
+            stats.waiting_for_names += 1
+            stats.skipped += 1
+            log.info("Waiting for speaker names plaud_id=%s named=%d of %d, need %d%%, waiting at most %d days",
+                     item.plaud_id, named, total, min_named_percent, naming_wait_days)
+            return
+        # Waited long enough (D-024): import with the names there are; the deletion follows as usual.
+        log.warning("Speaker naming time is over, importing anyway plaud_id=%s named=%d of %d",
+                    item.plaud_id, named, total)
+
+    content_hash = compute_content_hash(summary, segments)
     title = detail.title or item.title
 
     if existing is None:
@@ -232,7 +238,8 @@ def _replace_segments(session: Session, recording_id: int, segments: list[dict])
 
 
 def run_import(session_factory: Callable[[], Session], client: PlaudClient,
-               now_fn: Callable[[], dt.datetime] = now_utc, min_named_percent: int = 0) -> ImportStats:
+               now_fn: Callable[[], dt.datetime] = now_utc, min_named_percent: int = 0,
+               naming_wait_days: int = 7) -> ImportStats:
     """Import every recording still at Plaud. A PlaudAuthError aborts the run."""
     stats = ImportStats()
     items = client.list_recordings()
@@ -241,7 +248,7 @@ def run_import(session_factory: Callable[[], Session], client: PlaudClient,
     for item in items:
         with session_factory() as session:
             try:
-                import_recording(session, client, item, now_fn(), stats, min_named_percent)
+                import_recording(session, client, item, now_fn(), stats, min_named_percent, naming_wait_days)
             except PlaudAuthError:
                 raise
             except PlaudError as exc:

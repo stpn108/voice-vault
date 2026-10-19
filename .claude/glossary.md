@@ -34,7 +34,7 @@ contract that keeps conversation and code from drifting apart.
 | Thema | A subject that runs through several conversations. | `topics`, `topic_notes` | Matched by name without regard to case. |
 | Tagesübersicht | The daily overview Claude writes, one per day. | `digests`, `save_digest` | Saving again replaces the day. |
 | Mindestalter | Minimum age of a recording before it may be trashed, default 1 minute (D-022); it can be raised in `.env`. A recording with unknown (0) duration is never trashed. | `MIN_AGE_MINUTES` | Measured from the end of the recording (`start_time + duration`). |
-| Sprechernamen | The share of the speakers of a transcript that carry a real name instead of "Speaker 2". Needed before an import, default 80 percent (D-023). | `MIN_SPEAKERS_NAMED_PERCENT`, `import_service.speakers_named_enough()` | Counted over the different speaker labels. 0 switches the check off. |
+| Sprechernamen | The share of the speakers of a transcript that carry a real name instead of "Speaker 2". Needed before an import, default 50 percent (D-023, D-024); after 7 days the recording is imported anyway. | `MIN_SPEAKERS_NAMED_PERCENT`, `import_service.speakers_named_enough()` | Counted over the different speaker labels. 0 switches the check off. |
 
 ## Units and formats
 

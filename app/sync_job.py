@@ -65,7 +65,7 @@ class SyncJob:
         try:
             self.check_token()
             imported = run_import(self._session_factory, self._client, self._now_fn,
-                                  self._cfg.min_speakers_named_percent)
+                                  self._cfg.min_speakers_named_percent, self._cfg.speaker_naming_wait_days)
             self._count_failures(imported.failed > 0)
             run_deletion(self._session_factory, self._client, self._cfg, self._now_fn, imported)
         except PlaudAuthError as exc:

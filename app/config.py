@@ -57,6 +57,7 @@ class Config:
     stability_minutes: int
     permanent_delete_after_hours: int
     min_speakers_named_percent: int
+    speaker_naming_wait_days: int
     delete_enabled: bool
     store_audio: bool
     token_warn_days: int
@@ -89,7 +90,8 @@ def load_config() -> Config:
         min_age_minutes=_int("MIN_AGE_MINUTES", 1, 1),
         stability_minutes=_int("STABILITY_MINUTES", 10, 1),
         permanent_delete_after_hours=_int("PERMANENT_DELETE_AFTER_HOURS", 0, 0),
-        min_speakers_named_percent=_int("MIN_SPEAKERS_NAMED_PERCENT", 80, 0, 100),
+        min_speakers_named_percent=_int("MIN_SPEAKERS_NAMED_PERCENT", 50, 0, 100),
+        speaker_naming_wait_days=_int("SPEAKER_NAMING_WAIT_DAYS", 7, 0),
         delete_enabled=_bool("PLAUD_DELETE_ENABLED", False),
         store_audio=_bool("STORE_AUDIO", False),
         token_warn_days=_int("TOKEN_WARN_DAYS", 5, 0),

@@ -296,3 +296,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner decision. The speakers are named in Plaud, and after the deletion that is no longer possible, so the names have to be there first. |
 | **Rejected alternatives** | (A) import first, name later here: the names would not be in the stored copy, and the Plaud original is gone; (B) count the share of utterances instead of speakers: a name for the one who speaks most would be enough and hide unnamed others; (C) skip for good after one try: the owner names speakers after the recording. **Open point:** a recording whose speakers are never named stays at Plaud and is not visible here; the log is the only trace. |
 | **Status** | **FINAL** |
+
+### D-024: Half of the speakers named, and at most seven days of waiting for names (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-19 |
+| **Decision** | Amends D-023. `MIN_SPEAKERS_NAMED_PERCENT` defaults to 50. A recording with fewer named speakers waits at most `SPEAKER_NAMING_WAIT_DAYS` (default 7, 0 means no waiting), counted from the end of the recording. After that it is imported with the names it has, logged as `Speaker naming time is over, importing anyway`, verified, and deleted at Plaud like every other recording (D-022). It is never deleted at Plaud without being stored here first. |
+| **In plain words** | Half of the speakers need names. If they do not get them within a week, the conversation is downloaded anyway and then deleted at Plaud. |
+| **Reasoning** | Owner decision: the speakers are usually named, 80 percent held back too much, and a recording must not stay at Plaud forever only because nobody named the speakers. |
+| **Rejected alternatives** | (A) delete at Plaud after seven days without downloading: the conversation would be lost; (B) no time limit (D-023): unnamed recordings stay at Plaud for good and are invisible here. |
+| **Status** | **FINAL** |

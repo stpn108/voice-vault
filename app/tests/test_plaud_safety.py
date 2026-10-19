@@ -20,6 +20,8 @@ from tests.test_import_service import FakeClient, START_MS, raw_seg
 from tests.test_plaud_client import detail_raw, make_client, ok
 
 OLD_NOW = dt.datetime(2026, 10, 6, 12, 0, tzinfo=dt.timezone.utc)
+# A day after the fake recordings were made: inside the time the import waits for speaker names.
+FRESH = dt.datetime.fromtimestamp(START_MS / 1000, tz=dt.timezone.utc) + dt.timedelta(days=1)
 
 
 def stored(session_factory):
@@ -360,22 +362,22 @@ def named_client(speakers):
 
 
 def test_d023_a_recording_with_too_few_named_speakers_is_not_imported_and_not_confirmed(session_factory):
-    stats = run_import(session_factory, named_client(["Speaker 1", "Speaker 2", "Dennis"]), lambda: OLD_NOW,
+    stats = run_import(session_factory, named_client(["Speaker 1", "Speaker 2", "Dennis"]), lambda: FRESH,
                        min_named_percent=80)
     assert stored(session_factory) == [] and stats.waiting_for_names == 1
     assert stats.confirmed == set() and stats.seen == {"r1"}
 
 
 def test_d023_once_the_speakers_are_named_in_plaud_the_next_cycle_imports_it(session_factory):
-    run_import(session_factory, named_client(["Speaker 1", "Dennis"]), lambda: OLD_NOW, min_named_percent=80)
+    run_import(session_factory, named_client(["Speaker 1", "Dennis"]), lambda: FRESH, min_named_percent=80)
     assert stored(session_factory) == []
-    stats = run_import(session_factory, named_client(["Anna", "Dennis"]), lambda: OLD_NOW, min_named_percent=80)
+    stats = run_import(session_factory, named_client(["Anna", "Dennis"]), lambda: FRESH, min_named_percent=80)
     assert stats.imported == 1 and stats.confirmed == {"r1"} and stats.waiting_for_names == 0
 
 
 def test_d023_a_stored_recording_whose_names_vanish_is_not_confirmed_for_deletion(session_factory):
-    run_import(session_factory, named_client(["Anna", "Dennis"]), lambda: OLD_NOW, min_named_percent=80)
-    stats = run_import(session_factory, named_client(["Speaker 1", "Speaker 2"]), lambda: OLD_NOW, min_named_percent=80)
+    run_import(session_factory, named_client(["Anna", "Dennis"]), lambda: FRESH, min_named_percent=80)
+    stats = run_import(session_factory, named_client(["Speaker 1", "Speaker 2"]), lambda: FRESH, min_named_percent=80)
     assert stats.confirmed == set() and stats.waiting_for_names == 1
     assert len(stored(session_factory)) == 1
 
@@ -387,4 +389,26 @@ def test_d023_the_cycle_passes_the_configured_share_to_the_import(session_factor
     client = type("C", (), {"ensure_fresh_token": lambda s, n: None, "credential_seconds_left": lambda s, n: 10**9})()
     cfg = dataclasses.replace(CFG, min_speakers_named_percent=70)
     SyncJob(cfg, client, session_factory, notifier=lambda *a: True, now_fn=lambda: NOW).run()
-    assert seen["args"][3] == 70
+    assert seen["args"][3] == 70 and seen["args"][4] == 7
+
+
+# --- at most seven days of waiting for names (D-024) -------------------------------------------------------
+@pytest.mark.parametrize("days_after,imported", [(1, False), (6.9, False), (7.1, True), (30, True)])
+def test_d024_without_enough_names_the_import_waits_at_most_the_configured_days(session_factory, days_after, imported):
+    ended = dt.datetime.fromtimestamp(START_MS / 1000, tz=dt.timezone.utc) + dt.timedelta(minutes=1)
+    now = ended + dt.timedelta(days=days_after)
+    stats = run_import(session_factory, named_client(["Speaker 1", "Speaker 2"]), lambda: now,
+                       min_named_percent=50, naming_wait_days=7)
+    assert (len(stored(session_factory)) == 1) is imported
+    assert (stats.confirmed == {"r1"}) is imported and (stats.waiting_for_names == 1) is not imported
+
+
+def test_d024_half_of_the_speakers_named_is_enough_by_default():
+    segments = [{"speaker": s, "start_ms": 0, "end_ms": 1, "text": "x"} for s in ("Dennis", "Speaker 2")]
+    assert import_service.speakers_named_enough(segments, load_config().min_speakers_named_percent)
+
+
+def test_d024_a_wait_of_zero_days_imports_at_once(session_factory):
+    stats = run_import(session_factory, named_client(["Speaker 1"]), lambda: FRESH, min_named_percent=50,
+                       naming_wait_days=0)
+    assert stats.imported == 1
