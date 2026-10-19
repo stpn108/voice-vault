@@ -26,6 +26,7 @@ from plaud_auth import (
 log = logging.getLogger(__name__)
 
 TRANSCRIPT_TYPE = "transaction"
+POLISHED_TYPE = "transaction_polish"
 SUMMARY_TYPE = "auto_sum_note"
 TASK_DONE = 1
 PAGE_SIZE = 50
@@ -57,6 +58,20 @@ class PlaudDetail:
     duration_ms: int
     is_processed: bool
     raw: dict = field(default_factory=dict, repr=False)
+
+
+def _segments(value: Any) -> list[dict]:
+    """Utterances from the shapes Plaud uses: a list, {"trans_result": [...]}, or that as a JSON string."""
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except (ValueError, RecursionError):
+            return []
+    if isinstance(value, dict):
+        value = value.get("trans_result") or value.get("data") or value.get("segments")
+    if not isinstance(value, list):
+        return []
+    return [s for s in value if isinstance(s, dict)]
 
 
 def _content_item(raw: dict, data_type: str) -> Optional[dict]:
@@ -307,16 +322,24 @@ class PlaudClient:
     def fetch_segments(self, detail: PlaudDetail) -> list[dict]:
         """Transcript utterances: speaker, content, start_time/end_time in ms.
 
-        The current transcript comes from `POST /file/list`: it holds the owner's edits, above all the
-        speaker names given in Plaud (D-025). The file behind the transcript's download link is the state
-        right after transcription and only knows the voices Plaud recognised itself, so it is the fallback.
+        Plaud keeps two transcripts. The cleaned one ("Transkript bereinigt", block `transaction_polish`)
+        carries the speaker names the owner gave; the original one (`transaction`) keeps "Speaker 1" (D-026).
+        Order: the cleaned transcript from `POST /file/list`, then its download link, then the current
+        original transcript from `/file/list` (D-025), then the original's download link.
         """
-        live = self._current_transcript(detail.plaud_id)
-        if live:
-            return live
+        entry = self._file_entry(detail.plaud_id)
+        polished = _segments(entry.get(POLISHED_TYPE)) if entry else []
+        if not polished:
+            polished = self._download_block(detail, POLISHED_TYPE)
+        if polished:
+            return polished
+        log.warning("Cleaned transcript not available, using the original one plaud_id=%s", detail.plaud_id)
+        current = _segments(entry.get("trans_result")) if entry else []
+        if current:
+            return current
         item = _content_item(detail.raw, TRANSCRIPT_TYPE)
         if not item or not item.get("data_link"):
-            raise PlaudError(f"recording {detail.plaud_id} has no transcript link")
+            raise PlaudError(f"recording {detail.plaud_id} has no readable transcript")
         body = self._download(str(item["data_link"]))
         if isinstance(body, dict):
             body = body.get("trans_result")
@@ -324,26 +347,28 @@ class PlaudClient:
             raise PlaudError(f"transcript of {detail.plaud_id} has an unexpected shape")
         return [s for s in body if isinstance(s, dict)]
 
-    def _current_transcript(self, plaud_id: str) -> list[dict]:
-        """The edited transcript (`trans_result`), or [] if Plaud does not send one."""
+    def _file_entry(self, plaud_id: str) -> Optional[dict]:
+        """The recording's entry of `POST /file/list`, or None if Plaud does not send one."""
         _check_id(plaud_id)
         try:
             payload = self._request("POST", "/file/list", body=[plaud_id])
         except PlaudAuthError:
             raise
         except PlaudError as exc:
-            log.warning("Current transcript not available, using the download link plaud_id=%s reason=%s",
-                        plaud_id, exc)
-            return []
+            log.warning("File list not available plaud_id=%s reason=%s", plaud_id, exc)
+            return None
         files = payload.get("data_file_list")
-        match = next((f for f in files if isinstance(f, dict) and str(f.get("id") or f.get("file_id") or plaud_id)
-                      == plaud_id), None) if isinstance(files, list) else None
-        segments = match.get("trans_result") if match else None
-        if not isinstance(segments, list) or not segments:
-            log.warning("Current transcript missing in the file list, using the download link plaud_id=%s "
-                        "file_found=%s", plaud_id, match is not None)
+        if not isinstance(files, list):
+            return None
+        return next((f for f in files if isinstance(f, dict)
+                     and str(f.get("id") or f.get("file_id") or plaud_id) == plaud_id), None)
+
+    def _download_block(self, detail: PlaudDetail, data_type: str) -> list[dict]:
+        """Segments of a finished transcript block from its download link; [] if there is none."""
+        item = _content_item(detail.raw, data_type)
+        if not item or item.get("task_status") != TASK_DONE or not item.get("data_link"):
             return []
-        return [s for s in segments if isinstance(s, dict)]
+        return _segments(self._download(str(item["data_link"])))
 
     def fetch_summary(self, detail: PlaudDetail) -> str:
         """AI summary as markdown text. Empty string if Plaud sent none."""

@@ -430,11 +430,11 @@ def test_d025_without_a_current_transcript_the_download_link_is_the_fallback(res
     assert calls[0] == ("POST", "/file/list") and calls[-1][0] == "GET"
 
 
-def test_d025_a_silent_fallback_is_logged(caplog):
+def test_d025_a_fallback_to_the_original_transcript_is_logged(caplog):
     client, _ = transcript_client(ok(data_file_list=[{"id": "abc123"}]))
     with caplog.at_level("WARNING"):
         client.fetch_segments(detail())
-    assert "Current transcript missing in the file list" in caplog.text
+    assert "Cleaned transcript not available, using the original one" in caplog.text
 
 
 def test_live_check_speaker_report_prints_labels_from_every_source(capsys):
@@ -451,3 +451,58 @@ def test_live_check_speaker_report_prints_labels_from_every_source(capsys):
     assert "speaker='Jochen Rill' original='Speaker 2'" in out and "speaker='Speaker 2' original=None" in out
     assert "extra_data.speaker_names" in out and "field: speaker_map" in out
     assert "content': 'a'" not in out and "'b'" not in out
+
+
+# --- the cleaned transcript carries the names (D-026) --------------------------------------------------
+POLISHED = [{"speaker": "Dennis", "content": "a.", "start_time": 0, "end_time": 1},
+            {"speaker": "Jochen Rill", "content": "b.", "start_time": 1, "end_time": 2}]
+
+
+def polished_detail(with_link=True):
+    raw = detail_raw()
+    item = {"data_type": "transaction_polish", "task_status": 1}
+    if with_link:
+        item["data_link"] = "https://s3.example/p.json"
+    raw["content_list"].append(item)
+    return PlaudDetail("abc123", "t", 1_760_000_000_000, 60_000, True, raw)
+
+
+def polish_client(entry, polished_file=None):
+    calls = []
+
+    def handler(request):
+        calls.append(request.url.path)
+        if request.url.path == "/file/list":
+            return ok(data_file_list=[entry])
+        if request.url.path == "/p.json":
+            return httpx.Response(200, json=polished_file if polished_file is not None else {"trans_result": POLISHED})
+        return httpx.Response(200, json={"trans_result": STALE})
+    return make_client(handler), calls
+
+
+@pytest.mark.parametrize("shape", [POLISHED, {"trans_result": POLISHED}, json.dumps({"trans_result": POLISHED})])
+def test_d026_the_cleaned_transcript_from_the_file_list_is_used(shape):
+    client, calls = polish_client({"id": "abc123", "trans_result": CURRENT[:1], "transaction_polish": shape})
+    assert [s["speaker"] for s in client.fetch_segments(polished_detail())] == ["Dennis", "Jochen Rill"]
+    assert calls == ["/file/list"]
+
+
+def test_d026_without_it_in_the_file_list_the_cleaned_transcript_is_downloaded():
+    client, calls = polish_client({"id": "abc123", "trans_result": STALE})
+    assert [s["speaker"] for s in client.fetch_segments(polished_detail())] == ["Dennis", "Jochen Rill"]
+    assert calls == ["/file/list", "/p.json"]
+
+
+def test_d026_an_unfinished_cleaned_block_is_not_used():
+    d = polished_detail()
+    d.raw["content_list"][-1]["task_status"] = 0
+    client, calls = polish_client({"id": "abc123", "trans_result": STALE})
+    assert [s["speaker"] for s in client.fetch_segments(d)] == ["Dennis", "Speaker 2"]
+    assert "/p.json" not in calls
+
+
+def test_d026_without_any_transcript_the_import_fails_instead_of_storing_nothing():
+    d = PlaudDetail("abc123", "t", 1_760_000_000_000, 60_000, True, {"content_list": []})
+    client, _ = polish_client({"id": "abc123"})
+    with pytest.raises(PlaudError, match="no readable transcript"):
+        client.fetch_segments(d)

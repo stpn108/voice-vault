@@ -318,3 +318,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Reported by the owner: a recording with all speakers named in Plaud was held back as "1 of 3 named". The reference client `plaud-api` reads and writes speaker names through `/file/list` and `PATCH /file/{id}`, `plaud-tools` writes renames into `trans_result` as well. The download link is not updated by those edits. Not yet confirmed against the live API; the fallback keeps the import working if the call is refused. |
 | **Rejected alternatives** | (A) count names from the summary's participant line: AI text, it repeats or invents names; (B) map `original_speaker` through Plaud's global speaker list (`/speaker/list`): voice profiles, not the names given in one recording. |
 | **Status** | **FINAL** |
+
+### D-026: The cleaned transcript (with the speaker names) is the one that is read and stored (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-19 |
+| **Decision** | Amends D-025. Plaud keeps two transcripts: the original (`transaction`, "Transkript Original") with Plaud's labels such as "Speaker 1", and the cleaned one (`transaction_polish`, "Transkript bereinigt") that carries the speaker names the owner gives and smooths the wording. `fetch_segments` reads, in this order: the cleaned transcript from `POST /file/list`, the cleaned transcript's download link if that block is finished, the current original from `/file/list`, the original's download link. A fallback to the original is logged. The cleaned transcript is what is stored, so the stored copy and Claude see the names; the speaker check of D-023/D-024 counts on it. Recordings stored earlier get the cleaned version through the next re-import (content hash changes). |
+| **In plain words** | voice-vault now reads the cleaned transcript, where your speaker names are, and keeps that one. |
+| **Reasoning** | Reported by the owner, confirmed with `plaud_live_check --speakers`: the original transcript in both API sources held "Speaker 1" (125 utterances) and "Speaker 3" (11) although the names were set in Plaud; the owner pointed to the cleaned transcript as the place of the names. |
+| **Rejected alternatives** | (A) store the original and take only the names from the cleaned one: the two have different utterance boundaries, matching them is guesswork; (B) keep counting on the original: the names never show up there. |
+| **Status** | **FINAL** |

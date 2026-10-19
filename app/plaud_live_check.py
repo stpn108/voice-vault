@@ -31,7 +31,7 @@ from sqlalchemy.orm import Session
 
 from config import load_config
 from database import engine
-from plaud_client import PlaudError, build_client
+from plaud_client import PlaudError, _segments, build_client
 from utils import now_utc
 
 
@@ -112,6 +112,7 @@ def show_speakers(client, plaud_id: str) -> None:
             if isinstance(entry, dict):
                 print("  keys:", sorted(entry))
                 print("  trans_result labels:", _labels(entry.get("trans_result") or []))
+                print("  transaction_polish labels:", _labels(_segments(entry.get("transaction_polish"))))
                 for where, value in _speaker_fields(entry):
                     print("  field:", where, "=", value)
     except PlaudError as exc:
