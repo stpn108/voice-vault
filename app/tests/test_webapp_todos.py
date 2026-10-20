@@ -349,3 +349,4 @@ def test_d031_tag_saves_are_checked(client, make_todo, data, status):
 def test_d031_the_tag_script_is_served(client):
     response = client.get("/static/people.js")
     assert response.status_code == 200 and "data-people-url" in response.text and "textContent" in response.text
+    assert "insertReplacementText" in response.text  # a pick from the suggestion list is taken at once

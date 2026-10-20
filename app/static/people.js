@@ -42,9 +42,7 @@
     save().catch(function () { checkbox.checked = !checkbox.checked; });
   });
 
-  input.addEventListener("keydown", function (event) {
-    if (event.key !== "Enter" && event.key !== ",") { return; }
-    event.preventDefault();
+  function takeInput() {
     var names = input.value.split(",").map(function (s) { return s.trim().replace(/\s+/g, " "); })
       .filter(function (s) { return s; });
     if (!names.length) { return; }
@@ -54,5 +52,25 @@
     });
     input.value = "";
     save().catch(function () { window.location.reload(); });
+  }
+
+  function suggested(value) {
+    var match = false;
+    document.querySelectorAll("#" + input.getAttribute("list") + " option").forEach(function (option) {
+      if (option.value === value) { match = true; }
+    });
+    return match;
+  }
+
+  input.addEventListener("keydown", function (event) {
+    if (event.key !== "Enter" && event.key !== ",") { return; }
+    event.preventDefault();
+    takeInput();
   });
+  // A click on a suggestion of the list is taken at once (browsers report it without a typed character).
+  input.addEventListener("input", function (event) {
+    if ((!event.inputType || event.inputType === "insertReplacementText") && suggested(input.value)) { takeInput(); }
+  });
+  // A typed name is taken when the field is left, so "Save" is never needed for it.
+  input.addEventListener("change", takeInput);
 })();
