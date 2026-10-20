@@ -72,7 +72,17 @@ async def lifespan(app: FastAPI):
 
 
 cfg_at_start = load_config()
-app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
+WIP_LIMIT = 20  # tasks shown in the "in progress" reminder of every page (D-028)
+
+
+def load_in_progress(request: Request, session: Session = Depends(get_session)) -> None:
+    """Every page shows the owner's tasks in progress as a reminder in the header."""
+    if request.method == "GET":
+        request.state.in_progress = todos.list_todos(session, now_utc(), status="in_progress", limit=WIP_LIMIT)[0]
+
+
+app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan,
+              dependencies=[Depends(load_in_progress)])
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=LOCAL_HOSTS + list(cfg_at_start.ui_allowed_hosts))
 templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
@@ -144,7 +154,8 @@ def render(request: Request, cfg: Config, name: str, status_code: int = 200, **c
         ("ui_discard_plaud_now" if immediate else "ui_discard_plaud_on") if cfg.delete_enabled else "ui_discard_plaud_off",
         min_age_hours=cfg.min_age_minutes // 60, wait_hours=cfg.permanent_delete_after_hours,
     )
-    context.update(t=t, lang=cfg.ui_lang, csrf=csrf_token(), plaud_note=plaud_note)
+    context.update(t=t, lang=cfg.ui_lang, csrf=csrf_token(), plaud_note=plaud_note,
+                   in_progress=getattr(request.state, "in_progress", []))
     return templates.TemplateResponse(request, name, context, status_code=status_code)
 
 
@@ -247,7 +258,7 @@ def _todo_error(exc: todos.TodoError) -> HTTPException:
 
 
 @app.get("/todos", response_class=HTMLResponse)
-def todo_list(request: Request, status: str = Query("open", max_length=10), topic: str = Query("", max_length=120),
+def todo_list(request: Request, status: str = Query("open", max_length=12), topic: str = Query("", max_length=120),
               sort: str = Query("priority", max_length=10), session: Session = Depends(get_session), cfg: Config = Depends(get_config)):
     if status not in todos.STATUSES or sort not in todos.SORTS:
         raise HTTPException(status_code=400, detail="invalid status or sort")
@@ -287,7 +298,7 @@ def todo_detail(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX
 def todo_edit(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX_ID)], title: str = Form("", max_length=todos.TITLE_MAX),
               detail: str = Form("", max_length=todos.DETAIL_MAX), priority: int = Form(3),
               due: str = Form("", max_length=10), topic: str = Form("", max_length=todos.TOPIC_MAX),
-              status: str = Form("open", max_length=10), csrf: str = Form(""),
+              status: str = Form("open", max_length=12), csrf: str = Form(""),
               back: str = Form("", max_length=20), session: Session = Depends(get_session)):
     require_csrf(request, csrf)
     try:
@@ -301,7 +312,7 @@ def todo_edit(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX_I
 
 
 @app.post("/todos/{todo_id}/status")
-def todo_status(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX_ID)], status: str = Form("", max_length=10), csrf: str = Form(""),
+def todo_status(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX_ID)], status: str = Form("", max_length=12), csrf: str = Form(""),
                 back: str = Form("", max_length=20), session: Session = Depends(get_session)):
     """One-click check-off from the list. The page script asks for JSON and updates the list in place."""
     require_csrf(request, csrf)
@@ -315,6 +326,8 @@ def todo_status(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX
         raise _todo_error(exc)
     if "application/json" in request.headers.get("accept", ""):
         return JSONResponse({"ok": True, "status": status, "previous": previous, "counts": todos.counts(session)})
+    if back == "page" and request.headers.get("referer", "").startswith(f"{request.url.scheme}://{request.headers.get('host')}/"):
+        return RedirectResponse(request.headers["referer"], status_code=303)
     return RedirectResponse("/todos" if back == "list" else f"/todos/{todo_id}", status_code=303)
 
 

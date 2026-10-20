@@ -340,3 +340,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner request. A same-origin script file keeps the protection of the policy: an injected text still cannot run code, because inline scripts stay forbidden. Checked in Chromium: no navigation, counts right, empty groups disappear, undo restores, no console errors. |
 | **Rejected alternatives** | (A) inline script with a nonce: more moving parts per response for the same effect; (B) a front-end framework: a dependency and a build step for one interaction; (C) no undo: an instant, silent removal makes a slip easy and hard to notice. |
 | **Status** | **FINAL** |
+
+### D-028: Status "in progress" and a reminder of those tasks on every page (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-20 |
+| **Decision** | Tasks get a fourth status `in_progress` (column widened to 20 characters, migration `004_todos_status_length`). It counts as unfinished: the filter `open` (UI tab, `list_todos`, counts, duplicate check, the 2000 limit, topic counters) covers `open` and `in_progress`; `in_progress` has its own tab and filter. Within a priority, tasks in progress come first. Starting is logged as event `started` and can be undone. In the list, "Start" and "Put back" change the row in place (the row stays, a marker shows the status). Every GET page loads the tasks in progress (at most 20, without excluded topics) through an app-wide dependency; if there are any, the header shows "In progress (n)", which opens a native HTML popover with "Done", "Put back" and "Note" (link to the task's detail text). A second script `/static/wip.js` opens the popover once per day by itself (date in `localStorage`) and updates it without reloading. Without JavaScript the buttons still work; the form returns to the page it came from, but only to a Referer of this host. |
+| **In plain words** | Tasks can be "In Arbeit". A button at the top of every page shows how many and lists them with "Erledigt" and "Zurückstellen"; once a day the list pops up by itself and asks how things are going. |
+| **Reasoning** | Owner request: a status in progress plus something to see those tasks as a reminder and for quick access. Counting them as open keeps the routine, MCP and the existing "Open" view unchanged in meaning: a started task is still to do. The popover API needs no inline script and no library. |
+| **Rejected alternatives** | (A) a modal that blocks every page until answered: annoying several times a day; (B) a separate page only: no reminder; (C) `in_progress` outside "open": tasks would vanish from the main list and from Claude's default view once started. |
+| **Status** | **FINAL** |

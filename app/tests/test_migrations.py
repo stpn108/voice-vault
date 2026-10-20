@@ -83,3 +83,9 @@ def test_failed_migration_is_rolled_back_and_not_recorded(memory_engine, monkeyp
     monkeypatch.setattr(database, "MIGRATIONS", [])
     database.migrate_schema(memory_engine)
     assert "001_broken" not in _applied_versions(memory_engine)
+
+
+def test_d028_status_column_fits_in_progress():
+    from database import MIGRATIONS, Todo
+    assert "004_todos_status_length" in [name for name, _ in MIGRATIONS]
+    assert Todo.__table__.c.status.type.length >= len("in_progress")

@@ -55,6 +55,16 @@
     event.preventDefault();
     var item = form.closest("li.task");
     var status = button.value;
+    var tab = toast.getAttribute("data-tab");
+    var shown = tab === "open" ? ["open", "in_progress"] : [tab];
+    if (shown.indexOf(status) !== -1) {
+      // Still belongs in this list (started or put back): update the row where it is.
+      post(form, status).then(function (result) {
+        setCounts(result.counts);
+        item.setAttribute("data-status", result.status);
+      }).catch(function () { form.dataset.plain = "1"; form.requestSubmit(button); });
+      return;
+    }
     item.classList.add("leaving");
     post(form, status).then(function (result) {
       setCounts(result.counts);

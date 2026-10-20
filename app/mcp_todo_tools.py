@@ -20,7 +20,8 @@ def _props(**properties) -> dict:
 TOOLS = [
     {
         "name": "list_todos",
-        "description": "List tasks, most urgent first." + UNTRUSTED,
+        "description": "List tasks, most urgent first. Status open lists every unfinished task: open ones and "
+                       "those in progress." + UNTRUSTED,
         "inputSchema": _props(
             status={"type": "string", "enum": list(svc.STATUSES), "default": "open"},
             topic={"type": "string", "description": "Only tasks of this topic."},
@@ -46,7 +47,8 @@ TOOLS = [
     },
     {
         "name": "update_todo",
-        "description": "Change a task, including its status: done, dropped (no longer relevant) or open again. "
+        "description": "Change a task, including its status: in_progress (being worked on), done, dropped (no "
+                       "longer relevant) or open again. "
                        "Only the given fields change. An empty string clears due or topic. The owner can undo "
                        "every change. Tasks cannot be deleted. " + PRIORITY_HELP,
         "inputSchema": {**_props(

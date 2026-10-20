@@ -235,3 +235,53 @@ def test_d027_the_script_is_served(client):
     response = client.get("/static/todos.js")
     assert response.status_code == 200 and "javascript" in response.headers["content-type"]
     assert "requestSubmit" in response.text
+
+
+# --- status in progress and the reminder in the header (D-028) ----------------------------------------
+def test_d028_starting_from_the_list_keeps_the_task_in_the_open_tab(client, make_todo):
+    todo = make_todo(title="Write offer")
+    body = client.post(f"/todos/{todo}/status", data={"csrf": webapp.csrf_token(), "status": "in_progress"},
+                       headers={"Accept": "application/json"}).json()
+    assert (body["status"], body["previous"]) == ("in_progress", "open")
+    assert body["counts"]["open"] == 1 and body["counts"]["in_progress"] == 1
+    html = client.get("/todos").text
+    assert "Write offer" in html and 'data-status="in_progress"' in html
+    assert "Write offer" in client.get("/todos?status=in_progress").text
+
+
+@pytest.mark.parametrize("url", ["/", "/todos", "/topics", "/digests"])
+def test_d028_every_page_reminds_of_the_tasks_in_progress(client, make_todo, url):
+    started = make_todo(title="Write offer")
+    make_todo(title="Call Anna")
+    post(client, f"/todos/{started}/status", status="in_progress")
+    html = client.get(url).text
+    panel = html[html.index('id="wip"'):html.index("</div>", html.index('class="wip-all"'))]
+    assert "popovertarget=\"wip\"" in html and "Write offer" in panel and "Call Anna" not in panel
+    assert '<script src="/static/wip.js" defer></script>' in html
+
+
+def test_d028_no_reminder_without_tasks_in_progress(client, make_todo):
+    make_todo(title="Call Anna")
+    html = client.get("/todos").text
+    assert 'id="wip"' not in html and "wip.js" not in html
+
+
+def test_d028_the_reminder_form_returns_to_the_page_it_came_from(client, make_todo):
+    todo = make_todo(title="Write offer")
+    response = client.post(f"/todos/{todo}/status", follow_redirects=False,
+                           data={"csrf": webapp.csrf_token(), "status": "done", "back": "page"},
+                           headers={"Referer": "http://localhost/topics"})
+    assert response.status_code == 303 and response.headers["location"] == "http://localhost/topics"
+
+
+def test_d028_the_reminder_never_redirects_to_another_site(client, make_todo):
+    todo = make_todo(title="Write offer")
+    response = client.post(f"/todos/{todo}/status", follow_redirects=False,
+                           data={"csrf": webapp.csrf_token(), "status": "done", "back": "page"},
+                           headers={"Referer": "http://localhost.evil.example/x"})
+    assert response.headers["location"] == f"/todos/{todo}"
+
+
+def test_d028_the_reminder_script_is_served(client):
+    response = client.get("/static/wip.js")
+    assert response.status_code == 200 and "showPopover" in response.text

@@ -27,25 +27,28 @@
 {% if grouped %}<h2 class="group-title"><span class="dot p{{ prio }}"></span>{{ t("todo_prio_" ~ prio) }}<span class="count">{{ items | length }}</span></h2>{% endif %}
 <ul class="list">
   {% for row in items %}
-  <li class="task {% if row.status != 'open' %}finished{% endif %}">
+  <li class="task {% if row.status not in ('open', 'in_progress') %}finished{% endif %}" data-status="{{ row.status }}">
     <form class="check" data-quick method="post" action="/todos/{{ row.id }}/status">
       <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="list">
-      {% if row.status == "open" %}<button class="check" type="submit" name="status" value="done" title="{{ t('ui_todo_check') }}" aria-label="{{ t('ui_todo_check') }}">✓</button>
+      {% if row.status in ("open", "in_progress") %}<button class="check" type="submit" name="status" value="done" title="{{ t('ui_todo_check') }}" aria-label="{{ t('ui_todo_check') }}">✓</button>
       {% else %}<button class="check" type="submit" name="status" value="open" title="{{ t('ui_todo_reopen') }}" aria-label="{{ t('ui_todo_reopen') }}" style="color:var(--ok);border-color:var(--ok)">✓</button>{% endif %}
     </form>
     <div class="task-main">
       <a class="task-title" href="/todos/{{ row.id }}">{{ row.title }}</a>
       <div class="task-meta">
-        {% if row.due_date %}<span class="due {% if row.status == 'open' and row.due_date < today %}overdue{% endif %}">{{ t("ui_overdue") if row.status == 'open' and row.due_date < today else t("ui_due") }} {{ row.due_date.strftime("%d.%m.") }}</span>{% endif %}
+        <span class="pill progress-chip">{{ t("todo_status_in_progress") }}</span>
+        {% set active = row.status in ('open', 'in_progress') %}{% if row.due_date %}<span class="due {% if active and row.due_date < today %}overdue{% endif %}">{{ t("ui_overdue") if active and row.due_date < today else t("ui_due") }} {{ row.due_date.strftime("%d.%m.") }}</span>{% endif %}
         {% if row.topic %}<a href="/todos?status={{ status }}&amp;sort={{ sort }}&amp;topic={{ row.topic | urlencode }}">{{ row.topic }}</a>{% endif %}
         {% if not grouped %}<span>{{ t("todo_prio_" ~ row.priority) }}</span>{% endif %}
         {% if row.created_by == "claude" %}<span class="by">Claude</span>{% endif %}
         <span>{{ row.age_days }} {{ t("ui_days") }}</span>
       </div>
     </div>
-    {% if row.status == "open" %}
+    {% if row.status in ("open", "in_progress") %}
     <form class="task-actions" data-quick method="post" action="/todos/{{ row.id }}/status">
       <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="list">
+      <button class="ghost btn-start" type="submit" name="status" value="in_progress">{{ t("ui_todo_start") }}</button>
+      <button class="ghost btn-pause" type="submit" name="status" value="open">{{ t("ui_todo_pause") }}</button>
       <button class="ghost" type="submit" name="status" value="dropped" title="{{ t('ui_todo_drop') }}">{{ t("ui_todo_drop_short") }}</button>
     </form>
     {% endif %}
@@ -57,7 +60,7 @@
 {% else %}
 <div class="card empty">{{ t("ui_todo_empty") }}</div>
 {% endif %}
-<div id="toast" class="toast" role="status" aria-live="polite" hidden
+<div id="toast" class="toast" role="status" aria-live="polite" hidden data-tab="{{ status }}"
      data-done="{{ t('todo_toast_done') }}" data-dropped="{{ t('todo_toast_dropped') }}" data-open="{{ t('todo_toast_open') }}">
   <span data-toast-text></span><button type="button">{{ t("ui_undo") }}</button>
 </div>

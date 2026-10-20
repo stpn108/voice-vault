@@ -155,6 +155,15 @@ TEXTS = {
     "todo_toast_done": {"de": "Erledigt", "en": "Done"},
     "todo_toast_dropped": {"de": "Als nicht relevant markiert", "en": "Marked as not relevant"},
     "todo_toast_open": {"de": "Wieder geöffnet", "en": "Reopened"},
+    "todo_status_in_progress": {"de": "In Arbeit", "en": "In progress"},
+    "todo_event_started": {"de": "begonnen", "en": "started"},
+    "ui_wip": {"de": "In Arbeit", "en": "In progress"},
+    "ui_wip_question": {"de": "Wie steht's damit?", "en": "How are these going?"},
+    "ui_wip_done": {"de": "Erledigt", "en": "Done"},
+    "ui_wip_note": {"de": "Notiz", "en": "Note"},
+    "ui_wip_all": {"de": "Alle anzeigen", "en": "Show all"},
+    "ui_todo_start": {"de": "Beginnen", "en": "Start"},
+    "ui_todo_pause": {"de": "Zurückstellen", "en": "Put back"},
     "ui_cleanup_confirm": {"de": "{count} Aufnahme(n) endgültig verwerfen", "en": "Discard {count} recording(s) for good"},
 }
 

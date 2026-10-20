@@ -23,7 +23,7 @@ def topic_counts(session: Session, topic_id: int) -> Optional[tuple]:
         return None
     tasks = session.scalars(select(Todo).where(Todo.topic_id == topic.id)).all()
     notes = session.scalar(select(func.count()).select_from(TopicNote).where(TopicNote.topic_id == topic.id))
-    return topic, sum(1 for t in tasks if t.status == "open"), len(tasks), notes
+    return topic, sum(1 for t in tasks if t.status in todo_service.ACTIVE), len(tasks), notes
 
 
 def delete_topic(session: Session, now: dt.datetime, topic_id: int, *, keep_excluded: bool = False) -> Optional[dict]:

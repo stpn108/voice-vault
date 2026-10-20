@@ -9,14 +9,14 @@
   <div class="head" style="margin-bottom:.4rem">
     <div style="flex:1;min-width:0">
       <input class="title-input" type="text" name="title" value="{{ row.title }}" maxlength="300" required aria-label="{{ t('ui_col_task') }}"></div>
-    <span class="pill state-{{ 'verified' if row.status == 'done' else 'waiting' if row.status == 'open' else '' }}">{{ t("todo_status_" ~ row.status) }}</span>
+    <span class="pill state-{{ 'verified' if row.status == 'done' else 'waiting' if row.status in ('open', 'in_progress') else '' }}">{{ t("todo_status_" ~ row.status) }}</span>
   </div>
   <p class="sub" style="margin:0 0 1.2rem">{{ t("ui_created_by") }} {{ row.created_by }}, {{ row.created_at | localtime }}
     {% if row.recording_id %} · <a href="/recordings/{{ row.recording_id }}">{{ t("ui_recording") }} {{ row.recording_id }}</a>{% endif %}
     {% if row.topic %} · <a href="/topics/{{ row.topic_id }}">{{ row.topic }}</a>{% endif %}</p>
   <div class="split">
     <div class="card"><label class="field"><span>{{ t("ui_detail") }}</span>
-      <textarea name="detail" rows="8" maxlength="4000">{{ row.detail }}</textarea></label></div>
+      <textarea id="detail" name="detail" rows="8" maxlength="4000">{{ row.detail }}</textarea></label></div>
     <div class="card">
       <label class="field"><span>{{ t("ui_status") }}</span><select name="status">{% for s in statuses %}<option value="{{ s }}" {% if s == row.status %}selected{% endif %}>{{ t("todo_status_" ~ s) }}</option>{% endfor %}</select></label>
       <label class="field"><span>{{ t("ui_col_prio") }}</span><select name="priority">{% for p in priorities %}<option value="{{ p }}" {% if p == row.priority %}selected{% endif %}>{{ t("todo_prio_" ~ p) }}</option>{% endfor %}</select></label>

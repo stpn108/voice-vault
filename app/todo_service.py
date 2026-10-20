@@ -23,13 +23,14 @@ log = logging.getLogger(__name__)
 
 PRIORITIES = (1, 2, 3, 4)  # 1 urgent, 2 high, 3 normal, 4 low
 DEFAULT_PRIORITY = 3
-STATUSES = ("open", "done", "dropped")
+STATUSES = ("open", "in_progress", "done", "dropped")
+ACTIVE = ("open", "in_progress")  # not finished; the list "open" shows both (D-028)
 ACTORS = ("claude", "owner")
 TITLE_MAX, DETAIL_MAX, NOTE_MAX, TOPIC_MAX, DIGEST_MAX = 300, 4000, 1000, 120, 20000
 LIST_LIMIT_MAX = 200
 MAX_OPEN_TASKS = 2000
 SIMILARITY_THRESHOLD = 0.6
-UNDOABLE_KINDS = ("updated", "completed", "reopened", "dropped")
+UNDOABLE_KINDS = ("updated", "completed", "reopened", "dropped", "started")
 UNSET = object()  # "argument not given", as opposed to None or "" which clear a field
 
 
@@ -191,7 +192,7 @@ def similar_open(session: Session, title: str, limit: int = 3) -> list:
     """Open tasks whose title is close to `title` (word overlap), most similar first."""
     wanted = _tokens(title)
     scored = []
-    stmt = select(Todo).where(Todo.status == "open")
+    stmt = select(Todo).where(Todo.status.in_(ACTIVE))
     hidden = _excluded_ids(session)
     if hidden:  # the tasks of an excluded topic must not show up, not even as "a similar task exists"
         stmt = stmt.where(Todo.topic_id.is_(None) | Todo.topic_id.not_in(hidden))
@@ -258,7 +259,7 @@ def create_todo(session: Session, now: dt.datetime, *, title: str, actor: str, p
     priority = _priority(priority)
     due_date = _due(due)
     recording_id = _visible_recording(session, recording_id)
-    open_tasks = session.scalar(select(func.count()).select_from(Todo).where(Todo.status == "open"))
+    open_tasks = session.scalar(select(func.count()).select_from(Todo).where(Todo.status.in_(ACTIVE)))
     if open_tasks >= MAX_OPEN_TASKS:
         raise TodoError(f"there are {open_tasks} open tasks already; finish or drop some first")
     if not allow_similar:
@@ -326,7 +327,7 @@ def update_todo(session: Session, now: dt.datetime, todo_id: int, *, actor: str,
     kind = "updated"
     if "status" in changes:
         changes["done_at"] = now.isoformat() if changes["status"] == "done" else None
-        kind = {"done": "completed", "open": "reopened", "dropped": "dropped"}[changes["status"]]
+        kind = {"done": "completed", "open": "reopened", "dropped": "dropped", "in_progress": "started"}[changes["status"]]
     before = {k: current[k] for k in changes}
     _apply(session, todo, changes)
     todo.updated_at = now
@@ -382,7 +383,9 @@ def _order(sort: str) -> tuple:
     """ORDER BY terms for a sort name. The id always breaks ties so paging and tests are stable."""
     if sort not in SORTS:
         raise TodoError(f"sort must be one of: {', '.join(SORTS)}")
-    by_priority = (Todo.priority, Todo.due_date.is_(None), Todo.due_date, Todo.created_at, Todo.id)
+    # Within a priority, the tasks being worked on come first.
+    by_priority = (Todo.priority, Todo.status != "in_progress", Todo.due_date.is_(None), Todo.due_date,
+                   Todo.created_at, Todo.id)
     return {
         "priority": by_priority,
         "due": (Todo.due_date.is_(None), Todo.due_date, Todo.priority, Todo.created_at, Todo.id),
@@ -403,7 +406,9 @@ def list_todos(session: Session, now: dt.datetime, *, status: str = "open", topi
         hidden = _excluded_ids(session)
         if hidden:
             stmt = stmt.where(Todo.topic_id.is_(None) | Todo.topic_id.not_in(hidden))
-    if status != "all":
+    if status == "open":
+        stmt = stmt.where(Todo.status.in_(ACTIVE))
+    elif status != "all":
         stmt = stmt.where(Todo.status == _status(status))
     if topic:
         found = session.scalar(select(Topic).where(func.lower(Topic.name) == topic.strip().lower()))
@@ -433,6 +438,7 @@ def counts(session: Session) -> dict:
         stmt = stmt.where(Todo.topic_id.is_(None) | Todo.topic_id.not_in(hidden))
     for status, number in session.execute(stmt):
         result[status] = number
+    result["open"] += result["in_progress"]  # "open" counts every unfinished task, like the list
     return result
 
 
@@ -461,7 +467,7 @@ def list_topics(session: Session) -> list:
     result = []
     for topic in session.scalars(select(Topic).order_by(Topic.name)):
         open_count = session.scalar(select(func.count()).select_from(Todo)
-                                    .where(Todo.topic_id == topic.id, Todo.status == "open"))
+                                    .where(Todo.topic_id == topic.id, Todo.status.in_(ACTIVE)))
         notes = session.scalars(select(TopicNote).where(TopicNote.topic_id == topic.id)).all()
         todos = session.scalars(select(Todo).where(Todo.topic_id == topic.id)).all()
         stamps = [as_utc(n.updated_at) for n in notes] + [as_utc(t.updated_at) for t in todos]

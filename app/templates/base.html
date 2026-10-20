@@ -148,6 +148,21 @@
   .segment:last-child { border-bottom: 0; } .segment .who { font-weight: 600; } .segment .at { color: var(--faint); font-size: .85rem; padding-top: .1rem; }
   .notice { border: 1px solid color-mix(in srgb, var(--warn) 50%, var(--line)); background: color-mix(in srgb, var(--warn) 10%, transparent); padding: .6rem 1rem; border-radius: .6rem; margin-bottom: 1rem; }
   .actions { margin-top: 1.4rem; display: flex; gap: .7rem; align-items: center; flex-wrap: wrap; }
+  .progress-chip { display: none; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+  li.task[data-status="in_progress"] .progress-chip { display: inline-flex; }
+  li.task[data-status="in_progress"] .btn-start, li.task[data-status="open"] .btn-pause { display: none; }
+  li.task[data-status="in_progress"] { box-shadow: inset 3px 0 0 var(--accent); }
+  button.wip-badge { font: inherit; font-size: .85rem; cursor: pointer; border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+    background: var(--accent-soft); color: var(--accent); border-radius: 999px; padding: .25rem .7rem; margin-right: .4rem; white-space: nowrap; }
+  .wip { margin: 3.6rem 1rem auto auto; width: min(26rem, calc(100vw - 2rem)); padding: .9rem 1rem; border: 1px solid var(--line);
+    border-radius: .8rem; background: var(--bg); color: var(--text); box-shadow: 0 12px 32px rgba(0,0,0,.18); }
+  .wip-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: .5rem; }
+  .wip ul { list-style: none; margin: 0; padding: 0; }
+  .wip li { padding: .55rem 0; border-top: 1px solid var(--line); }
+  .wip li a { color: var(--text); text-decoration: none; font-weight: 500; }
+  .wip form { display: flex; gap: .4rem; margin-top: .35rem; align-items: center; }
+  .wip form button, .wip form a.ghost { font-size: .8rem; padding: .2rem .55rem; }
+  .wip-all { display: inline-block; margin-top: .5rem; font-size: .85rem; color: var(--accent); }
   .task.leaving { opacity: 0; transform: translateX(10px); transition: opacity .18s ease, transform .18s ease; }
   .toast { position: fixed; left: 50%; bottom: 1.5rem; transform: translateX(-50%); z-index: 20; display: flex; gap: 1rem; align-items: center;
     background: var(--text); color: var(--bg); padding: .6rem .7rem .6rem 1.1rem; border-radius: .7rem; box-shadow: 0 6px 24px rgba(0,0,0,.18); font-weight: 500; }
@@ -155,7 +170,8 @@
   .toast button { background: transparent; color: var(--bg); border-color: color-mix(in srgb, var(--bg) 40%, transparent); padding: .25rem .8rem; }
   .toast button:hover { background: color-mix(in srgb, var(--bg) 15%, transparent); }
   @media (max-width: 44rem) { .split { grid-template-columns: 1fr; } .segment { grid-template-columns: 1fr; gap: 0; } .hide-small { display: none; }
-    header.top .wrap { overflow-x: auto; } a.brand span { display: none; } a.brand { margin-right: .4rem; } .wrap { padding: 0 1rem; } }
+    header.top .wrap { overflow-x: auto; } a.brand span { display: none; } a.brand { margin-right: .4rem; order: -2; }
+    button.wip-badge { order: -1; } .wrap { padding: 0 1rem; } }
 </style>
 </head>
 <body>
@@ -168,8 +184,30 @@
   <a class="nav {% if nav == 'topics' %}current{% endif %}" href="/topics">{{ t("ui_nav_topics") }}</a>
   <a class="nav {% if nav == 'digests' %}current{% endif %}" href="/digests">{{ t("ui_nav_digests") }}</a>
   <span class="spacer"></span>
+  {% if in_progress %}<button class="wip-badge" type="button" popovertarget="wip" data-wip-count>{{ t("ui_wip") }} <b>{{ in_progress|length }}</b></button>{% endif %}
   <a class="nav {% if nav == 'cleanup' %}current{% endif %}" href="/cleanup">{{ t("ui_cleanup") }}</a>
 </div></header>
+{% if in_progress %}
+<div id="wip" class="wip" popover>
+  <div class="wip-head"><strong>{{ t("ui_wip_question") }}</strong>
+    <button class="ghost" type="button" popovertarget="wip" popovertargetaction="hide" aria-label="×">×</button></div>
+  <ul>
+  {% for row in in_progress %}
+    <li data-wip-item>
+      <a href="/todos/{{ row.id }}">{{ row.title }}</a>
+      <form method="post" action="/todos/{{ row.id }}/status" data-wip>
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="page">
+        <button class="primary" type="submit" name="status" value="done">{{ t("ui_wip_done") }}</button>
+        <button class="ghost" type="submit" name="status" value="open">{{ t("ui_todo_pause") }}</button>
+        <a class="ghost" href="/todos/{{ row.id }}#detail">{{ t("ui_wip_note") }}</a>
+      </form>
+    </li>
+  {% endfor %}
+  </ul>
+  <a class="wip-all" href="/todos?status=in_progress">{{ t("ui_wip_all") }}</a>
+</div>
+<script src="/static/wip.js" defer></script>
+{% endif %}
 <main class="wrap">
 {% block crumbs %}{% endblock %}
 {% block content %}{% endblock %}

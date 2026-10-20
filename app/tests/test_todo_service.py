@@ -334,7 +334,7 @@ def test_counts_and_get_todo(db_session):
     a = make(db_session, "Alpha task here")
     make(db_session, "Beta task there")
     svc.update_todo(db_session, LATER, a.id, actor="owner", status="done")
-    assert svc.counts(db_session) == {"open": 1, "done": 1, "dropped": 0}
+    assert svc.counts(db_session) == {"open": 1, "in_progress": 0, "done": 1, "dropped": 0}
     row, evs = svc.get_todo(db_session, LATER, a.id)
     assert row.status == "done" and [e.kind for e in evs] == ["completed", "created"]
     assert svc.get_todo(db_session, LATER, 999) is None
@@ -494,3 +494,34 @@ def test_req_006_tasks_of_an_excluded_topic_are_hidden_but_come_back(db_session)
     assert [r.title for r in hidden] == ["Family trip"]
     svc.set_topic_excluded(db_session, "Family", False)
     assert len(svc.list_todos(db_session, NOW)[0]) == 2
+
+
+# --- status in progress (D-028) ------------------------------------------------------------------
+def test_d028_starting_a_task_is_logged_and_can_be_undone(db_session):
+    todo = make(db_session)
+    svc.update_todo(db_session, LATER, todo.id, actor="owner", status="in_progress")
+    row, evs = svc.get_todo(db_session, LATER, todo.id)
+    assert row.status == "in_progress" and evs[0].kind == "started"
+    svc.undo_event(db_session, LATER, evs[0].id, actor="owner")
+    assert svc.get_todo(db_session, LATER, todo.id)[0].status == "open"
+
+
+@pytest.mark.parametrize("status, expected", [
+    ("open", {"Started task here", "Waiting task there"}),
+    ("in_progress", {"Started task here"}),
+    ("done", set()),
+])
+def test_d028_the_open_list_includes_tasks_in_progress(db_session, status, expected):
+    started = make(db_session, "Started task here")
+    make(db_session, "Waiting task there")
+    svc.update_todo(db_session, LATER, started.id, actor="owner", status="in_progress")
+    assert {r.title for r in svc.list_todos(db_session, LATER, status=status)[0]} == expected
+
+
+def test_d028_counts_and_ordering_treat_in_progress_as_unfinished(db_session):
+    waiting = make(db_session, "Waiting task there", priority=2)
+    started = make(db_session, "Started task here", priority=2)
+    svc.update_todo(db_session, LATER, started.id, actor="owner", status="in_progress")
+    assert svc.counts(db_session) == {"open": 2, "in_progress": 1, "done": 0, "dropped": 0}
+    assert [r.id for r in svc.list_todos(db_session, LATER)[0]] == [started.id, waiting.id]
+    assert [r.title for r in svc.similar_open(db_session, "Started task here")] == ["Started task here"]

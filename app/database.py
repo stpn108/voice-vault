@@ -90,7 +90,7 @@ class Todo(Base):
     title: Mapped[str] = mapped_column(String(300))
     detail: Mapped[str] = mapped_column(Text, default="")
     priority: Mapped[int] = mapped_column(Integer, default=3)
-    status: Mapped[str] = mapped_column(String(10), default="open", index=True)
+    status: Mapped[str] = mapped_column(String(20), default="open", index=True)
     due_date: Mapped[Optional[dt.date]] = mapped_column(Date, nullable=True)
     topic_id: Mapped[Optional[int]] = mapped_column(ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True)
     recording_id: Mapped[Optional[int]] = mapped_column(ForeignKey("recordings.id", ondelete="SET NULL"), nullable=True)
@@ -233,10 +233,17 @@ def _migrate_003_topics_excluded(conn):
         ))
 
 
+def _migrate_004_todos_status_length(conn):
+    # "in_progress" (D-028) needs more than the 10 characters the column had.
+    if conn.dialect.name == "postgresql":
+        conn.execute(sqltext("ALTER TABLE IF EXISTS todos ALTER COLUMN status TYPE VARCHAR(20);"))
+
+
 MIGRATIONS: list = [
     ("001_recordings_discarded_at", _migrate_001_recordings_discarded_at),
     ("002_recordings_analyzed_at", _migrate_002_recordings_analyzed_at),
     ("003_topics_excluded", _migrate_003_topics_excluded),
+    ("004_todos_status_length", _migrate_004_todos_status_length),
 ]
 
 # Advisory lock key: serialises schema setup when several replicas start at

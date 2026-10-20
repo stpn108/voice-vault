@@ -194,3 +194,10 @@ def test_review_the_number_of_open_tasks_is_capped(client, session_factory, monk
         assert not is_error(call(client, "add_todo", {"title": f"task {i}", "allow_similar": True}))
     refused = call(client, "add_todo", {"title": "one more completely different thing"})
     assert is_error(refused) and "open tasks already" in text_of(refused)
+
+
+def test_d028_claude_can_start_a_task_and_open_still_lists_it(client):
+    todo_id = add(client, title="Write offer")
+    assert not is_error(call(client, "update_todo", {"id": todo_id, "status": "in_progress"}))
+    assert "Write offer" in text_of(call(client, "list_todos"))
+    assert "Write offer" in text_of(call(client, "list_todos", {"status": "in_progress"}))
