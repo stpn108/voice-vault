@@ -54,7 +54,7 @@ Once a day Claude reads the recordings that are new since its last run, adds the
 16. **Hardening after the security review (D-020).**
     Given a task in a topic the owner excluded, then Claude can neither find it through the duplicate check, nor change or move it (it gets the same answer as for an unknown id), nor see the topic name in `list_topics`. A digest or topic note that a later write replaces is kept as an earlier version; the digest page lists them. At most 2000 tasks may be open. The owner can let the routine read a recording again. A batch has at most 20 messages.
 17. **Status "in progress" and a reminder (D-028).**
-    Given a task the owner or Claude starts, then its status is `in_progress`; the "Open" tab and `list_todos` with status `open` still list it, first within its priority, and it has its own tab. Given any task in progress, then every page shows "In progress (n)" in the header; it opens a list with "Done", "Put back" and "Note" for each task, and the list opens by itself on the first page of a day.
+    Given a task the owner or Claude starts, then its status is `in_progress`; the "Open" tab and `list_todos` with status `open` still list it, first within its priority, and it has its own tab. Given any task in progress, then every page shows "In progress (n)" in the header; it opens a list with "Done", "Put back" and "Note" for each task. It opens only on a click. Every change of a status, in the list or in that panel, updates the count, the panel and the list without reloading (D-029). Tasks in progress are marked in amber.
 
 ## Out of scope
 

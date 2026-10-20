@@ -48,6 +48,31 @@
     hideTimer = setTimeout(function () { toast.hidden = true; }, 6000);
   }
 
+  function announce(result) {
+    document.dispatchEvent(new CustomEvent("todo:changed", { detail: { source: "list", result: result } }));
+  }
+
+  function belongsHere(status) {
+    var tab = toast.getAttribute("data-tab");
+    return (tab === "open" ? ["open", "in_progress"] : [tab]).indexOf(status) !== -1;
+  }
+
+  function leave(item) {
+    item.classList.add("leaving");
+    setTimeout(function () { item.hidden = true; }, 180);
+    adjustGroup(item, -1);
+  }
+
+  // Done or put back in the header list (wip.js): the row here follows.
+  document.addEventListener("todo:changed", function (event) {
+    if (event.detail.source !== "wip") { return; }
+    var result = event.detail.result;
+    setCounts(result.counts);
+    var item = document.querySelector('li.task[data-id="' + result.id + '"]');
+    if (!item || item.hidden) { return; }
+    if (belongsHere(result.status)) { item.setAttribute("data-status", result.status); } else { leave(item); }
+  });
+
   document.addEventListener("submit", function (event) {
     var form = event.target;
     var button = event.submitter;
@@ -55,13 +80,12 @@
     event.preventDefault();
     var item = form.closest("li.task");
     var status = button.value;
-    var tab = toast.getAttribute("data-tab");
-    var shown = tab === "open" ? ["open", "in_progress"] : [tab];
-    if (shown.indexOf(status) !== -1) {
+    if (belongsHere(status)) {
       // Still belongs in this list (started or put back): update the row where it is.
       post(form, status).then(function (result) {
         setCounts(result.counts);
         item.setAttribute("data-status", result.status);
+        announce(result);
       }).catch(function () { form.dataset.plain = "1"; form.requestSubmit(button); });
       return;
     }
@@ -70,12 +94,15 @@
       setCounts(result.counts);
       setTimeout(function () { item.hidden = true; }, 180);
       adjustGroup(item, -1);
+      announce(result);
       showToast(toast.getAttribute("data-" + status), function () {
         post(form, result.previous).then(function (back) {
           setCounts(back.counts);
           item.hidden = false;
           item.classList.remove("leaving");
+          item.setAttribute("data-status", back.status);
           adjustGroup(item, 1);
+          announce(back);
         }).catch(function () { window.location.reload(); });
       });
     }).catch(function () {

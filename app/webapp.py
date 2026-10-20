@@ -78,7 +78,13 @@ WIP_LIMIT = 20  # tasks shown in the "in progress" reminder of every page (D-028
 def load_in_progress(request: Request, session: Session = Depends(get_session)) -> None:
     """Every page shows the owner's tasks in progress as a reminder in the header."""
     if request.method == "GET":
-        request.state.in_progress = todos.list_todos(session, now_utc(), status="in_progress", limit=WIP_LIMIT)[0]
+        request.state.in_progress = _in_progress(session)
+        request.state.wip_count = todos.counts(session)["in_progress"]
+
+
+def _in_progress(session: Session) -> list:
+    rows = todos.list_todos(session, now_utc(), status="in_progress", limit=WIP_LIMIT)[0]
+    return [{"id": row.id, "title": row.title} for row in rows]
 
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan,
@@ -155,7 +161,8 @@ def render(request: Request, cfg: Config, name: str, status_code: int = 200, **c
         min_age_hours=cfg.min_age_minutes // 60, wait_hours=cfg.permanent_delete_after_hours,
     )
     context.update(t=t, lang=cfg.ui_lang, csrf=csrf_token(), plaud_note=plaud_note,
-                   in_progress=getattr(request.state, "in_progress", []))
+                   in_progress=getattr(request.state, "in_progress", []),
+                   wip_count=getattr(request.state, "wip_count", 0))
     return templates.TemplateResponse(request, name, context, status_code=status_code)
 
 
@@ -325,7 +332,8 @@ def todo_status(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX
             raise HTTPException(status_code=404, detail=str(exc))
         raise _todo_error(exc)
     if "application/json" in request.headers.get("accept", ""):
-        return JSONResponse({"ok": True, "status": status, "previous": previous, "counts": todos.counts(session)})
+        return JSONResponse({"ok": True, "id": todo_id, "status": status, "previous": previous,
+                             "counts": todos.counts(session), "in_progress": _in_progress(session)})
     if back == "page" and request.headers.get("referer", "").startswith(f"{request.url.scheme}://{request.headers.get('host')}/"):
         return RedirectResponse(request.headers["referer"], status_code=303)
     return RedirectResponse("/todos" if back == "list" else f"/todos/{todo_id}", status_code=303)

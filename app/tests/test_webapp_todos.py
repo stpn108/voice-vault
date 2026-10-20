@@ -260,10 +260,21 @@ def test_d028_every_page_reminds_of_the_tasks_in_progress(client, make_todo, url
     assert '<script src="/static/wip.js" defer></script>' in html
 
 
-def test_d028_no_reminder_without_tasks_in_progress(client, make_todo):
+def test_d029_without_tasks_in_progress_the_header_count_is_hidden_but_ready(client, make_todo):
     make_todo(title="Call Anna")
     html = client.get("/todos").text
-    assert 'id="wip"' not in html and "wip.js" not in html
+    assert 'data-wip-count hidden' in html and 'id="wip"' in html and "wip.js" in html
+
+
+def test_d029_every_change_answers_with_the_tasks_in_progress(client, make_todo):
+    started = make_todo(title="Write offer")
+    body = client.post(f"/todos/{started}/status", data={"csrf": webapp.csrf_token(), "status": "in_progress"},
+                       headers={"Accept": "application/json"}).json()
+    assert body["id"] == started and body["in_progress"] == [{"id": started, "title": "Write offer"}]
+    assert body["counts"]["in_progress"] == 1
+    done = client.post(f"/todos/{started}/status", data={"csrf": webapp.csrf_token(), "status": "done"},
+                       headers={"Accept": "application/json"}).json()
+    assert done["in_progress"] == [] and done["counts"]["in_progress"] == 0
 
 
 def test_d028_the_reminder_form_returns_to_the_page_it_came_from(client, make_todo):
@@ -282,6 +293,7 @@ def test_d028_the_reminder_never_redirects_to_another_site(client, make_todo):
     assert response.headers["location"] == f"/todos/{todo}"
 
 
-def test_d028_the_reminder_script_is_served(client):
+def test_d029_the_reminder_script_never_opens_by_itself(client):
     response = client.get("/static/wip.js")
-    assert response.status_code == 200 and "showPopover" in response.text
+    assert response.status_code == 200 and "todo:changed" in response.text
+    assert "showPopover" not in response.text and "localStorage" not in response.text

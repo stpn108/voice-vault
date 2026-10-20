@@ -27,7 +27,7 @@
 {% if grouped %}<h2 class="group-title"><span class="dot p{{ prio }}"></span>{{ t("todo_prio_" ~ prio) }}<span class="count">{{ items | length }}</span></h2>{% endif %}
 <ul class="list">
   {% for row in items %}
-  <li class="task {% if row.status not in ('open', 'in_progress') %}finished{% endif %}" data-status="{{ row.status }}">
+  <li class="task {% if row.status not in ('open', 'in_progress') %}finished{% endif %}" data-status="{{ row.status }}" data-id="{{ row.id }}">
     <form class="check" data-quick method="post" action="/todos/{{ row.id }}/status">
       <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="list">
       {% if row.status in ("open", "in_progress") %}<button class="check" type="submit" name="status" value="done" title="{{ t('ui_todo_check') }}" aria-label="{{ t('ui_todo_check') }}">✓</button>

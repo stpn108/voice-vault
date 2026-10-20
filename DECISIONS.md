@@ -351,3 +351,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner request: a status in progress plus something to see those tasks as a reminder and for quick access. Counting them as open keeps the routine, MCP and the existing "Open" view unchanged in meaning: a started task is still to do. The popover API needs no inline script and no library. |
 | **Rejected alternatives** | (A) a modal that blocks every page until answered: annoying several times a day; (B) a separate page only: no reminder; (C) `in_progress` outside "open": tasks would vanish from the main list and from Claude's default view once started. |
 | **Status** | **FINAL** |
+
+### D-029: The in-progress reminder opens only on click, follows every change live, and "in progress" is amber (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-20 |
+| **Decision** | Amends D-028. The popover no longer opens by itself (no `localStorage`). The header count and the popover are always in the page (hidden at zero). Every JSON answer of `/todos/{id}/status` carries the task id and the current tasks in progress (`in_progress`, at most 20, id and title); `wip.js` rebuilds the panel from it with text-only DOM nodes and sets the count from `counts.in_progress`. The two scripts talk through one `todo:changed` event: a change in the list updates the header, a change in the panel updates the row and the tab counts in the list. Colours: open stays neutral, in progress is amber (`--progress`: chip, left bar, light row tint, header count), done stays green, red stays reserved for urgent and overdue. |
+| **In plain words** | The list at the top only opens when you click it. Starting, finishing or putting back a task changes the number at the top straight away. "In Arbeit" is now amber, so it stands out. |
+| **Reasoning** | Owner feedback: the automatic popup was irritating, the count needed a reload, and the blue marker was hard to see (blue is also the "normal" priority). Amber for "in progress" follows the common traffic-light pattern of task tools (grey open, amber/yellow in progress, green done); red would collide with "urgent" and "overdue". |
+| **Rejected alternatives** | (A) reload the page after a change: loses the scroll position, the reason for D-027; (B) a second request for the panel after each change: one more round trip for data the answer can carry; (C) red for in progress: already means urgent/overdue here. |
+| **Status** | **FINAL** |

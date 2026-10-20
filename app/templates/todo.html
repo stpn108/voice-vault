@@ -9,7 +9,7 @@
   <div class="head" style="margin-bottom:.4rem">
     <div style="flex:1;min-width:0">
       <input class="title-input" type="text" name="title" value="{{ row.title }}" maxlength="300" required aria-label="{{ t('ui_col_task') }}"></div>
-    <span class="pill state-{{ 'verified' if row.status == 'done' else 'waiting' if row.status in ('open', 'in_progress') else '' }}">{{ t("todo_status_" ~ row.status) }}</span>
+    <span class="pill state-{{ 'verified' if row.status == 'done' else 'progress' if row.status == 'in_progress' else 'waiting' if row.status == 'open' else '' }}">{{ t("todo_status_" ~ row.status) }}</span>
   </div>
   <p class="sub" style="margin:0 0 1.2rem">{{ t("ui_created_by") }} {{ row.created_by }}, {{ row.created_at | localtime }}
     {% if row.recording_id %} · <a href="/recordings/{{ row.recording_id }}">{{ t("ui_recording") }} {{ row.recording_id }}</a>{% endif %}
