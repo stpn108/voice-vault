@@ -266,12 +266,14 @@ def _todo_error(exc: todos.TodoError) -> HTTPException:
 
 @app.get("/todos", response_class=HTMLResponse)
 def todo_list(request: Request, status: str = Query("open", max_length=12), topic: str = Query("", max_length=120),
+              person: str = Query("", max_length=todos.PERSON_MAX),
               sort: str = Query("priority", max_length=10), session: Session = Depends(get_session), cfg: Config = Depends(get_config)):
     if status not in todos.STATUSES or sort not in todos.SORTS:
         raise HTTPException(status_code=400, detail="invalid status or sort")
-    rows, truncated = todos.list_todos(session, now_utc(), status=status, topic=topic or None,
+    rows, truncated = todos.list_todos(session, now_utc(), status=status, topic=topic or None, person=person or None,
                                        limit=todos.LIST_LIMIT_MAX, sort=sort)
-    return render(request, cfg, "todos.html", rows=rows, truncated=truncated, status=status, topic=topic, sort=sort, sorts=todos.SORTS,
+    return render(request, cfg, "todos.html", rows=rows, truncated=truncated, status=status, topic=topic, person=person,
+                  sort=sort, sorts=todos.SORTS,
                   today=now_utc().astimezone(LOCAL_TZ).date(),
                   counts=todos.counts(session), statuses=todos.STATUSES, priorities=todos.PRIORITIES)
 
@@ -297,20 +299,25 @@ def todo_detail(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX
         raise HTTPException(status_code=404, detail="task not found")
     row, events = found
     undoable = events[0].id if events and events[0].kind in todos.UNDOABLE_KINDS else None
-    return render(request, cfg, "todo.html", row=row, events=events, undoable=undoable,
-                  statuses=todos.STATUSES, priorities=todos.PRIORITIES)
+    speakers = todos.speakers_of(session, row.recording_id)
+    # The speakers of the task's recording are offered as checkboxes; the people already named stay ticked.
+    candidates = row.people + [s for s in speakers if s.lower() not in {p.lower() for p in row.people}]
+    return render(request, cfg, "todo.html", row=row, events=events, undoable=undoable, candidates=candidates,
+                  speakers=speakers, known=todos.known_people(session), statuses=todos.STATUSES, priorities=todos.PRIORITIES)
 
 
 @app.post("/todos/{todo_id}")
 def todo_edit(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX_ID)], title: str = Form("", max_length=todos.TITLE_MAX),
               detail: str = Form("", max_length=todos.DETAIL_MAX), priority: int = Form(3),
               due: str = Form("", max_length=10), topic: str = Form("", max_length=todos.TOPIC_MAX),
-              status: str = Form("open", max_length=12), csrf: str = Form(""),
+              status: str = Form("open", max_length=12), people: list[str] = Form([]),
+              people_more: str = Form("", max_length=400), csrf: str = Form(""),
               back: str = Form("", max_length=20), session: Session = Depends(get_session)):
     require_csrf(request, csrf)
+    names = people + people_more.split(",")
     try:
         todos.update_todo(session, now_utc(), todo_id, actor="owner", title=title, detail=detail,
-                          priority=priority, due=due, topic=topic, status=status)
+                          priority=priority, due=due, topic=topic, status=status, people=names)
     except todos.TodoError as exc:
         if "no task" in str(exc):
             raise HTTPException(status_code=404, detail=str(exc))

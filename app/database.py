@@ -98,6 +98,8 @@ class Todo(Base):
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     done_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Whom the owner has to talk to about it (D-030): names, one per line.
+    people: Mapped[str] = mapped_column(Text, default="", server_default="")
 
 
 class TodoEvent(Base):
@@ -239,11 +241,17 @@ def _migrate_004_todos_status_length(conn):
         conn.execute(sqltext("ALTER TABLE IF EXISTS todos ALTER COLUMN status TYPE VARCHAR(20);"))
 
 
+def _migrate_005_todos_people(conn):
+    if conn.dialect.name == "postgresql":
+        conn.execute(sqltext("ALTER TABLE IF EXISTS todos ADD COLUMN IF NOT EXISTS people TEXT NOT NULL DEFAULT '';"))
+
+
 MIGRATIONS: list = [
     ("001_recordings_discarded_at", _migrate_001_recordings_discarded_at),
     ("002_recordings_analyzed_at", _migrate_002_recordings_analyzed_at),
     ("003_topics_excluded", _migrate_003_topics_excluded),
     ("004_todos_status_length", _migrate_004_todos_status_length),
+    ("005_todos_people", _migrate_005_todos_people),
 ]
 
 # Advisory lock key: serialises schema setup when several replicas start at

@@ -362,3 +362,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner feedback: the automatic popup was irritating, the count needed a reload, and the blue marker was hard to see (blue is also the "normal" priority). Amber for "in progress" follows the common traffic-light pattern of task tools (grey open, amber/yellow in progress, green done); red would collide with "urgent" and "overdue". |
 | **Rejected alternatives** | (A) reload the page after a change: loses the scroll position, the reason for D-027; (B) a second request for the panel after each change: one more round trip for data the answer can carry; (C) red for in progress: already means urgent/overdue here. |
 | **Status** | **FINAL** |
+
+### D-030: Tasks name the people to talk to, stored on the task, suggested from the transcript speakers (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-20 |
+| **Decision** | A task gets a list of people (at most 10 names of at most 80 characters; duplicates in any case removed), stored in a new column `todos.people` as one name per line (migration `005_todos_people`). Changing the list is an ordinary task change: logged as `updated`, undoable, the same for adding and for taking a name off. The task page shows the people already named plus the speaker names of the task's recording as checkboxes; Plaud labels that match `UNNAMED_SPEAKER` are left out. A text field (comma-separated) takes more names and suggests every known name: names on tasks and speaker names of recordings not discarded. In the list, each name is a chip that filters by that person (`?person=`, whole name, any case, LIKE wildcards escaped). MCP: `add_todo` and `update_todo` take `people` (update replaces the whole list, `[]` clears it), `list_todos` takes `person` and prints the names. |
+| **In plain words** | You can note on a task with whom you have to talk. The names from the recording are offered for ticking; untick a name to take it off. A click on a name shows all tasks with that person. |
+| **Reasoning** | Owner request, names ideally from the transcripts, and taking a name off again must be possible. A column on the task keeps the people inside the task's snapshot, so history and undo work without extra code, and the service keeps its rule of never deleting rows. |
+| **Rejected alternatives** | (A) a `people` table with a link table: needs deleting link rows to take a name off, which the service rule forbids, and its own history; (B) free text in the detail field: no filter, no suggestions; (C) a people page with merge and rename: not asked for; a misspelt name is fixed by ticking the right one. |
+| **Status** | **FINAL** |

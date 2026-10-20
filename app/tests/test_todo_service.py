@@ -525,3 +525,60 @@ def test_d028_counts_and_ordering_treat_in_progress_as_unfinished(db_session):
     assert svc.counts(db_session) == {"open": 2, "in_progress": 1, "done": 0, "dropped": 0}
     assert [r.id for r in svc.list_todos(db_session, LATER)[0]] == [started.id, waiting.id]
     assert [r.title for r in svc.similar_open(db_session, "Started task here")] == ["Started task here"]
+
+
+# --- people to talk to (D-030) ---------------------------------------------------------------------
+def name_speakers(session, recording, *names):
+    from database import Segment
+    for i, name in enumerate(names):
+        session.add(Segment(recording_id=recording.id, idx=100 + i, speaker=name, text="x"))
+    session.commit()
+
+
+def test_d030_people_are_stored_logged_and_undoable(db_session):
+    todo = svc.create_todo(db_session, NOW, title="Discuss budget", actor="owner", people=["Jochen Rill", " anna "])
+    assert svc.get_todo(db_session, LATER, todo.id)[0].people == ["anna", "Jochen Rill"]
+    svc.update_todo(db_session, LATER, todo.id, actor="owner", people=["Jochen Rill"])
+    row, evs = svc.get_todo(db_session, LATER, todo.id)
+    assert row.people == ["Jochen Rill"] and evs[0].kind == "updated"
+    svc.undo_event(db_session, LATER, evs[0].id)
+    assert svc.get_todo(db_session, LATER, todo.id)[0].people == ["anna", "Jochen Rill"]
+
+
+def test_d030_same_people_in_another_case_or_order_change_nothing(db_session):
+    todo = svc.create_todo(db_session, NOW, title="Discuss budget", actor="owner", people=["Jochen", "Anna"])
+    assert svc.update_todo(db_session, LATER, todo.id, actor="owner", people=["anna", "JOCHEN"])[1] is False
+
+
+@pytest.mark.parametrize("people, message", [
+    ("Jochen", "list of names"),
+    (["x" * (svc.PERSON_MAX + 1)], "at most"),
+    ([f"P{i}" for i in range(svc.PEOPLE_PER_TASK + 1)], "at most"),
+    ([3], "must be text"),
+])
+def test_d030_invalid_people_are_rejected(db_session, people, message):
+    with pytest.raises(svc.TodoError, match=message):
+        svc.create_todo(db_session, NOW, title="Discuss budget", actor="owner", people=people)
+
+
+@pytest.mark.parametrize("person, expected", [
+    ("jochen rill", {"Discuss budget"}),
+    ("Anna", {"Discuss budget", "Call back"}),
+    ("Jochen", set()),          # only whole names match
+    ("100%", set()),            # LIKE wildcards are matched literally
+])
+def test_d030_list_filters_by_person(db_session, person, expected):
+    svc.create_todo(db_session, NOW, title="Discuss budget", actor="owner", people=["Jochen Rill", "Anna"])
+    svc.create_todo(db_session, NOW, title="Call back", actor="owner", people=["Anna"])
+    svc.create_todo(db_session, NOW, title="Alone", actor="owner")
+    assert {r.title for r in svc.list_todos(db_session, LATER, person=person)[0]} == expected
+
+
+def test_d030_speaker_names_come_from_the_transcript_without_plaud_labels(db_session):
+    rec = add_recording(db_session, 1)  # segments labelled "Speaker 0/1"
+    name_speakers(db_session, rec, "Jochen Rill", "Dennis", "Sprecher 3")
+    gone = add_recording(db_session, 2, discarded_at=NOW)
+    name_speakers(db_session, gone, "Secret Person")
+    svc.create_todo(db_session, NOW, title="Ask Anna", actor="owner", people=["Anna"])
+    assert svc.speakers_of(db_session, rec.id) == ["Dennis", "Jochen Rill"]
+    assert svc.known_people(db_session) == ["Anna", "Dennis", "Jochen Rill"]

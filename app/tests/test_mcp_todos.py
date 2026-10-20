@@ -201,3 +201,11 @@ def test_d028_claude_can_start_a_task_and_open_still_lists_it(client):
     assert not is_error(call(client, "update_todo", {"id": todo_id, "status": "in_progress"}))
     assert "Write offer" in text_of(call(client, "list_todos"))
     assert "Write offer" in text_of(call(client, "list_todos", {"status": "in_progress"}))
+
+
+def test_d030_claude_names_people_and_filters_by_them(client):
+    todo_id = add(client, title="Discuss budget", people=["Jochen Rill"])
+    assert "people Jochen Rill" in text_of(call(client, "list_todos", {"person": "jochen rill"}))
+    call(client, "update_todo", {"id": todo_id, "people": []})
+    assert "No open tasks" in text_of(call(client, "list_todos", {"person": "Jochen Rill"}))
+    assert "error" in call(client, "add_todo", {"title": "Bad", "people": "Jochen"}).json()

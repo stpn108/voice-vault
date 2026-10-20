@@ -10,13 +10,14 @@ import datetime as dt
 import json
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
-from sqlalchemy import func, select
+from sqlalchemy import func, literal, select
 from sqlalchemy.orm import Session
 
-from database import Digest, Recording, TextVersion, Todo, TodoEvent, Topic, TopicNote
+from database import Digest, Recording, Segment, TextVersion, Todo, TodoEvent, Topic, TopicNote
+from import_service import UNNAMED_SPEAKER
 from utils import as_utc, day_bounds, local_day
 
 log = logging.getLogger(__name__)
@@ -27,6 +28,7 @@ STATUSES = ("open", "in_progress", "done", "dropped")
 ACTIVE = ("open", "in_progress")  # not finished; the list "open" shows both (D-028)
 ACTORS = ("claude", "owner")
 TITLE_MAX, DETAIL_MAX, NOTE_MAX, TOPIC_MAX, DIGEST_MAX = 300, 4000, 1000, 120, 20000
+PERSON_MAX, PEOPLE_PER_TASK = 80, 10
 LIST_LIMIT_MAX = 200
 MAX_OPEN_TASKS = 2000
 SIMILARITY_THRESHOLD = 0.6
@@ -60,6 +62,7 @@ class TodoRow:
     done_at: Optional[dt.datetime]
     age_days: int
     topic_id: Optional[int] = None
+    people: list = field(default_factory=list)
 
 
 # --- validation -------------------------------------------------------------------------
@@ -115,6 +118,46 @@ def _visible_recording(session: Session, recording_id: Optional[int]) -> Optiona
     if rec is None or rec.discarded_at is not None:
         raise TodoError(f"no recording with id {recording_id}")
     return recording_id
+
+
+# --- people (D-030) ------------------------------------------------------------------------
+def _people(value) -> list:
+    """Validated names, duplicates (any case) removed, in the given order."""
+    if not isinstance(value, (list, tuple)):
+        raise TodoError("people must be a list of names")
+    names, seen = [], set()
+    for item in value:
+        name = " ".join(_text(item, "person", PERSON_MAX).split())
+        if name and name.lower() not in seen:
+            seen.add(name.lower())
+            names.append(name)
+    if len(names) > PEOPLE_PER_TASK:
+        raise TodoError(f"a task can name at most {PEOPLE_PER_TASK} people")
+    return names
+
+
+def _names_of(todo: Todo) -> list:
+    return [n for n in (todo.people or "").split("\n") if n]
+
+
+def speakers_of(session: Session, recording_id: Optional[int]) -> list:
+    """The names given to the speakers of a recording; Plaud's "Speaker 1" labels are left out."""
+    if recording_id is None:
+        return []
+    labels = session.scalars(select(Segment.speaker).where(Segment.recording_id == recording_id).distinct()).all()
+    return sorted({" ".join(s.split()) for s in labels if s and len(s) <= PERSON_MAX and not UNNAMED_SPEAKER.match(s)},
+                  key=str.lower)
+
+
+def known_people(session: Session) -> list:
+    """Every name already on a task, and every speaker name of a recording still kept."""
+    labels = session.scalars(select(Segment.speaker).join(Recording, Recording.id == Segment.recording_id)
+                             .where(Recording.discarded_at.is_(None)).distinct()).all()
+    names = {" ".join(s.split()) for s in labels if s and len(s) <= PERSON_MAX and not UNNAMED_SPEAKER.match(s)}
+    by_key = {n.lower(): n for n in names}
+    for stored in session.scalars(select(Todo.people).where(Todo.people != "")):
+        by_key.update({n.lower(): n for n in stored.split("\n") if n})
+    return sorted(by_key.values(), key=str.lower)
 
 
 # --- topics -----------------------------------------------------------------------------
@@ -208,7 +251,7 @@ def similar_open(session: Session, title: str, limit: int = 3) -> list:
     return [todo for _, todo in scored[:limit]]
 
 
-FIELDS = ("title", "detail", "priority", "status", "due", "topic", "done_at")
+FIELDS = ("title", "detail", "priority", "status", "due", "topic", "people", "done_at")
 
 
 def _snapshot(session: Session, todo: Todo, fields=FIELDS) -> dict:
@@ -217,6 +260,7 @@ def _snapshot(session: Session, todo: Todo, fields=FIELDS) -> dict:
         "title": todo.title, "detail": todo.detail, "priority": todo.priority, "status": todo.status,
         "due": todo.due_date.isoformat() if todo.due_date else None,
         "topic": _topic_name(session, todo.topic_id),
+        "people": sorted(_names_of(todo), key=str.lower),
         "done_at": as_utc(todo.done_at).isoformat() if todo.done_at else None,
     }
     return {k: values[k] for k in fields}
@@ -234,6 +278,8 @@ def _apply(session: Session, todo: Todo, values: dict) -> None:
         todo.due_date = _due(values["due"])
     if "topic" in values:
         todo.topic_id = get_or_create_topic(session, values["topic"]).id if values["topic"] else None
+    if "people" in values:
+        todo.people = "\n".join(values["people"])
     if "status" in values:
         todo.status = values["status"]
     if "done_at" in values:
@@ -251,12 +297,13 @@ def _log(session: Session, now: dt.datetime, todo: Todo, kind: str, actor: str, 
 
 def create_todo(session: Session, now: dt.datetime, *, title: str, actor: str, priority=DEFAULT_PRIORITY,
                 detail: str = "", due=None, topic: Optional[str] = None, recording_id: Optional[int] = None,
-                note: str = "", allow_similar: bool = False) -> Todo:
+                note: str = "", allow_similar: bool = False, people=()) -> Todo:
     actor = _actor(actor)
     title = _text(title, "title", TITLE_MAX, required=True)
     detail = _text(detail, "detail", DETAIL_MAX)
     note = _text(note, "note", NOTE_MAX)
     priority = _priority(priority)
+    people = _people(people)
     due_date = _due(due)
     recording_id = _visible_recording(session, recording_id)
     open_tasks = session.scalar(select(func.count()).select_from(Todo).where(Todo.status.in_(ACTIVE)))
@@ -269,11 +316,12 @@ def create_todo(session: Session, now: dt.datetime, *, title: str, actor: str, p
     topic_row = _writable_topic(session, topic) if topic else None
     todo = Todo(title=title, detail=detail, priority=priority, status="open", due_date=due_date,
                 topic_id=topic_row.id if topic_row else None, recording_id=recording_id, created_by=actor,
+                people="\n".join(people),
                 created_at=now, updated_at=now)
     session.add(todo)
     session.flush()
     _log(session, now, todo, "created", actor, recording_id, note, {},
-         _snapshot(session, todo, ("title", "priority", "status", "due", "topic")))
+         _snapshot(session, todo, ("title", "priority", "status", "due", "topic", "people")))
     session.commit()
     log.info("Todo created id=%s actor=%s priority=%s", todo.id, actor, priority)
     return todo
@@ -295,17 +343,21 @@ def _requested_changes(todo_fields: dict) -> dict:
         wanted["topic"] = _text(todo_fields["topic"], "topic", TOPIC_MAX) or None
     if todo_fields["status"] is not UNSET:
         wanted["status"] = _status(todo_fields["status"])
+    if todo_fields["people"] is not UNSET:
+        wanted["people"] = _people(todo_fields["people"])
     return wanted
 
 
 def _differs(field: str, wanted, current) -> bool:
     if field == "topic":  # topic names are matched without regard to case
         return (wanted or "").lower() != (current or "").lower()
+    if field == "people":
+        return sorted(n.lower() for n in wanted) != sorted(n.lower() for n in current)
     return wanted != current
 
 
 def update_todo(session: Session, now: dt.datetime, todo_id: int, *, actor: str, title=UNSET, detail=UNSET,
-                priority=UNSET, due=UNSET, topic=UNSET, status=UNSET, recording_id: Optional[int] = None,
+                priority=UNSET, due=UNSET, topic=UNSET, status=UNSET, people=UNSET, recording_id: Optional[int] = None,
                 note: str = "") -> tuple:
     """Change a task. Returns (todo, changed). Fields left at UNSET stay as they are."""
     actor = _actor(actor)
@@ -316,7 +368,7 @@ def update_todo(session: Session, now: dt.datetime, todo_id: int, *, actor: str,
     note = _text(note, "note", NOTE_MAX)
     recording_id = _visible_recording(session, recording_id)
     wanted = _requested_changes({"title": title, "detail": detail, "priority": priority, "due": due,
-                                 "topic": topic, "status": status})
+                                 "topic": topic, "status": status, "people": people})
     current = _snapshot(session, todo)
     changes = {k: v for k, v in wanted.items() if _differs(k, v, current[k])}
     if not changes:
@@ -371,7 +423,7 @@ def _rows(session: Session, todos: list, now: dt.datetime) -> list:
     return [
         TodoRow(t.id, t.title, t.detail, t.priority, t.status, t.due_date, topics.get(t.topic_id), t.recording_id,
                 t.created_by, as_utc(t.created_at), as_utc(t.done_at) if t.done_at else None,
-                max((now - as_utc(t.created_at)).days, 0), t.topic_id)
+                max((now - as_utc(t.created_at)).days, 0), t.topic_id, sorted(_names_of(t), key=str.lower))
         for t in todos
     ]
 
@@ -397,7 +449,7 @@ def _order(sort: str) -> tuple:
 
 
 def list_todos(session: Session, now: dt.datetime, *, status: str = "open", topic: Optional[str] = None,
-               limit: int = 50, include_excluded: bool = False, sort: str = "priority") -> tuple:
+               person: Optional[str] = None, limit: int = 50, include_excluded: bool = False, sort: str = "priority") -> tuple:
     """Without tasks of excluded topics; most urgent first unless `sort` says otherwise.
     Returns (rows, truncated)."""
     limit = min(max(limit, 1), LIST_LIMIT_MAX)
@@ -415,6 +467,9 @@ def list_todos(session: Session, now: dt.datetime, *, status: str = "open", topi
         if found is None:
             return [], False
         stmt = stmt.where(Todo.topic_id == found.id)
+    if person:
+        line = "\n" + " ".join(person.split()).lower() + "\n"
+        stmt = stmt.where(func.lower(literal("\n") + Todo.people + literal("\n")).contains(line, autoescape=True))
     stmt = stmt.order_by(*_order(sort)).limit(limit + 1)
     found_rows = session.scalars(stmt).all()
     return _rows(session, found_rows[:limit], now), len(found_rows) > limit

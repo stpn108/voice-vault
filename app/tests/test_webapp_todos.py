@@ -297,3 +297,26 @@ def test_d029_the_reminder_script_never_opens_by_itself(client):
     response = client.get("/static/wip.js")
     assert response.status_code == 200 and "todo:changed" in response.text
     assert "showPopover" not in response.text and "localStorage" not in response.text
+
+
+# --- people to talk to (D-030) -------------------------------------------------------------------
+def test_d030_detail_offers_the_recording_speakers_and_saves_the_ticked_ones(client, make_todo, session_factory):
+    from database import Segment
+    with session_factory() as s:
+        rec = add_recording(s, 1)
+        s.add_all([Segment(recording_id=rec.id, idx=50, speaker="Jochen Rill", text="x"),
+                   Segment(recording_id=rec.id, idx=51, speaker="<b>Eve</b>", text="x")])
+        s.commit()
+        rec_id = rec.id
+    todo = make_todo(title="Discuss budget", recording_id=rec_id)
+    html = client.get(f"/todos/{todo}").text
+    assert 'name="people" value="Jochen Rill"' in html and "&lt;b&gt;Eve&lt;/b&gt;" in html and "<b>Eve" not in html
+    response = client.post(f"/todos/{todo}", follow_redirects=False, data={
+        "csrf": webapp.csrf_token(), "title": "Discuss budget", "priority": "3", "status": "open",
+        "people": ["Jochen Rill"], "people_more": "Anna, , anna"})
+    assert response.status_code == 303
+    html = client.get("/todos").text
+    assert 'class="person" href="/todos?status=open&amp;sort=priority&amp;person=Anna"' in html
+    filtered = client.get("/todos?person=Jochen%20Rill").text
+    assert "Discuss budget" in filtered and "Person: <strong>Jochen Rill</strong>" in filtered
+    assert "Discuss budget" not in client.get("/todos?person=Eve").text

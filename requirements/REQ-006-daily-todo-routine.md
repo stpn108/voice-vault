@@ -55,6 +55,8 @@ Once a day Claude reads the recordings that are new since its last run, adds the
     Given a task in a topic the owner excluded, then Claude can neither find it through the duplicate check, nor change or move it (it gets the same answer as for an unknown id), nor see the topic name in `list_topics`. A digest or topic note that a later write replaces is kept as an earlier version; the digest page lists them. At most 2000 tasks may be open. The owner can let the routine read a recording again. A batch has at most 20 messages.
 17. **Status "in progress" and a reminder (D-028).**
     Given a task the owner or Claude starts, then its status is `in_progress`; the "Open" tab and `list_todos` with status `open` still list it, first within its priority, and it has its own tab. Given any task in progress, then every page shows "In progress (n)" in the header; it opens a list with "Done", "Put back" and "Note" for each task. It opens only on a click. Every change of a status, in the list or in that panel, updates the count, the panel and the list without reloading (D-029). Tasks in progress are marked in amber.
+18. **People to talk to (D-030).**
+    Given a task, then the owner and Claude can name up to 10 people to talk to and take names off again (a logged, undoable change). The task page offers the speaker names of the task's recording (not Plaud's "Speaker N" labels) as checkboxes and suggests every known name. A click on a name in the list shows only that person's tasks; `list_todos` has the same `person` filter.
 
 ## Out of scope
 

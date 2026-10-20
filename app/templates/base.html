@@ -164,6 +164,13 @@
   .wip form { display: flex; gap: .4rem; margin-top: .35rem; align-items: center; }
   .wip form button, .wip form a.ghost { font-size: .8rem; padding: .2rem .55rem; }
   .wip-all { display: inline-block; margin-top: .5rem; font-size: .85rem; color: var(--accent); }
+  a.person { display: inline-flex; align-items: center; gap: .25rem; padding: .05rem .5rem; border-radius: 999px; font-size: .78rem;
+    color: var(--text); background: var(--hover); border: 1px solid var(--line); text-decoration: none; }
+  a.person::before { content: ""; width: .45rem; height: .45rem; border-radius: 50%; background: var(--muted); }
+  a.person:hover { border-color: var(--accent); color: var(--accent); }
+  .people-pick { display: flex; flex-wrap: wrap; gap: .35rem .8rem; margin: .2rem 0 .5rem; font-size: .9rem; }
+  .people-pick label { display: inline-flex; gap: .35rem; align-items: center; cursor: pointer; white-space: nowrap; }
+  .people-pick input[type=checkbox] { width: auto; margin: 0; padding: 0; }
   .task.leaving { opacity: 0; transform: translateX(10px); transition: opacity .18s ease, transform .18s ease; }
   .toast { position: fixed; left: 50%; bottom: 1.5rem; transform: translateX(-50%); z-index: 20; display: flex; gap: 1rem; align-items: center;
     background: var(--text); color: var(--bg); padding: .6rem .7rem .6rem 1.1rem; border-radius: .7rem; box-shadow: 0 6px 24px rgba(0,0,0,.18); font-weight: 500; }

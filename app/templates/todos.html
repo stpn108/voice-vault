@@ -1,17 +1,18 @@
 {% extends "base.html" %}
 {% block title %}{{ t("ui_nav_todos") }}{% endblock %}
 {% block content %}
+{% set keep = ("&topic=" ~ topic | urlencode if topic else "") ~ ("&person=" ~ person | urlencode if person else "") %}
 <div class="head" style="margin-top:1.6rem">
   <h1>{{ t("ui_nav_todos") }}</h1>
   <div class="seg">
-  {% for s in statuses %}<a href="/todos?status={{ s }}&amp;sort={{ sort }}{% if topic %}&amp;topic={{ topic | urlencode }}{% endif %}" {% if s == status %}class="current"{% endif %}>{{ t("todo_status_" ~ s) }}<small data-count="{{ s }}">{{ counts[s] }}</small></a>{% endfor %}
+  {% for s in statuses %}<a href="/todos?status={{ s }}&amp;sort={{ sort }}{{ keep }}" {% if s == status %}class="current"{% endif %}>{{ t("todo_status_" ~ s) }}<small data-count="{{ s }}">{{ counts[s] }}</small></a>{% endfor %}
   </div>
 </div>
 <div class="pager" style="margin-top:-.2rem">
   <span class="muted" style="font-size:.85rem">{{ t("ui_sort") }}</span>
-  {% for s in sorts %}<a class="chip {% if s == sort %}current{% endif %}" href="/todos?status={{ status }}&amp;sort={{ s }}{% if topic %}&amp;topic={{ topic | urlencode }}{% endif %}">{{ t("ui_sort_" ~ s) }}</a>{% endfor %}
+  {% for s in sorts %}<a class="chip {% if s == sort %}current{% endif %}" href="/todos?status={{ status }}&amp;sort={{ s }}{{ keep }}">{{ t("ui_sort_" ~ s) }}</a>{% endfor %}
 </div>
-{% if topic %}<p class="sub" style="margin:-.5rem 0 1rem">{{ t("ui_topic") }}: <strong>{{ topic }}</strong> · <a href="/todos?status={{ status }}&amp;sort={{ sort }}">{{ t("ui_filter_clear") }}</a></p>{% endif %}
+{% if topic or person %}<p class="sub" style="margin:-.5rem 0 1rem">{% if topic %}{{ t("ui_topic") }}: <strong>{{ topic }}</strong> · {% endif %}{% if person %}{{ t("ui_person") }}: <strong>{{ person }}</strong> · {% endif %}<a href="/todos?status={{ status }}&amp;sort={{ sort }}">{{ t("ui_filter_clear") }}</a></p>{% endif %}
 <form class="card quick" method="post" action="/todos">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <input type="text" name="title" placeholder="{{ t('ui_todo_new') }}" maxlength="300" required>
@@ -39,6 +40,7 @@
         <span class="pill progress-chip">{{ t("todo_status_in_progress") }}</span>
         {% set active = row.status in ('open', 'in_progress') %}{% if row.due_date %}<span class="due {% if active and row.due_date < today %}overdue{% endif %}">{{ t("ui_overdue") if active and row.due_date < today else t("ui_due") }} {{ row.due_date.strftime("%d.%m.") }}</span>{% endif %}
         {% if row.topic %}<a href="/todos?status={{ status }}&amp;sort={{ sort }}&amp;topic={{ row.topic | urlencode }}">{{ row.topic }}</a>{% endif %}
+        {% for name in row.people %}<a class="person" href="/todos?status={{ status }}&amp;sort={{ sort }}&amp;person={{ name | urlencode }}">{{ name }}</a>{% endfor %}
         {% if not grouped %}<span>{{ t("todo_prio_" ~ row.priority) }}</span>{% endif %}
         {% if row.created_by == "claude" %}<span class="by">Claude</span>{% endif %}
         <span>{{ row.age_days }} {{ t("ui_days") }}</span>
