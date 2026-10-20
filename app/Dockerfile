@@ -15,6 +15,7 @@ COPY *.py .
 
 # --- Templates & static assets ---
 COPY templates ./templates
+COPY static ./static
 
 # Build-time version info
 ARG APP_VERSION=0.0

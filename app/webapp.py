@@ -18,7 +18,8 @@ from typing import Annotated, Iterator
 from fastapi import Depends, FastAPI, Form, HTTPException, Query, Request
 from fastapi import Path as PathParam
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -39,8 +40,10 @@ log = logging.getLogger(__name__)
 # Per process unless UI_SECRET is set: forms from before a restart are rejected.
 CSRF_SECRET = (os.getenv("UI_SECRET") or secrets.token_hex(32)).encode()
 LOCAL_HOSTS = ["localhost", "127.0.0.1", "[::1]"]
-CSP = ("default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; "
-       "frame-ancestors 'none'; base-uri 'none'")
+# Scripts only from this server's own /static files (no inline code, D-027); fetch only to this server.
+CSP = ("default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; "
+       "form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
+STATIC_DIR = Path(__file__).resolve().parent / "static"
 TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
 MAX_ID = svc.MAX_ID  # ids beyond the database column are rejected before they reach a query
 
@@ -72,6 +75,7 @@ cfg_at_start = load_config()
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=LOCAL_HOSTS + list(cfg_at_start.ui_allowed_hosts))
 templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
 def _localtime(value) -> str:
@@ -299,14 +303,18 @@ def todo_edit(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX_I
 @app.post("/todos/{todo_id}/status")
 def todo_status(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX_ID)], status: str = Form("", max_length=10), csrf: str = Form(""),
                 back: str = Form("", max_length=20), session: Session = Depends(get_session)):
-    """One-click check-off from the list."""
+    """One-click check-off from the list. The page script asks for JSON and updates the list in place."""
     require_csrf(request, csrf)
+    found = todos.get_todo(session, now_utc(), todo_id)
+    previous = found[0].status if found else None
     try:
         todos.update_todo(session, now_utc(), todo_id, actor="owner", status=status)
     except todos.TodoError as exc:
         if "no task" in str(exc):
             raise HTTPException(status_code=404, detail=str(exc))
         raise _todo_error(exc)
+    if "application/json" in request.headers.get("accept", ""):
+        return JSONResponse({"ok": True, "status": status, "previous": previous, "counts": todos.counts(session)})
     return RedirectResponse("/todos" if back == "list" else f"/todos/{todo_id}", status_code=303)
 
 

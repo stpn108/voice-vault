@@ -4,7 +4,7 @@
 <div class="head" style="margin-top:1.6rem">
   <h1>{{ t("ui_nav_todos") }}</h1>
   <div class="seg">
-  {% for s in statuses %}<a href="/todos?status={{ s }}&amp;sort={{ sort }}{% if topic %}&amp;topic={{ topic | urlencode }}{% endif %}" {% if s == status %}class="current"{% endif %}>{{ t("todo_status_" ~ s) }}<small>{{ counts[s] }}</small></a>{% endfor %}
+  {% for s in statuses %}<a href="/todos?status={{ s }}&amp;sort={{ sort }}{% if topic %}&amp;topic={{ topic | urlencode }}{% endif %}" {% if s == status %}class="current"{% endif %}>{{ t("todo_status_" ~ s) }}<small data-count="{{ s }}">{{ counts[s] }}</small></a>{% endfor %}
   </div>
 </div>
 <div class="pager" style="margin-top:-.2rem">
@@ -28,7 +28,7 @@
 <ul class="list">
   {% for row in items %}
   <li class="task {% if row.status != 'open' %}finished{% endif %}">
-    <form class="check" method="post" action="/todos/{{ row.id }}/status">
+    <form class="check" data-quick method="post" action="/todos/{{ row.id }}/status">
       <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="list">
       {% if row.status == "open" %}<button class="check" type="submit" name="status" value="done" title="{{ t('ui_todo_check') }}" aria-label="{{ t('ui_todo_check') }}">✓</button>
       {% else %}<button class="check" type="submit" name="status" value="open" title="{{ t('ui_todo_reopen') }}" aria-label="{{ t('ui_todo_reopen') }}" style="color:var(--ok);border-color:var(--ok)">✓</button>{% endif %}
@@ -44,7 +44,7 @@
       </div>
     </div>
     {% if row.status == "open" %}
-    <form class="task-actions" method="post" action="/todos/{{ row.id }}/status">
+    <form class="task-actions" data-quick method="post" action="/todos/{{ row.id }}/status">
       <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="list">
       <button class="ghost" type="submit" name="status" value="dropped" title="{{ t('ui_todo_drop') }}">{{ t("ui_todo_drop_short") }}</button>
     </form>
@@ -57,4 +57,9 @@
 {% else %}
 <div class="card empty">{{ t("ui_todo_empty") }}</div>
 {% endif %}
+<div id="toast" class="toast" role="status" aria-live="polite" hidden
+     data-done="{{ t('todo_toast_done') }}" data-dropped="{{ t('todo_toast_dropped') }}" data-open="{{ t('todo_toast_open') }}">
+  <span data-toast-text></span><button type="button">{{ t("ui_undo") }}</button>
+</div>
+<script src="/static/todos.js" defer></script>
 {% endblock %}

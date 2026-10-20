@@ -191,3 +191,47 @@ def test_review_the_owner_can_let_the_routine_read_a_recording_again(client, ses
         assert s.get(Recording, rec_id).analyzed_at is None
     assert "unanalyze" not in client.get(f"/recordings/{rec_id}").text
     assert post(client, "/recordings/9999/unanalyze").status_code == 404
+
+
+# --- checking off without reloading the page (D-027) ----------------------------------------------------
+def test_d027_a_check_off_asked_for_json_answers_json_with_the_new_counts(client, make_todo):
+    first = make_todo(title="Pay invoice")
+    make_todo(title="Call Anna")
+    response = client.post(f"/todos/{first}/status", data={"csrf": webapp.csrf_token(), "status": "done"},
+                           headers={"Accept": "application/json"})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True and (body["status"], body["previous"]) == ("done", "open")
+    assert body["counts"]["open"] == 1 and body["counts"]["done"] == 1
+    back = client.post(f"/todos/{first}/status", data={"csrf": webapp.csrf_token(), "status": body["previous"]},
+                       headers={"Accept": "application/json"}).json()
+    assert back["counts"]["open"] == 2
+
+
+def test_d027_without_json_the_form_still_redirects(client, make_todo):
+    todo = make_todo(title="Pay invoice")
+    response = post(client, f"/todos/{todo}/status", status="done", back="list")
+    assert response.status_code == 303 and response.headers["location"] == "/todos"
+
+
+def test_d027_a_json_check_off_still_needs_the_csrf_token(client, make_todo):
+    todo = make_todo(title="Pay invoice")
+    response = client.post(f"/todos/{todo}/status", data={"csrf": "bad", "status": "done"},
+                           headers={"Accept": "application/json"})
+    assert response.status_code == 403
+
+
+def test_d027_the_list_loads_the_script_from_this_server_only(client, make_todo):
+    make_todo(title="Pay invoice")
+    response = client.get("/todos")
+    html, csp = response.text, response.headers["content-security-policy"]
+    assert '<script src="/static/todos.js" defer></script>' in html and "data-quick" in html
+    assert 'data-count="open"' in html and 'id="toast"' in html
+    assert "script-src 'self'" in csp and "connect-src 'self'" in csp and "unsafe-inline' ;" not in csp
+    assert "script-src 'self' 'unsafe-inline'" not in csp and "<script>" not in html
+
+
+def test_d027_the_script_is_served(client):
+    response = client.get("/static/todos.js")
+    assert response.status_code == 200 and "javascript" in response.headers["content-type"]
+    assert "requestSubmit" in response.text

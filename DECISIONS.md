@@ -329,3 +329,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Reported by the owner, confirmed with `plaud_live_check --speakers`: the original transcript in both API sources held "Speaker 1" (125 utterances) and "Speaker 3" (11) although the names were set in Plaud; the owner pointed to the cleaned transcript as the place of the names. |
 | **Rejected alternatives** | (A) store the original and take only the names from the cleaned one: the two have different utterance boundaries, matching them is guesswork; (B) keep counting on the original: the names never show up there. |
 | **Status** | **FINAL** |
+
+### D-027: Checking off a task without reloading the page, with a script from this server only (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-20 |
+| **Decision** | Amends D-008 and D-021, which allowed no JavaScript. The task list loads one script, `/static/todos.js`, served from the app (`StaticFiles`, `COPY static` in the Dockerfile). The Content-Security-Policy allows `script-src 'self'` and `connect-src 'self'`, still no inline code and no other origin. The script intercepts the check and "not relevant" buttons, posts the same form with `Accept: application/json` (CSRF token and origin check unchanged), fades the row out, updates the tab and group counts from the answer and shows a notice with "Undo" for six seconds; undo posts the previous status back. If anything fails, the form is submitted the normal way, so errors show as before. Without JavaScript the page works as before. `[hidden]` always hides, also where CSS sets `display`. |
+| **In plain words** | Ticking off a task now only removes that row; the page stays where it is, and an "Undo" appears for a moment. |
+| **Reasoning** | Owner request. A same-origin script file keeps the protection of the policy: an injected text still cannot run code, because inline scripts stay forbidden. Checked in Chromium: no navigation, counts right, empty groups disappear, undo restores, no console errors. |
+| **Rejected alternatives** | (A) inline script with a nonce: more moving parts per response for the same effect; (B) a front-end framework: a dependency and a build step for one interaction; (C) no undo: an instant, silent removal makes a slip easy and hard to notice. |
+| **Status** | **FINAL** |
