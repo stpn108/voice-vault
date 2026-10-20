@@ -28,7 +28,7 @@ The owner opens a small web page on the server (reached through his SSH tunnel),
 2. **State per recording.**
    Given recordings in different states, then each row shows one of: imported, verified, trashed at Plaud, deleted at Plaud, waiting (Plaud not finished or content still changing).
 3. **Detail.**
-   Given a recording with 42 segments, when the owner opens it, then the page shows title, start and duration, the summary and all 42 segments in order with speaker and `mm:ss` timestamp. All stored text is HTML-escaped; the summary is shown as plain text, Markdown is not rendered to HTML.
+   Given a recording with 42 segments, when the owner opens it, then the page shows title, start and duration, the summary and all 42 segments in order with speaker and `mm:ss` timestamp. All stored text is HTML-escaped; the summary's Markdown is formatted by the safe subset renderer (D-033), raw HTML never gets through.
 4. **Search.**
    Given a recording whose transcript contains "Kündigungsfrist", when the owner searches "kündigungsfrist", then it is found (case-insensitive over title, summary and segment text, parameterised query) and the matching list shows only matching recordings. An empty search shows everything.
 5. **Discard one recording.**
@@ -73,7 +73,7 @@ Written, status stays APPROVED until merged and deployed.
 |---|---|
 | 1 List and paging | `test_recording_service.py::test_req_002_first_page_has_the_50_newest_and_a_cursor`, `test_req_002_paging_has_no_skips_or_duplicates_even_if_a_new_recording_arrives`, `test_paging_is_stable_for_recordings_with_the_same_start`; `test_webapp.py::test_req_002_list_shows_rows_and_a_next_link` |
 | 2 State | `test_recording_service.py::test_req_002_state_per_recording` |
-| 3 Detail and escaping | `test_webapp.py::test_req_002_detail_shows_all_segments_in_order_with_speaker_and_time`, `test_req_002_stored_text_is_escaped_and_markdown_is_not_rendered` |
+| 3 Detail and escaping | `test_webapp.py::test_req_002_detail_shows_all_segments_in_order_with_speaker_and_time`, `test_req_002_stored_text_is_escaped_and_the_summary_markdown_is_rendered_safely` |
 | 4 Search | `test_recording_service.py::test_req_002_search_is_case_insensitive_over_transcript`, `test_search_covers_title_summary_and_segments`, `test_search_treats_wildcards_literally`, `test_search_with_sql_metacharacters_is_harmless`; `test_webapp.py::test_req_002_search_via_query_string` |
 | 5 Discard one | `test_recording_service.py::test_req_002_discard_removes_content_and_keeps_a_tombstone`; `test_webapp.py::test_req_002_discard_post_with_token_removes_content_and_redirects`; `test_import_service.py::test_req_002_discarded_recording_is_never_fetched_or_stored_again` |
 | 6 Discard older than N days | `test_recording_service.py::test_req_002_discard_older_than_n_days_discards_exactly_those`; `test_webapp.py::test_req_002_cleanup_with_the_shown_count_discards_exactly_those`, `test_cleanup_with_a_changed_count_discards_nothing` |

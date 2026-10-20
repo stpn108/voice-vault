@@ -395,3 +395,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner request. Posting the whole form reuses the existing route and its checks; one queue keeps two quick edits from overtaking each other. |
 | **Rejected alternatives** | (A) save on every keystroke: many history entries for one edit; (B) a separate route per field: more code for the same checks; (C) keep the Save button next to autosave: two ways to do one thing. |
 | **Status** | **FINAL** |
+
+### D-033: Markdown is formatted in recording summaries and task details, with a wider safe subset (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-20 |
+| **Decision** | Amends REQ-002 criterion 3 (summary as plain text) and D-013's renderer. `markdown_lite` now also handles numbered lists (`<ol>`), lists nested by indentation, task boxes (`- [ ]`, `- [x]`), quotes (`>`, rendered recursively), rules (`---`, also the trailing `---` Plaud puts after a line), simple pipe tables and `__bold__`. It still escapes everything first and creates no links, images or raw HTML. The recording page shows the summary through it. On the task page the details show formatted; a click (or Enter) opens the text field, leaving it saves (D-032) and shows the server-rendered result again. Without JavaScript the text field stays as it was. |
+| **In plain words** | Summaries and task details now look formatted: headings, lists, check boxes, quotes. To change the details, click on them. |
+| **Reasoning** | Owner report: Markdown in the summaries was shown raw. A real Plaud summary uses quotes, nested lists, task boxes and rules, which the old subset did not cover. Escaping first keeps it safe; the CSP still forbids inline scripts. |
+| **Rejected alternatives** | (A) a Markdown library (e.g. markdown-it): a dependency plus a sanitizer for a subset we fully control; (B) a client-side renderer: needs innerHTML from untrusted text in the browser; (C) a split editor with live preview: more than asked. |
+| **Status** | **FINAL** |

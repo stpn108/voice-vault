@@ -10,7 +10,7 @@
 </div>
 <p class="sub">{{ rec.started_at | localtime }} · {{ rec.duration_ms | hms }}</p>
 <h2>{{ t("ui_summary") }}</h2>
-<div class="card"><pre class="text">{{ rec.summary }}</pre></div>
+<div class="card prose">{{ rec.summary | md }}</div>
 <h2>{{ t("ui_transcript") }}</h2>
 <div class="card">
 {% for seg in segments %}

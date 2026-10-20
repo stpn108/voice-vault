@@ -8,6 +8,16 @@
   var pill = form.querySelector("[data-status-pill]");
   var pillClass = { done: "state-verified", in_progress: "state-progress", open: "state-waiting" };
   var queue = Promise.resolve();
+  var view = form.querySelector("[data-detail-view]");
+  var detail = form.querySelector("textarea[name=detail]");
+
+  // The details show as formatted text; a click turns them into the text field, leaving it shows them again.
+  function showView() { view.hidden = false; detail.hidden = true; }
+  function edit() { view.hidden = true; detail.hidden = false; detail.focus(); }
+  showView();
+  view.addEventListener("click", edit);
+  view.addEventListener("keydown", function (event) { if (event.key === "Enter") { event.preventDefault(); edit(); } });
+  detail.addEventListener("blur", function () { setTimeout(showView, 0); });
 
   function mark(field, cls) {
     var box = field.closest(".field");
@@ -37,6 +47,7 @@
       }).then(function (result) {
         mark(field, "saved");
         show("saved");
+        view.innerHTML = result.detail_html;  // rendered and escaped by the server (markdown_lite)
         if (field.name === "status") {
           var select = form.querySelector("select[name=status]");
           pill.textContent = select.options[select.selectedIndex].text;

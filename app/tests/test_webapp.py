@@ -60,7 +60,7 @@ def test_req_002_detail_shows_all_segments_in_order_with_speaker_and_time(client
     assert "Speaker 1" in html and "01:01" in html  # segment 1 starts at 61 s
 
 
-def test_req_002_stored_text_is_escaped_and_markdown_is_not_rendered(client, session_factory):
+def test_req_002_stored_text_is_escaped_and_the_summary_markdown_is_rendered_safely(client, session_factory):
     with session_factory() as s:
         rec = add_recording(s, 1, segments=0, title="<b>bold</b>", summary="**not bold** <script>alert(1)</script>")
         s.add(Segment(recording_id=rec.id, idx=0, speaker="<i>X</i>", start_ms=0, text="<img src=x onerror=alert(2)>"))
@@ -70,7 +70,7 @@ def test_req_002_stored_text_is_escaped_and_markdown_is_not_rendered(client, ses
     assert "<script>alert(1)</script>" not in html and "&lt;script&gt;alert(1)&lt;/script&gt;" in html
     assert "<img src=x" not in html and "&lt;img src=x onerror=alert(2)&gt;" in html
     assert "<b>bold</b>" not in html and "<i>X</i>" not in html
-    assert "**not bold**" in html and "<strong>not bold" not in html
+    assert "<strong>not bold</strong>" in html  # D-033: the summary is formatted, never raw HTML
 
 
 def test_req_002_search_via_query_string(client, session_factory):

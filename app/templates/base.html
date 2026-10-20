@@ -141,6 +141,16 @@
   /* topics and digests */
   .count-badge { min-width: 1.6rem; text-align: center; }
   .prose p { margin: 0 0 .7rem; } .prose p:last-child { margin: 0; } .prose ul { margin: 0 0 .7rem; padding-left: 1.25rem; }
+  .prose ol { margin: 0 0 .7rem; padding-left: 1.4rem; } .prose li { margin: .15rem 0; } .prose li > ul, .prose li > ol { margin: .2rem 0 .3rem; }
+  .prose blockquote { margin: 0 0 .8rem; padding: .5rem .9rem; border-left: 3px solid var(--line); background: var(--hover); border-radius: 0 .5rem .5rem 0; }
+  .prose blockquote p:last-child, .prose blockquote ol:last-child, .prose blockquote ul:last-child { margin-bottom: 0; }
+  .prose hr { border: 0; border-top: 1px solid var(--line); margin: 1rem 0; }
+  .prose table { border-collapse: collapse; margin: 0 0 .8rem; font-size: .92rem; display: block; overflow-x: auto; }
+  .prose th, .prose td { border: 1px solid var(--line); padding: .3rem .55rem; text-align: left; vertical-align: top; }
+  .prose th { background: var(--hover); } .prose .box { color: var(--muted); } .prose .box.done { color: var(--ok); }
+  .detail-view { min-height: 8rem; padding: .55rem .7rem; border: 1px solid transparent; border-radius: .55rem; cursor: text; }
+  .detail-view:hover, .detail-view:focus { border-color: var(--line); outline: none; }
+  .detail-view:empty::before { content: attr(data-empty); color: var(--faint); }
   .prose h3, .prose h4, .prose h5 { margin: 1rem 0 .4rem; font-size: 1rem; } .prose code { background: var(--hover); padding: .05rem .35rem; border-radius: .3rem; font-size: .9em; }
   .digest-day { font-size: 1.05rem; font-weight: 650; margin: 0 0 .6rem; letter-spacing: -.01em; }
   pre.text { white-space: pre-wrap; word-wrap: break-word; font: inherit; margin: 0; }
