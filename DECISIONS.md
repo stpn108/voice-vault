@@ -373,3 +373,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner request, names ideally from the transcripts, and taking a name off again must be possible. A column on the task keeps the people inside the task's snapshot, so history and undo work without extra code, and the service keeps its rule of never deleting rows. |
 | **Rejected alternatives** | (A) a `people` table with a link table: needs deleting link rows to take a name off, which the service rule forbids, and its own history; (B) free text in the detail field: no filter, no suggestions; (C) a people page with merge and rename: not asked for; a misspelt name is fixed by ticking the right one. |
 | **Status** | **FINAL** |
+
+### D-031: People are picked as tags that save on every tap (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-20 |
+| **Decision** | Amends D-030. On the task page the people are tags instead of checkboxes: an outlined "+ name" tag is a suggestion, a filled "✓ name" tag is assigned; a tap toggles it and `/static/people.js` saves the whole list at once through `POST /todos/{id}/people` (CSRF and origin check as everywhere, JSON answer with the stored names). A name typed into the field plus Enter (or comma) becomes an assigned tag and is saved. If a save fails, the tag flips back. The tags are still checkboxes underneath, so without JavaScript they are saved with the form's "Save" button. |
+| **In plain words** | Names are tags now: tap one and it is on the task, tap it again and it is gone. No "Save" needed for that. |
+| **Reasoning** | Owner request: checkboxes look dated; tags that toggle on a tap are what current tools do. |
+| **Rejected alternatives** | (A) tags that change only on "Save": a tap that does not stick surprises; (B) a separate remove "×" on each tag: two targets per name where one toggle does. |
+| **Status** | **FINAL** |

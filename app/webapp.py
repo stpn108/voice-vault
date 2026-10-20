@@ -325,6 +325,22 @@ def todo_edit(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX_I
     return RedirectResponse("/todos" if back == "list" else f"/todos/{todo_id}", status_code=303)
 
 
+@app.post("/todos/{todo_id}/people")
+def todo_people(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX_ID)], people: list[str] = Form([]),
+                csrf: str = Form(""), session: Session = Depends(get_session)):
+    """Tags on the task page: every tap saves the whole list at once (D-031)."""
+    require_csrf(request, csrf)
+    try:
+        todos.update_todo(session, now_utc(), todo_id, actor="owner", people=people)
+    except todos.TodoError as exc:
+        if "no task" in str(exc):
+            raise HTTPException(status_code=404, detail=str(exc))
+        raise _todo_error(exc)
+    if "application/json" in request.headers.get("accept", ""):
+        return JSONResponse({"ok": True, "people": todos.get_todo(session, now_utc(), todo_id)[0].people})
+    return RedirectResponse(f"/todos/{todo_id}", status_code=303)
+
+
 @app.post("/todos/{todo_id}/status")
 def todo_status(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX_ID)], status: str = Form("", max_length=12), csrf: str = Form(""),
                 back: str = Form("", max_length=20), session: Session = Depends(get_session)):

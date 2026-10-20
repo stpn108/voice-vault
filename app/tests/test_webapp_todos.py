@@ -320,3 +320,32 @@ def test_d030_detail_offers_the_recording_speakers_and_saves_the_ticked_ones(cli
     filtered = client.get("/todos?person=Jochen%20Rill").text
     assert "Discuss budget" in filtered and "Person: <strong>Jochen Rill</strong>" in filtered
     assert "Discuss budget" not in client.get("/todos?person=Eve").text
+
+
+def test_d031_a_tap_on_a_tag_saves_the_people_at_once(client, make_todo):
+    todo = make_todo(title="Discuss budget", people=["Jochen Rill"])
+    url = f"/todos/{todo}/people"
+    added = client.post(url, data={"csrf": webapp.csrf_token(), "people": ["Jochen Rill", "Anna"]},
+                        headers={"Accept": "application/json"})
+    assert added.json() == {"ok": True, "people": ["Anna", "Jochen Rill"]}
+    removed = client.post(url, data={"csrf": webapp.csrf_token(), "people": ["Anna"]},
+                          headers={"Accept": "application/json"}).json()
+    assert removed["people"] == ["Anna"]
+    cleared = client.post(url, data={"csrf": webapp.csrf_token()}, headers={"Accept": "application/json"}).json()
+    assert cleared["people"] == []
+    assert 'data-people-url="/todos/%d/people"' % todo in client.get(f"/todos/{todo}").text
+
+
+@pytest.mark.parametrize("data, status", [
+    ({"csrf": "bad", "people": ["Anna"]}, 403),
+    ({"people": ["x" * 81]}, 400),
+])
+def test_d031_tag_saves_are_checked(client, make_todo, data, status):
+    todo = make_todo(title="Discuss budget")
+    data = {"csrf": webapp.csrf_token(), **data}
+    assert client.post(f"/todos/{todo}/people", data=data, headers={"Accept": "application/json"}).status_code == status
+
+
+def test_d031_the_tag_script_is_served(client):
+    response = client.get("/static/people.js")
+    assert response.status_code == 200 and "data-people-url" in response.text and "textContent" in response.text

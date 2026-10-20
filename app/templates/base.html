@@ -168,9 +168,17 @@
     color: var(--text); background: var(--hover); border: 1px solid var(--line); text-decoration: none; }
   a.person::before { content: ""; width: .45rem; height: .45rem; border-radius: 50%; background: var(--muted); }
   a.person:hover { border-color: var(--accent); color: var(--accent); }
-  .people-pick { display: flex; flex-wrap: wrap; gap: .35rem .8rem; margin: .2rem 0 .5rem; font-size: .9rem; }
-  .people-pick label { display: inline-flex; gap: .35rem; align-items: center; cursor: pointer; white-space: nowrap; }
-  .people-pick input[type=checkbox] { width: auto; margin: 0; padding: 0; }
+  .tags { display: flex; flex-wrap: wrap; gap: .4rem; margin: .25rem 0 .55rem; }
+  .tag { position: relative; cursor: pointer; }
+  .tag input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+  .tag span { display: inline-flex; align-items: center; gap: .3rem; padding: .25rem .7rem; border-radius: 999px; font-size: .85rem;
+    border: 1px dashed var(--faint); color: var(--muted); background: transparent; white-space: nowrap; transition: background .12s, color .12s; user-select: none; }
+  .tag span::before { content: "+"; font-weight: 600; }
+  .tag:hover span { border-color: var(--accent); color: var(--accent); }
+  .tag input:checked + span { border: 1px solid var(--accent); background: var(--accent); color: #fff; }
+  .tag input:checked + span::before { content: "✓"; }
+  .tag input:checked + span:hover::before { content: "×"; }
+  .tag input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
   .task.leaving { opacity: 0; transform: translateX(10px); transition: opacity .18s ease, transform .18s ease; }
   .toast { position: fixed; left: 50%; bottom: 1.5rem; transform: translateX(-50%); z-index: 20; display: flex; gap: 1rem; align-items: center;
     background: var(--text); color: var(--bg); padding: .6rem .7rem .6rem 1.1rem; border-radius: .7rem; box-shadow: 0 6px 24px rgba(0,0,0,.18); font-weight: 500; }

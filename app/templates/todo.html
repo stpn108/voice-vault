@@ -23,10 +23,10 @@
       <label class="field"><span>{{ t("ui_col_due") }}</span><input type="date" name="due" value="{{ row.due_date.isoformat() if row.due_date else '' }}"></label>
       <label class="field"><span>{{ t("ui_topic") }}</span><input type="text" name="topic" value="{{ row.topic or '' }}" maxlength="120"></label>
       <div class="field"><span>{{ t("ui_people") }}</span>
-        {% if candidates %}<div class="people-pick">{% for name in candidates %}<label><input type="checkbox" name="people" value="{{ name }}" {% if name in row.people %}checked{% endif %}>{{ name }}</label>{% endfor %}</div>{% endif %}
+        <div class="tags" data-people-url="/todos/{{ row.id }}/people">{% for name in candidates %}<label class="tag"><input type="checkbox" name="people" value="{{ name }}" {% if name in row.people %}checked{% endif %}><span>{{ name }}</span></label>{% endfor %}</div>
         <input type="text" name="people_more" list="known-people" maxlength="400" placeholder="{{ t('ui_people_more') }}" aria-label="{{ t('ui_people_more') }}">
         <datalist id="known-people">{% for name in known %}<option value="{{ name }}">{% endfor %}</datalist>
-        {% if speakers %}<small class="muted">{{ t("ui_people_from_recording") }}</small>{% endif %}
+        <small class="muted">{{ t("ui_people_help") }}</small>
       </div>
       <button class="primary" type="submit" style="width:100%;justify-content:center">{{ t("ui_save") }}</button>
     </div>
@@ -45,4 +45,5 @@
   </li>
   {% endfor %}
 </ul>
+<script src="/static/people.js" defer></script>
 {% endblock %}
