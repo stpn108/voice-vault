@@ -57,6 +57,8 @@ Once a day Claude reads the recordings that are new since its last run, adds the
     Given a task the owner or Claude starts, then its status is `in_progress`; the "Open" tab and `list_todos` with status `open` still list it, first within its priority, and it has its own tab. Given any task in progress, then every page shows "In progress (n)" in the header; it opens a list with "Done", "Put back" and "Note" for each task. It opens only on a click. Every change of a status, in the list or in that panel, updates the count, the panel and the list without reloading (D-029). Tasks in progress are marked in amber.
 18. **People to talk to (D-030).**
     Given a task, then the owner and Claude can name up to 10 people to talk to and take names off again (a logged, undoable change). The task page shows the speaker names of the task's recording (not Plaud's "Speaker N" labels) as tags: a tap adds a name, a second tap takes it off, each tap is saved at once (D-031); a name picked from the suggestions, or typed and confirmed with Enter or by leaving the field, becomes a tag at once; every known name is suggested. A click on a name in the list shows only that person's tasks; `list_todos` has the same `person` filter.
+19. **The task page saves itself (D-032).**
+    Given the task page, then there is no Save button: a changed field (title, detail, status, priority, due date, topic) is saved in the background when it is left, the page stays where it is and shows "Gespeichert" or, for a rejected value such as an empty title, "Nicht gespeichert" without changing the stored task. A changed status updates the status badge and the in-progress count in the header.
 
 ## Out of scope
 

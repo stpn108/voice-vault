@@ -384,3 +384,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner request: checkboxes look dated; tags that toggle on a tap are what current tools do. |
 | **Rejected alternatives** | (A) tags that change only on "Save": a tap that does not stick surprises; (B) a separate remove "×" on each tag: two targets per name where one toggle does. |
 | **Status** | **FINAL** |
+
+### D-032: The task page saves each field in the background when it is left; no Save button (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-20 |
+| **Decision** | On the task page, `/static/task.js` listens for `change` (fired when a text field or the description is left, at once for status, priority and date) and posts the whole form to `POST /todos/{id}` with `Accept: application/json`; the route answers JSON (status, counts, tasks in progress) instead of redirecting. The people field's text input is left out of that post (people.js owns it). Saves run one after another in the order the fields were left. The field gets a short green border and the header shows "Gespeichert"; a rejected value (browser validation or HTTP error) shows "Nicht gespeichert, bitte prüfen" with a red border and stores nothing. Enter in a one-line field leaves the field instead of posting the page. A status change updates the status badge and, via the `todo:changed` event, the in-progress reminder. The Save button stays inside `<noscript>`, so without JavaScript the page works as before. The history list updates on the next load. |
+| **In plain words** | On a task page you just change a field and click elsewhere: it is saved, the page stays put. |
+| **Reasoning** | Owner request. Posting the whole form reuses the existing route and its checks; one queue keeps two quick edits from overtaking each other. |
+| **Rejected alternatives** | (A) save on every keystroke: many history entries for one edit; (B) a separate route per field: more code for the same checks; (C) keep the Save button next to autosave: two ways to do one thing. |
+| **Status** | **FINAL** |

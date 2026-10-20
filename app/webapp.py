@@ -322,6 +322,10 @@ def todo_edit(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX_I
         if "no task" in str(exc):
             raise HTTPException(status_code=404, detail=str(exc))
         raise _todo_error(exc)
+    if "application/json" in request.headers.get("accept", ""):
+        # Saved in the background from the task page (D-032); the header reminder follows the status.
+        return JSONResponse({"ok": True, "id": todo_id, "status": status, "counts": todos.counts(session),
+                             "in_progress": _in_progress(session)})
     return RedirectResponse("/todos" if back == "list" else f"/todos/{todo_id}", status_code=303)
 
 

@@ -168,6 +168,10 @@
     color: var(--text); background: var(--hover); border: 1px solid var(--line); text-decoration: none; }
   a.person::before { content: ""; width: .45rem; height: .45rem; border-radius: 50%; background: var(--muted); }
   a.person:hover { border-color: var(--accent); color: var(--accent); }
+  .save-state { font-size: .82rem; color: var(--muted); margin-right: .6rem; white-space: nowrap; }
+  .save-state.failed { color: var(--danger); font-weight: 600; }
+  .field.saved input, .field.saved select, .field.saved textarea { border-color: var(--ok); transition: border-color .4s; }
+  .field.failed input, .field.failed select, .field.failed textarea { border-color: var(--danger); }
   .tags { display: flex; flex-wrap: wrap; gap: .4rem; margin: .25rem 0 .55rem; }
   .tag { position: relative; cursor: pointer; }
   .tag input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }

@@ -350,3 +350,28 @@ def test_d031_the_tag_script_is_served(client):
     response = client.get("/static/people.js")
     assert response.status_code == 200 and "data-people-url" in response.text and "textContent" in response.text
     assert "insertReplacementText" in response.text  # a pick from the suggestion list is taken at once
+
+
+# --- the task page saves each field when it is left (D-032) --------------------------------------
+def test_d032_a_background_save_answers_json_and_keeps_the_people(client, make_todo, session_factory):
+    todo = make_todo(title="Discuss budget", people=["Anna"])
+    response = client.post(f"/todos/{todo}", headers={"Accept": "application/json"}, data={
+        "csrf": webapp.csrf_token(), "title": "Discuss budget", "priority": "1", "status": "in_progress",
+        "due": "", "topic": "Budget", "detail": "", "people": ["Anna"]})
+    body = response.json()
+    assert body["ok"] is True and body["status"] == "in_progress" and body["counts"]["in_progress"] == 1
+    assert body["in_progress"] == [{"id": todo, "title": "Discuss budget"}]
+    with session_factory() as s:
+        row = svc.get_todo(s, now_utc(), todo)[0]
+        assert (row.priority, row.topic, row.people) == (1, "Budget", ["Anna"])
+
+
+def test_d032_the_task_page_has_no_save_button_when_scripts_run(client, make_todo):
+    html = client.get(f"/todos/{make_todo(title='Discuss budget')}").text
+    assert "data-autosave" in html and '<script src="/static/task.js" defer></script>' in html
+    assert "<noscript><button" in html
+
+
+def test_d032_the_autosave_script_is_served(client):
+    response = client.get("/static/task.js")
+    assert response.status_code == 200 and "reportValidity" in response.text and "todo:changed" in response.text
