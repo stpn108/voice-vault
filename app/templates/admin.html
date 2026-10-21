@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}{{ t("ui_nav_admin") }}{% endblock %}
+{% block content %}
+<div class="head" style="margin-top:1.6rem"><h1>{{ t("ui_nav_admin") }}</h1></div>
+<div class="tiles">
+  {% for tool in tools %}<a class="card tile" href="{{ tool.path }}"><strong>{{ t(tool.title) }}</strong><span>{{ t(tool.text) }}</span></a>{% endfor %}
+</div>
+{% endblock %}

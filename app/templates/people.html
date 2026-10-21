@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}{{ t("ui_admin_people") }}{% endblock %}
+{% block crumbs %}
+<nav class="crumbs" aria-label="breadcrumb"><a href="/admin">{{ t("ui_nav_admin") }}</a><span class="sep">/</span><span aria-current="page">{{ t("ui_admin_people") }}</span></nav>
+{% endblock %}
+{% block content %}
+<div class="head"><h1>{{ t("ui_admin_people") }}</h1></div>
+{% if done %}<p class="notice ok">{{ t("ui_people_done_" ~ done) }}</p>{% endif %}
+<datalist id="known-people">{% for name in known %}<option value="{{ name }}">{% endfor %}</datalist>
+<h2>{{ t("ui_people_names") }}</h2>
+{% if people %}
+<ul class="list">
+  {% for p in people %}
+  <li><div class="item" style="cursor:default;flex-wrap:wrap;gap:.6rem">
+    <div class="item-main">
+      <div class="item-title">{% if p.tasks %}<a href="/todos?status=open&amp;person={{ p.name | urlencode }}" style="color:var(--text);text-decoration:none">{{ p.name }}</a>{% else %}{{ p.name }}{% endif %}</div>
+      <div class="item-meta">{{ t("ui_people_counts", tasks=p.tasks, recordings=p.recordings, segments=p.segments) }}</div>
+    </div>
+    <form class="inline" method="post" action="/admin/people/rename" style="display:flex;gap:.4rem">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="old" value="{{ p.name }}">
+      <input type="text" name="new" list="known-people" maxlength="80" required placeholder="{{ t('ui_people_rename_to') }}" aria-label="{{ t('ui_people_rename_to') }}" style="width:12rem">
+      <button class="small" type="submit">{{ t("ui_people_rename") }}</button>
+    </form>
+    <a class="btn small danger" style="padding:.25rem .7rem;font-size:.82rem" href="/admin/people/delete?name={{ p.name | urlencode }}">{{ t("ui_people_delete") }}</a>
+  </div></li>
+  {% endfor %}
+</ul>
+<p class="muted" style="font-size:.85rem">{{ t("ui_people_rename_hint") }}</p>
+{% else %}
+<div class="card empty">{{ t("ui_people_empty") }}</div>
+{% endif %}
+<h2>{{ t("ui_people_orphans") }}</h2>
+<p class="muted" style="font-size:.85rem;margin-top:-.3rem">{{ t("ui_people_orphans_hint") }}</p>
+{% if orphans %}
+<ul class="list">
+  {% for o in orphans %}
+  <li><div class="item" style="cursor:default;flex-wrap:wrap;align-items:flex-start">
+    <div class="item-main">
+      <div class="item-title"><a href="/recordings/{{ o.recording_id }}" style="color:var(--text);text-decoration:none">{{ o.title or ("#" ~ o.recording_id) }}</a>
+        · <span class="pill">{{ o.label or "?" }}</span></div>
+      <div class="item-meta">{{ o.started_at | localtime }} · {{ t("ui_people_passages", count=o.segments) }}</div>
+      {% if o.samples %}<ul class="orphan-samples">{% for s in o.samples %}<li>„{{ s | truncate(160) }}“</li>{% endfor %}</ul>{% endif %}
+    </div>
+    <form class="inline" method="post" action="/admin/people/assign" style="display:flex;gap:.4rem">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="recording_id" value="{{ o.recording_id }}">
+      <input type="hidden" name="label" value="{{ o.label }}">
+      <input type="text" name="name" list="known-people" maxlength="80" required placeholder="{{ t('ui_people_assign_to') }}" aria-label="{{ t('ui_people_assign_to') }}" style="width:12rem">
+      <button class="small" type="submit">{{ t("ui_people_assign") }}</button>
+    </form>
+  </div></li>
+  {% endfor %}
+</ul>
+{% else %}
+<div class="card empty">{{ t("ui_people_orphans_empty") }}</div>
+{% endif %}
+{% endblock %}

@@ -375,3 +375,48 @@ def test_d032_the_task_page_has_no_save_button_when_scripts_run(client, make_tod
 def test_d032_the_autosave_script_is_served(client):
     response = client.get("/static/task.js")
     assert response.status_code == 200 and "reportValidity" in response.text and "todo:changed" in response.text
+
+
+# --- administration (D-034) ----------------------------------------------------------------------
+def test_d034_admin_lists_its_tools_and_the_header_links_to_it(client):
+    html = client.get("/admin").text
+    assert 'href="/admin/people"' in html and 'href="/cleanup"' in html
+    assert 'href="/admin"' in client.get("/todos").text
+
+
+def test_d034_people_page_deletes_with_confirmation_and_assigns(client, make_todo, session_factory):
+    from database import Segment
+    with session_factory() as s:
+        rec = add_recording(s, 1, segments=2)
+        s.add(Segment(recording_id=rec.id, idx=9, speaker="<b>Eve</b>", text="hallo"))
+        s.commit()
+        rec_id = rec.id
+    todo = make_todo(title="Discuss budget", people=["Anna"])
+    html = client.get("/admin/people").text
+    assert "Anna" in html and "&lt;b&gt;Eve&lt;/b&gt;" in html and "<b>Eve" not in html and "Speaker 0" in html
+    confirm = client.get("/admin/people/delete?name=Anna").text
+    assert 'name="expected_tasks" value="1"' in confirm
+    stale = post(client, "/admin/people/delete", name="Anna", expected_tasks=0, expected_segments=0)
+    assert stale.status_code == 409
+    done = post(client, "/admin/people/delete", name="Anna", expected_tasks=1, expected_segments=0)
+    assert done.headers["location"] == "/admin/people?done=deleted"
+    with session_factory() as s:
+        assert svc.get_todo(s, now_utc(), todo)[0].people == []
+    assigned = post(client, "/admin/people/assign", recording_id=rec_id, label="Speaker 0", name="Jochen")
+    assert assigned.headers["location"] == "/admin/people?done=assigned"
+    assert "Jochen" in client.get(f"/recordings/{rec_id}").text
+
+
+@pytest.mark.parametrize("url, data, status", [
+    ("/admin/people/rename", {"old": "Nobody", "new": "X"}, 404),
+    ("/admin/people/assign", {"recording_id": 999, "label": "Speaker 0", "name": "X"}, 404),
+    ("/admin/people/delete", {"name": "Nobody", "expected_tasks": 0, "expected_segments": 0}, 404),
+])
+def test_d034_unknown_names_and_recordings_are_404(client, url, data, status):
+    assert post(client, url, **data).status_code == status
+
+
+def test_d034_admin_changes_need_the_csrf_token(client, make_todo):
+    make_todo(title="Discuss budget", people=["Anna"])
+    response = client.post("/admin/people/rename", data={"csrf": "bad", "old": "Anna", "new": "Bea"})
+    assert response.status_code == 403

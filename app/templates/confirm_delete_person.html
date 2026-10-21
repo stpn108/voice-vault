@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}{{ t("ui_people_delete") }}{% endblock %}
+{% block crumbs %}
+<nav class="crumbs" aria-label="breadcrumb"><a href="/admin">{{ t("ui_nav_admin") }}</a><span class="sep">/</span><a href="/admin/people">{{ t("ui_admin_people") }}</a><span class="sep">/</span><span aria-current="page">{{ t("ui_people_delete") }}</span></nav>
+{% endblock %}
+{% block content %}
+<div class="card">
+<h1 style="margin-bottom:.6rem">{{ t("ui_people_delete_title") }}</h1>
+<p><strong>{{ person.name }}</strong></p>
+<p>{{ t("ui_people_delete_text", tasks=person.tasks, segments=person.segments, recordings=person.recordings) }}</p>
+<form method="post" action="/admin/people/delete">
+  <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="name" value="{{ person.name }}">
+  <input type="hidden" name="expected_tasks" value="{{ person.tasks }}"><input type="hidden" name="expected_segments" value="{{ person.segments }}">
+  <div class="actions">
+    <button class="danger" type="submit">{{ t("ui_people_delete_confirm") }}</button>
+    <a class="btn" href="/admin/people">{{ t("ui_cancel") }}</a>
+  </div>
+</form>
+</div>
+{% endblock %}

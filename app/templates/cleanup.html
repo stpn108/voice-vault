@@ -1,6 +1,9 @@
 {% extends "base.html" %}
+{% block crumbs %}
+<nav class="crumbs" aria-label="breadcrumb"><a href="/admin">{{ t("ui_nav_admin") }}</a><span class="sep">/</span><span aria-current="page">{{ t("ui_cleanup") }}</span></nav>
+{% endblock %}
 {% block content %}
-<div class="head" style="margin-top:1.6rem"><h1>{{ t("ui_cleanup") }}</h1></div>
+<div class="head"><h1>{{ t("ui_cleanup") }}</h1></div>
 {% if changed %}<p class="notice">{{ t("ui_cleanup_changed") }}</p>{% endif %}
 <form class="card quick" method="get" action="/cleanup">
   <label>{{ t("ui_cleanup_text") }}</label>

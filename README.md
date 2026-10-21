@@ -172,7 +172,8 @@ of each topic and the daily overviews. Through MCP Claude can use `list_todos`, 
 `mark_recording_analyzed`, `save_digest` and `list_digests`. Every change is logged with who made
 it and can be undone on the task page. Claude can delete nothing. You can delete a topic on its page,
 after a confirmation: its notes go, its tasks stay. The task list sorts by priority, due date, age, topic
-or title. A task can name the people you have to talk to: the task page shows the speaker names of its
+or title. The header link "Verwaltung" (`/admin`) collects the admin tools: "Personen" (delete, rename or merge
+names, name the unnamed speakers of stored transcripts) and "Aufräumen". A task can name the people you have to talk to: the task page shows the speaker names of its
 recording as tags: tap to add, tap again to take off, saved at once; a click on a name in the list filters by that person.
 
 Prompt for the routine (connector `Dennis_Voice-Vault`). It can run several times a day, for example every two

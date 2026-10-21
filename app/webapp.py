@@ -27,6 +27,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 import recording_service as svc
 import todo_service as todos
+import people_admin
 import topic_admin
 from config import Config, load_config
 from database import engine, migrate_schema
@@ -374,6 +375,80 @@ def todo_undo(request: Request, event_id: Annotated[int, PathParam(ge=1, le=MAX_
     except todos.TodoError as exc:
         raise _todo_error(exc)
     return RedirectResponse(f"/todos/{todo.id}", status_code=303)
+
+
+# --- administration (D-034) -------------------------------------------------------------------
+# Every admin tool is one entry here and gets a tile on /admin. A new tool: add an entry, its routes
+# under /admin/..., its template and strings.
+ADMIN_TOOLS = [
+    {"path": "/admin/people", "title": "ui_admin_people", "text": "ui_admin_people_text"},
+    {"path": "/cleanup", "title": "ui_cleanup", "text": "ui_admin_cleanup_text"},
+]
+PEOPLE_MESSAGES = ("renamed", "deleted", "assigned")
+
+
+def _people_error(exc: people_admin.PeopleError) -> HTTPException:
+    return HTTPException(status_code=404 if "unknown" in str(exc) or "no recording" in str(exc) else 400,
+                         detail=str(exc))
+
+
+@app.get("/admin", response_class=HTMLResponse)
+def admin_index(request: Request, cfg: Config = Depends(get_config)):
+    return render(request, cfg, "admin.html", tools=ADMIN_TOOLS)
+
+
+@app.get("/admin/people", response_class=HTMLResponse)
+def admin_people(request: Request, done: str = Query("", max_length=10), session: Session = Depends(get_session),
+                 cfg: Config = Depends(get_config)):
+    return render(request, cfg, "people.html", people=people_admin.people(session), orphans=people_admin.orphans(session),
+                  known=todos.known_people(session), done=done if done in PEOPLE_MESSAGES else "")
+
+
+@app.post("/admin/people/rename")
+def admin_people_rename(request: Request, old: str = Form(..., max_length=todos.PERSON_MAX),
+                        new: str = Form(..., max_length=todos.PERSON_MAX), csrf: str = Form(""),
+                        session: Session = Depends(get_session)):
+    require_csrf(request, csrf)
+    try:
+        people_admin.rename_person(session, now_utc(), old, new)
+    except (people_admin.PeopleError, todos.TodoError) as exc:
+        raise _people_error(exc) if isinstance(exc, people_admin.PeopleError) else _todo_error(exc)
+    return RedirectResponse("/admin/people?done=renamed", status_code=303)
+
+
+@app.get("/admin/people/delete", response_class=HTMLResponse)
+def admin_people_delete_confirm(request: Request, name: str = Query(..., max_length=todos.PERSON_MAX),
+                                session: Session = Depends(get_session), cfg: Config = Depends(get_config)):
+    found = people_admin.person(session, name)
+    if found is None:
+        raise HTTPException(status_code=404, detail="unknown name")
+    return render(request, cfg, "confirm_delete_person.html", person=found)
+
+
+@app.post("/admin/people/delete")
+def admin_people_delete(request: Request, name: str = Form(..., max_length=todos.PERSON_MAX),
+                        expected_tasks: int = Form(..., ge=0), expected_segments: int = Form(..., ge=0),
+                        csrf: str = Form(""), session: Session = Depends(get_session)):
+    require_csrf(request, csrf)
+    found = people_admin.person(session, name)
+    if found is None:
+        raise HTTPException(status_code=404, detail="unknown name")
+    if (found.tasks, found.segments) != (expected_tasks, expected_segments):
+        raise HTTPException(status_code=409, detail=get_text("ui_changed_since", cfg_lang()))
+    people_admin.delete_person(session, now_utc(), found.name)
+    return RedirectResponse("/admin/people?done=deleted", status_code=303)
+
+
+@app.post("/admin/people/assign")
+def admin_people_assign(request: Request, recording_id: int = Form(..., ge=1, le=MAX_ID),
+                        label: str = Form("", max_length=255), name: str = Form(..., max_length=todos.PERSON_MAX),
+                        csrf: str = Form(""), session: Session = Depends(get_session)):
+    require_csrf(request, csrf)
+    try:
+        people_admin.assign_speaker(session, recording_id, label, name)
+    except people_admin.PeopleError as exc:
+        raise _people_error(exc)
+    return RedirectResponse("/admin/people?done=assigned", status_code=303)
 
 
 @app.get("/topics", response_class=HTMLResponse)

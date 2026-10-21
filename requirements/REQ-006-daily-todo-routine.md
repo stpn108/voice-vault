@@ -61,6 +61,8 @@ Once a day Claude reads the recordings that are new since its last run, adds the
     Given the task page, then there is no Save button: a changed field (title, detail, status, priority, due date, topic) is saved in the background when it is left, the page stays where it is and shows "Gespeichert" or, for a rejected value such as an empty title, "Nicht gespeichert" without changing the stored task. A changed status updates the status badge and the in-progress count in the header.
 20. **Formatted text (D-033).**
     Given Markdown in a task's details, a recording summary or an overview, then it is shown formatted (headings, nested and numbered lists, task boxes, quotes, rules, tables, bold, italics, code) and never as raw HTML. On the task page a click on the details opens the text for editing; leaving it saves and shows it formatted again.
+21. **Administration and people care (D-034).**
+    Given the header link "Verwaltung", then `/admin` lists the admin tools as tiles (people, cleanup; later tools are added there). On "Personen" the owner sees every name from tasks and kept transcripts with its counts and can rename it (onto an existing name it merges), or delete it after a confirmation that shows the counts (refused with 409 if they changed). A deleted name goes from every task (logged, undoable per task); its transcript passages become "Unbekannt N". The section "Ohne Namen" lists the unnamed speakers of each kept recording with text samples, and the owner gives them a name. Discarded recordings and Plaud are never changed. Claude has no tool for any of this.
 
 ## Out of scope
 

@@ -182,6 +182,12 @@
   .save-state.failed { color: var(--danger); font-weight: 600; }
   .field.saved input, .field.saved select, .field.saved textarea { border-color: var(--ok); transition: border-color .4s; }
   .field.failed input, .field.failed select, .field.failed textarea { border-color: var(--danger); }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: .8rem; }
+  a.tile { display: block; padding: 1rem 1.1rem; text-decoration: none; color: var(--text); }
+  a.tile:hover { border-color: var(--accent); } a.tile strong { display: block; margin-bottom: .3rem; } a.tile span { color: var(--muted); font-size: .9rem; }
+  .orphan-samples { margin: .3rem 0 .5rem; padding-left: 1rem; color: var(--muted); font-size: .88rem; }
+  .orphan-samples li { margin: .15rem 0; }
+  .notice.ok { padding: .6rem .9rem; border-radius: .6rem; border: 0; background: color-mix(in srgb, var(--ok) 12%, transparent); color: var(--ok); margin: 0 0 1rem; font-weight: 500; }
   .tags { display: flex; flex-wrap: wrap; gap: .4rem; margin: .25rem 0 .55rem; }
   .tag { position: relative; cursor: pointer; }
   .tag input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
@@ -206,7 +212,7 @@
 </head>
 <body>
 {% set path = request.url.path %}
-{% set nav = "todos" if path.startswith("/todos") else "topics" if path.startswith("/topics") else "digests" if path.startswith("/digests") else "cleanup" if path.startswith("/cleanup") else "recordings" %}
+{% set nav = "todos" if path.startswith("/todos") else "topics" if path.startswith("/topics") else "digests" if path.startswith("/digests") else "admin" if path.startswith(("/admin", "/cleanup")) else "recordings" %}
 <header class="top"><div class="wrap">
   <a class="brand" href="/"><i></i><span>voice-vault</span></a>
   <a class="nav {% if nav == 'recordings' %}current{% endif %}" href="/">{{ t("ui_nav_recordings") }}</a>
@@ -215,7 +221,7 @@
   <a class="nav {% if nav == 'digests' %}current{% endif %}" href="/digests">{{ t("ui_nav_digests") }}</a>
   <span class="spacer"></span>
   <button class="wip-badge" type="button" popovertarget="wip" data-wip-count {% if not in_progress %}hidden{% endif %}>{{ t("ui_wip") }} <b>{{ wip_count }}</b></button>
-  <a class="nav {% if nav == 'cleanup' %}current{% endif %}" href="/cleanup">{{ t("ui_cleanup") }}</a>
+  <a class="nav {% if nav == 'admin' %}current{% endif %}" href="/admin">{{ t("ui_nav_admin") }}</a>
 </div></header>
 <div id="wip" class="wip" popover data-csrf="{{ csrf }}" data-done="{{ t('ui_wip_done') }}"
      data-pause="{{ t('ui_todo_pause') }}" data-note="{{ t('ui_wip_note') }}">
