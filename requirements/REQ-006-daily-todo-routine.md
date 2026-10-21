@@ -67,6 +67,8 @@ Once a day Claude reads the recordings that are new since its last run, adds the
     Given the header link "Statistik", then `/stats` shows open tasks, tasks in progress, the net of the last four weeks and this week's conversation hours, and four charts over the last twelve weeks: new versus finished tasks, open tasks by priority at each week's end, open tasks per person (top 12) and conversation hours. Each chart has a table view. Tasks of excluded topics are left out.
 23. **Topic as a tag (D-036).**
     Given the task page, then the topic is picked like the people: the task's topic and up to seven more topics (busiest first, excluded ones never) are tags; a tap sets the topic or replaces it, a tap on the set topic clears it, a typed or picked topic becomes the tag; each tap is saved at once. A task keeps exactly one topic or none.
+24. **Waiting for others and person briefing (D-038).**
+    Given a commitment another person made to the owner in a recording, then Claude records it with `add_todo` kind `waiting` and that person in `people`; it appears only under "Wartet auf" in the task list, never in the owner's list, counts, reminder or statistics, and can be marked done (received) or dropped like a task. Given a name anywhere in the UI, then a click opens `/person?name=…` with the owner's open tasks with that person, what the person owes him, shared topics with their latest note, and the latest three conversations the person spoke in (with the summary).
 
 ## Out of scope
 

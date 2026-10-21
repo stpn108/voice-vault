@@ -56,7 +56,7 @@ def _status_at(timeline: list, moment: dt.datetime):
 
 def figures(session: Session, now: dt.datetime) -> dict:
     hidden = todos._excluded_ids(session)
-    stmt = select(Todo)
+    stmt = select(Todo).where(Todo.kind == "mine")  # what others owe the owner is not his workload
     if hidden:
         stmt = stmt.where(Todo.topic_id.is_(None) | Todo.topic_id.not_in(hidden))
     tasks = session.scalars(stmt).all()

@@ -28,13 +28,16 @@ TOOLS = [
             status={"type": "string", "enum": list(svc.STATUSES), "default": "open"},
             topic={"type": "string", "description": "Only tasks of this topic."},
             person={"type": "string", "maxLength": svc.PERSON_MAX, "description": "Only tasks naming this person."},
+            kind={"type": "string", "enum": list(svc.KINDS), "default": "mine",
+                  "description": "mine: the owner's own tasks; waiting: what other people promised the owner."},
             limit={"type": "integer", "minimum": 1, "maximum": svc.LIST_LIMIT_MAX, "default": 50}),
         "annotations": READ,
     },
     {
         "name": "add_todo",
-        "description": "Create a task for the OWNER from a recording: something he himself must do. Never add "
-                       "commitments of other people; the owner tracks those elsewhere. Rejected if a similar open "
+        "description": "Create an entry from a recording. kind mine (default): something the OWNER himself must do. "
+                       "kind waiting: something another person promised to deliver to the owner or do for him; set "
+                       "people to that person. Rejected if a similar open entry of the same kind exists "
                        "task exists (update that one instead, or pass allow_similar) or if the topic is excluded "
                        "by the owner. people: whom the owner has to talk to about it; use the speaker names "
                        "as the recording spells them, never the owner himself. " + PRIORITY_HELP,
@@ -46,6 +49,7 @@ TOOLS = [
             topic={"type": "string", "maxLength": svc.TOPIC_MAX},
             recording_id=_ID,
             people=PEOPLE,
+            kind={"type": "string", "enum": list(svc.KINDS), "default": "mine"},
             note={"type": "string", "maxLength": svc.NOTE_MAX, "description": "Why, for the change log."},
             allow_similar={"type": "boolean", "default": False}), "required": ["title"]},
         "annotations": WRITE,
@@ -128,7 +132,7 @@ def _day(value) -> str:
 
 
 def _line(row: svc.TodoRow) -> str:
-    parts = [f"#{row.id}", f"P{row.priority}", row.status, row.title]
+    parts = [f"#{row.id}", f"P{row.priority}", row.status if row.kind == "mine" else f"waiting/{row.status}", row.title]
     if row.due_date:
         parts.append(f"due {row.due_date.isoformat()}")
     if row.topic:
@@ -172,10 +176,11 @@ def list_todos_tool(session, arguments, now, stability_minutes):
     status = enum_arg(arguments, "status", svc.STATUSES, "open")
     topic = str_arg(arguments, "topic", svc.TOPIC_MAX) or None
     person = str_arg(arguments, "person", svc.PERSON_MAX) or None
+    kind = enum_arg(arguments, "kind", svc.KINDS, "mine")
     limit = int_arg(arguments, "limit", 50, 1, svc.LIST_LIMIT_MAX)
-    rows, truncated = svc.list_todos(session, now, status=status, topic=topic, person=person, limit=limit)
+    rows, truncated = svc.list_todos(session, now, status=status, topic=topic, person=person, kind=kind, limit=limit)
     if not rows:
-        return text_result(f"No {status} tasks.")
+        return text_result(f"No {status} tasks." if kind == "mine" else f"No {status} entries waiting on others.")
     lines = [_line(r) for r in rows]
     if truncated:
         lines.append(f"(more tasks exist than the limit of {limit}; narrow with topic or raise limit)")
@@ -195,6 +200,7 @@ def add_todo_tool(session, arguments, now, stability_minutes):
         recording_id=_optional_id(arguments, "recording_id"),
         note=str_arg(arguments, "note", svc.NOTE_MAX),
         people=people_arg(arguments),
+        kind=enum_arg(arguments, "kind", svc.KINDS, "mine"),
         allow_similar=bool_arg(arguments, "allow_similar"))
 
     def run():

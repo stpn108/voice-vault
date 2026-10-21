@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}{{ b.name }}{% endblock %}
+{% block crumbs %}
+<nav class="crumbs" aria-label="breadcrumb"><a href="/todos">{{ t("ui_nav_todos") }}</a><span class="sep">/</span><span aria-current="page">{{ b.name }}</span></nav>
+{% endblock %}
+{% block content %}
+<div class="briefing-head">
+  <h1>{{ b.name }}</h1>
+  <span class="muted">{% if b.last_talk %}{{ t("ui_brief_last_talk_today") if days_since == 0 else t("ui_brief_last_talk_yesterday") if days_since == 1 else t("ui_brief_last_talk", days=days_since) }} · {{ t("ui_brief_conversation_one") if b.conversations == 1 else t("ui_brief_conversations", count=b.conversations) }}{% else %}{{ t("ui_brief_no_talk") }}{% endif %}</span>
+</div>
+<div class="briefing-grid">
+  <section class="card">
+    <h2>{{ t("ui_brief_mine") }} <span class="count muted">{{ b.mine | length }}</span></h2>
+    {% if b.mine %}<ul class="brief-list">{% for row in b.mine %}<li><a href="/todos/{{ row.id }}">{{ row.title }}</a>
+      <div class="muted">{{ t("todo_status_" ~ row.status) }} · {{ t("todo_prio_" ~ row.priority) }}{% if row.topic %} · {{ row.topic }}{% endif %}{% if row.due_date %} · <span class="due {% if row.due_date < today %}overdue{% endif %}">{{ t("ui_overdue") if row.due_date < today else t("ui_due") }} {{ row.due_date.strftime("%d.%m.") }}</span>{% endif %}</div></li>{% endfor %}</ul>
+    {% else %}<p class="muted">{{ t("ui_brief_none") }}</p>{% endif %}
+  </section>
+  <section class="card">
+    <h2>{{ t("ui_brief_waiting", name=b.name) }} <span class="count muted">{{ b.waiting | length }}</span></h2>
+    {% if b.waiting %}<ul class="brief-list">{% for row in b.waiting %}<li><a href="/todos/{{ row.id }}">{{ row.title }}</a>
+      <div class="muted">{{ t("ui_brief_since_today") if row.age_days == 0 else t("ui_brief_since_one") if row.age_days == 1 else t("ui_brief_since", days=row.age_days) }}{% if row.topic %} · {{ row.topic }}{% endif %}{% if row.due_date %} · <span class="due {% if row.due_date < today %}overdue{% endif %}">{{ t("ui_overdue") if row.due_date < today else t("ui_due") }} {{ row.due_date.strftime("%d.%m.") }}</span>{% endif %}</div></li>{% endfor %}</ul>
+    {% else %}<p class="muted">{{ t("ui_brief_none") }}</p>{% endif %}
+  </section>
+  <section class="card">
+    <h2>{{ t("ui_brief_topics") }}</h2>
+    {% if b.topics %}<ul class="brief-list">{% for topic, note in b.topics %}<li><a href="/topics/{{ topic.id }}">{{ topic.name }}</a>
+      {% if note %}<div class="muted">{{ note.note }}</div>{% endif %}</li>{% endfor %}</ul>
+    {% else %}<p class="muted">{{ t("ui_brief_none") }}</p>{% endif %}
+  </section>
+  <section class="card">
+    <h2>{{ t("ui_brief_recordings") }}</h2>
+    {% if b.recordings %}<ul class="brief-list">{% for rec in b.recordings %}<li><a href="/recordings/{{ rec.id }}">{{ rec.title or ("#" ~ rec.id) }}</a>
+      <div class="muted">{{ rec.started_at | localtime }}</div>
+      {% if rec.summary %}<details><summary class="muted">{{ t("ui_summary") }}</summary><div class="prose">{{ rec.summary | md }}</div></details>{% endif %}</li>{% endfor %}</ul>
+    {% else %}<p class="muted">{{ t("ui_brief_none") }}</p>{% endif %}
+  </section>
+</div>
+<p style="margin-top:1rem"><a href="/todos?status=open&amp;person={{ b.name | urlencode }}">{{ t("ui_brief_all_tasks") }}</a></p>
+{% endblock %}

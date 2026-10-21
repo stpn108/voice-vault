@@ -316,7 +316,7 @@ def test_d030_detail_offers_the_recording_speakers_and_saves_the_ticked_ones(cli
         "people": ["Jochen Rill"], "people_more": "Anna, , anna"})
     assert response.status_code == 303
     html = client.get("/todos").text
-    assert 'class="person" href="/todos?status=open&amp;sort=priority&amp;person=Anna"' in html
+    assert 'class="person" href="/person?name=Anna"' in html  # D-038: a name opens the briefing
     filtered = client.get("/todos?person=Jochen%20Rill").text
     assert "Discuss budget" in filtered and "Person: <strong>Jochen Rill</strong>" in filtered
     assert "Discuss budget" not in client.get("/todos?person=Eve").text
@@ -485,3 +485,51 @@ def test_d037_list_rows_show_status_topic_age_then_people_and_no_author(client, 
     row = html[html.index("Discuss budget"):html.index("</li>", html.index("Discuss budget"))]
     assert '<span class="by">' not in row and ">Claude<" not in row
     assert row.index("s-open") < row.index(">Budget<") < row.index(" Tage") < row.index("task-people") < row.index(">Anna<")
+
+
+
+# --- waiting for others and the briefing (D-038) ---------------------------------------------------
+def test_d038_waiting_entries_have_their_own_list_and_stay_out_of_mine(client, make_todo):
+    make_todo(title="Write offer")
+    make_todo(title="Change ticket", kind="waiting", people=["Jochen Rill"])
+    mine, waiting = client.get("/todos").text, client.get("/todos?kind=waiting").text
+    assert "Write offer" in mine and "Change ticket" not in mine
+    assert "Change ticket" in waiting and "Write offer" not in waiting
+    assert 'data-count="in_progress"' not in waiting and 'name="person"' in waiting
+    assert 'href="/todos?kind=waiting"' in mine
+
+
+def test_d038_adding_from_the_waiting_list_records_who_delivers(client, session_factory):
+    response = post(client, "/todos", title="Send concept", kind="waiting", person="Jochen Rill", priority="3")
+    assert response.status_code == 303
+    with session_factory() as s:
+        row = svc.list_todos(s, now_utc(), kind="waiting")[0][0]
+        assert (row.title, row.people, row.kind) == ("Send concept", ["Jochen Rill"], "waiting")
+
+
+def test_d038_checking_off_a_waiting_entry_answers_its_own_counts(client, make_todo):
+    make_todo(title="Write offer")
+    todo = make_todo(title="Change ticket", kind="waiting", people=["Jochen Rill"])
+    body = client.post(f"/todos/{todo}/status", data={"csrf": webapp.csrf_token(), "status": "done"},
+                       headers={"Accept": "application/json"}).json()
+    assert body["counts"]["done"] == 1 and body["counts"]["open"] == 0 and body["wip"] == 0
+    assert post(client, f"/todos/{todo}/status", status="open", back="list").headers["location"] == "/todos?kind=waiting"
+
+
+def test_d038_briefing_shows_tasks_waiting_topics_and_conversations(client, make_todo, session_factory):
+    from database import Segment
+    with session_factory() as s:
+        rec = add_recording(s, 1, segments=1, summary="**Kernpunkt** aus dem Gespräch")
+        s.add(Segment(recording_id=rec.id, idx=5, speaker="Jochen Rill", text="hallo"))
+        s.commit()
+        svc.add_topic_note(s, now_utc(), topic="Security", recording_id=rec.id, note="SOC startet Dienstag")
+    make_todo(title="Write offer", people=["Jochen Rill"], topic="Budget")
+    make_todo(title="Change ticket", kind="waiting", people=["jochen rill"])
+    html = client.get("/person?name=Jochen%20Rill").text
+    for text in ("Write offer", "Change ticket", "Jochen Rill schuldet Dir", "Security", "SOC startet Dienstag",
+                 "Budget", "Title 1", "<strong>Kernpunkt</strong>", "1 Gespräch<", "seit heute"):
+        assert text in html, text
+
+
+def test_d038_briefing_of_an_unknown_person_is_404(client):
+    assert client.get("/person?name=Nobody").status_code == 404

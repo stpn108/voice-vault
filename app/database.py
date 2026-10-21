@@ -100,6 +100,8 @@ class Todo(Base):
     done_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     # Whom the owner has to talk to about it (D-030): names, one per line.
     people: Mapped[str] = mapped_column(Text, default="", server_default="")
+    # "mine": the owner has to do it; "waiting": someone (in people) promised it to the owner (D-038).
+    kind: Mapped[str] = mapped_column(String(10), default="mine", server_default="mine", index=True)
 
 
 class TodoEvent(Base):
@@ -246,12 +248,19 @@ def _migrate_005_todos_people(conn):
         conn.execute(sqltext("ALTER TABLE IF EXISTS todos ADD COLUMN IF NOT EXISTS people TEXT NOT NULL DEFAULT '';"))
 
 
+def _migrate_006_todos_kind(conn):
+    if conn.dialect.name == "postgresql":
+        conn.execute(sqltext("ALTER TABLE IF EXISTS todos ADD COLUMN IF NOT EXISTS kind VARCHAR(10) NOT NULL DEFAULT 'mine';"))
+        conn.execute(sqltext("CREATE INDEX IF NOT EXISTS ix_todos_kind ON todos (kind);"))
+
+
 MIGRATIONS: list = [
     ("001_recordings_discarded_at", _migrate_001_recordings_discarded_at),
     ("002_recordings_analyzed_at", _migrate_002_recordings_analyzed_at),
     ("003_topics_excluded", _migrate_003_topics_excluded),
     ("004_todos_status_length", _migrate_004_todos_status_length),
     ("005_todos_people", _migrate_005_todos_people),
+    ("006_todos_kind", _migrate_006_todos_kind),
 ]
 
 # Advisory lock key: serialises schema setup when several replicas start at

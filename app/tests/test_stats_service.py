@@ -48,3 +48,10 @@ def test_d035_tasks_of_excluded_topics_are_left_out(db_session):
     svc.create_todo(db_session, NOW, title="Alpha task here", actor="owner", topic="Secret")
     svc.set_topic_excluded(db_session, "Secret", True)
     assert stats.figures(db_session, NOW)["tiles"]["open"] == 0
+
+
+
+def test_d038_waiting_entries_are_not_the_owners_workload(db_session):
+    svc.create_todo(db_session, NOW, title="Alpha task here", actor="owner", kind="waiting", people=["Anna"])
+    data = stats.figures(db_session, NOW)
+    assert data["tiles"]["open"] == 0 and data["people"]["names"] == []

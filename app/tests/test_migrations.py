@@ -94,3 +94,9 @@ def test_d028_status_column_fits_in_progress():
 def test_d030_people_migration_is_registered():
     from database import MIGRATIONS, Todo
     assert "005_todos_people" in [name for name, _ in MIGRATIONS] and "people" in Todo.__table__.c
+
+
+
+def test_d038_kind_migration_is_registered():
+    from database import MIGRATIONS, Todo
+    assert "006_todos_kind" in [name for name, _ in MIGRATIONS] and "kind" in Todo.__table__.c

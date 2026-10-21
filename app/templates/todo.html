@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ row.title }}{% endblock %}
 {% block crumbs %}
-<nav class="crumbs" aria-label="breadcrumb"><a href="/todos">{{ t("ui_nav_todos") }}</a><span class="sep">/</span><span aria-current="page">{{ row.title }}</span></nav>
+<nav class="crumbs" aria-label="breadcrumb"><a href="/todos{{ '?kind=waiting' if row.kind == 'waiting' else '' }}">{{ t("ui_kind_" ~ row.kind) }}</a><span class="sep">/</span><span aria-current="page">{{ row.title }}</span></nav>
 {% endblock %}
 {% block content %}
 <form method="post" action="/todos/{{ row.id }}" data-autosave>
@@ -10,6 +10,7 @@
     <div style="flex:1;min-width:0">
       <input class="title-input" type="text" name="title" value="{{ row.title }}" maxlength="300" required aria-label="{{ t('ui_col_task') }}"></div>
     <span class="save-state" data-save-state aria-live="polite" data-saving="{{ t('ui_saving') }}" data-saved="{{ t('ui_saved') }}" data-failed="{{ t('ui_save_failed') }}"></span>
+    {% if row.kind == "waiting" %}<span class="pill">{{ t("ui_waiting_badge") }}</span>{% endif %}
     <span data-status-pill class="pill state-{{ 'verified' if row.status == 'done' else 'progress' if row.status == 'in_progress' else 'waiting' if row.status == 'open' else '' }}">{{ t("todo_status_" ~ row.status) }}</span>
   </div>
   <p class="sub" style="margin:0 0 1.2rem">{{ t("ui_created_by") }} {{ row.created_by }}, {{ row.created_at | localtime }}
@@ -28,7 +29,7 @@
         <input type="text" name="topic_more" list="known-topics" maxlength="120" placeholder="{{ t('ui_topic_more') }}" aria-label="{{ t('ui_topic_more') }}">
         <datalist id="known-topics">{% for name in known_topics %}<option value="{{ name }}">{% endfor %}</datalist>
       </div>
-      <div class="field"><span>{{ t("ui_people") }}</span>
+      <div class="field"><span>{{ t("ui_people_waiting") if row.kind == "waiting" else t("ui_people") }}</span>
         <div class="tags" data-url="/todos/{{ row.id }}/people" data-field="people">{% for name in candidates %}<label class="tag"><input type="checkbox" name="people" value="{{ name }}" {% if name in row.people %}checked{% endif %}><span>{{ name }}</span></label>{% endfor %}</div>
         <input type="text" name="people_more" list="known-people" maxlength="400" placeholder="{{ t('ui_people_more') }}" aria-label="{{ t('ui_people_more') }}">
         <datalist id="known-people">{% for name in known %}<option value="{{ name }}">{% endfor %}</datalist>

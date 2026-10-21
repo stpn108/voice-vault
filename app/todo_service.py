@@ -27,6 +27,7 @@ DEFAULT_PRIORITY = 3
 STATUSES = ("open", "in_progress", "done", "dropped")
 ACTIVE = ("open", "in_progress")  # not finished; the list "open" shows both (D-028)
 ACTORS = ("claude", "owner")
+KINDS = ("mine", "waiting")  # the owner's own tasks, and what others promised him (D-038)
 TITLE_MAX, DETAIL_MAX, NOTE_MAX, TOPIC_MAX, DIGEST_MAX = 300, 4000, 1000, 120, 20000
 PERSON_MAX, PEOPLE_PER_TASK = 80, 10
 LIST_LIMIT_MAX = 200
@@ -63,6 +64,7 @@ class TodoRow:
     age_days: int
     topic_id: Optional[int] = None
     people: list = field(default_factory=list)
+    kind: str = "mine"
 
 
 # --- validation -------------------------------------------------------------------------
@@ -102,6 +104,12 @@ def _due(value) -> Optional[dt.date]:
 def _status(value) -> str:
     if value not in STATUSES:
         raise TodoError("status must be open, done or dropped")
+    return value
+
+
+def _kind(value: str) -> str:
+    if value not in KINDS:
+        raise TodoError(f"kind must be one of: {', '.join(KINDS)}")
     return value
 
 
@@ -231,11 +239,11 @@ def _tokens(title: str) -> set:
     return set(re.findall(r"\w{3,}", title.lower()))
 
 
-def similar_open(session: Session, title: str, limit: int = 3) -> list:
-    """Open tasks whose title is close to `title` (word overlap), most similar first."""
+def similar_open(session: Session, title: str, limit: int = 3, kind: str = "mine") -> list:
+    """Open tasks of the same kind whose title is close to `title` (word overlap), most similar first."""
     wanted = _tokens(title)
     scored = []
-    stmt = select(Todo).where(Todo.status.in_(ACTIVE))
+    stmt = select(Todo).where(Todo.status.in_(ACTIVE), Todo.kind == kind)
     hidden = _excluded_ids(session)
     if hidden:  # the tasks of an excluded topic must not show up, not even as "a similar task exists"
         stmt = stmt.where(Todo.topic_id.is_(None) | Todo.topic_id.not_in(hidden))
@@ -297,8 +305,9 @@ def _log(session: Session, now: dt.datetime, todo: Todo, kind: str, actor: str, 
 
 def create_todo(session: Session, now: dt.datetime, *, title: str, actor: str, priority=DEFAULT_PRIORITY,
                 detail: str = "", due=None, topic: Optional[str] = None, recording_id: Optional[int] = None,
-                note: str = "", allow_similar: bool = False, people=()) -> Todo:
+                note: str = "", allow_similar: bool = False, people=(), kind: str = "mine") -> Todo:
     actor = _actor(actor)
+    kind = _kind(kind)
     title = _text(title, "title", TITLE_MAX, required=True)
     detail = _text(detail, "detail", DETAIL_MAX)
     note = _text(note, "note", NOTE_MAX)
@@ -310,13 +319,13 @@ def create_todo(session: Session, now: dt.datetime, *, title: str, actor: str, p
     if open_tasks >= MAX_OPEN_TASKS:
         raise TodoError(f"there are {open_tasks} open tasks already; finish or drop some first")
     if not allow_similar:
-        similar = similar_open(session, title)
+        similar = similar_open(session, title, kind=kind)
         if similar:
             raise DuplicateTodoError(similar)
     topic_row = _writable_topic(session, topic) if topic else None
     todo = Todo(title=title, detail=detail, priority=priority, status="open", due_date=due_date,
                 topic_id=topic_row.id if topic_row else None, recording_id=recording_id, created_by=actor,
-                people="\n".join(people),
+                people="\n".join(people), kind=kind,
                 created_at=now, updated_at=now)
     session.add(todo)
     session.flush()
@@ -423,7 +432,7 @@ def _rows(session: Session, todos: list, now: dt.datetime) -> list:
     return [
         TodoRow(t.id, t.title, t.detail, t.priority, t.status, t.due_date, topics.get(t.topic_id), t.recording_id,
                 t.created_by, as_utc(t.created_at), as_utc(t.done_at) if t.done_at else None,
-                max((now - as_utc(t.created_at)).days, 0), t.topic_id, sorted(_names_of(t), key=str.lower))
+                max((now - as_utc(t.created_at)).days, 0), t.topic_id, sorted(_names_of(t), key=str.lower), t.kind)
         for t in todos
     ]
 
@@ -449,7 +458,7 @@ def _order(sort: str) -> tuple:
 
 
 def list_todos(session: Session, now: dt.datetime, *, status: str = "open", topic: Optional[str] = None,
-               person: Optional[str] = None, limit: int = 50, include_excluded: bool = False, sort: str = "priority") -> tuple:
+               person: Optional[str] = None, kind: str = "mine", limit: int = 50, include_excluded: bool = False, sort: str = "priority") -> tuple:
     """Without tasks of excluded topics; most urgent first unless `sort` says otherwise.
     Returns (rows, truncated)."""
     limit = min(max(limit, 1), LIST_LIMIT_MAX)
@@ -458,6 +467,8 @@ def list_todos(session: Session, now: dt.datetime, *, status: str = "open", topi
         hidden = _excluded_ids(session)
         if hidden:
             stmt = stmt.where(Todo.topic_id.is_(None) | Todo.topic_id.not_in(hidden))
+    if kind != "all":
+        stmt = stmt.where(Todo.kind == _kind(kind))
     if status == "open":
         stmt = stmt.where(Todo.status.in_(ACTIVE))
     elif status != "all":
@@ -485,9 +496,9 @@ def get_todo(session: Session, now: dt.datetime, todo_id: int):
     return _rows(session, [todo], now)[0], events
 
 
-def counts(session: Session) -> dict:
+def counts(session: Session, kind: str = "mine") -> dict:
     result = {s: 0 for s in STATUSES}
-    stmt = select(Todo.status, func.count()).group_by(Todo.status)
+    stmt = select(Todo.status, func.count()).where(Todo.kind == _kind(kind)).group_by(Todo.status)
     hidden = _excluded_ids(session)
     if hidden:
         stmt = stmt.where(Todo.topic_id.is_(None) | Todo.topic_id.not_in(hidden))
@@ -522,7 +533,7 @@ def list_topics(session: Session) -> list:
     result = []
     for topic in session.scalars(select(Topic).order_by(Topic.name)):
         open_count = session.scalar(select(func.count()).select_from(Todo)
-                                    .where(Todo.topic_id == topic.id, Todo.status.in_(ACTIVE)))
+                                    .where(Todo.topic_id == topic.id, Todo.status.in_(ACTIVE), Todo.kind == "mine"))
         notes = session.scalars(select(TopicNote).where(TopicNote.topic_id == topic.id)).all()
         todos = session.scalars(select(Todo).where(Todo.topic_id == topic.id)).all()
         stamps = [as_utc(n.updated_at) for n in notes] + [as_utc(t.updated_at) for t in todos]

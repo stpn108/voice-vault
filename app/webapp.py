@@ -27,6 +27,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 import recording_service as svc
 import todo_service as todos
+import briefing_service
 import people_admin
 import stats_service
 import topic_admin
@@ -268,26 +269,31 @@ def _todo_error(exc: todos.TodoError) -> HTTPException:
 
 @app.get("/todos", response_class=HTMLResponse)
 def todo_list(request: Request, status: str = Query("open", max_length=12), topic: str = Query("", max_length=120),
-              person: str = Query("", max_length=todos.PERSON_MAX),
+              person: str = Query("", max_length=todos.PERSON_MAX), kind: str = Query("mine", max_length=10),
               sort: str = Query("priority", max_length=10), session: Session = Depends(get_session), cfg: Config = Depends(get_config)):
-    if status not in todos.STATUSES or sort not in todos.SORTS:
-        raise HTTPException(status_code=400, detail="invalid status or sort")
+    if status not in todos.STATUSES or sort not in todos.SORTS or kind not in todos.KINDS:
+        raise HTTPException(status_code=400, detail="invalid status, sort or kind")
     rows, truncated = todos.list_todos(session, now_utc(), status=status, topic=topic or None, person=person or None,
-                                       limit=todos.LIST_LIMIT_MAX, sort=sort)
+                                       kind=kind, limit=todos.LIST_LIMIT_MAX, sort=sort)
+    # What others owe the owner is not started or put back, so that list has no "in progress" tab (D-038).
+    statuses = [s for s in todos.STATUSES if kind == "mine" or s != "in_progress"]
     return render(request, cfg, "todos.html", rows=rows, truncated=truncated, status=status, topic=topic, person=person,
-                  sort=sort, sorts=todos.SORTS,
-                  today=now_utc().astimezone(LOCAL_TZ).date(),
-                  counts=todos.counts(session), statuses=todos.STATUSES, priorities=todos.PRIORITIES)
+                  kind=kind, kinds=todos.KINDS, kind_counts={k: todos.counts(session, k)["open"] for k in todos.KINDS},
+                  sort=sort, sorts=todos.SORTS, today=now_utc().astimezone(LOCAL_TZ).date(),
+                  counts=todos.counts(session, kind), statuses=statuses, priorities=todos.PRIORITIES,
+                  known_people=todos.known_people(session) if kind == "waiting" else [])
 
 
 @app.post("/todos")
 def todo_add(request: Request, title: str = Form("", max_length=todos.TITLE_MAX), priority: int = Form(3),
              due: str = Form("", max_length=10), topic: str = Form("", max_length=todos.TOPIC_MAX),
+             kind: str = Form("mine", max_length=10), person: str = Form("", max_length=todos.PERSON_MAX),
              csrf: str = Form(""), session: Session = Depends(get_session)):
     require_csrf(request, csrf)
     try:
         todo = todos.create_todo(session, now_utc(), title=title, actor="owner", priority=priority,
-                                 due=due or None, topic=topic or None, allow_similar=True)
+                                 due=due or None, topic=topic or None, allow_similar=True, kind=kind,
+                                 people=[person] if person.strip() else [])
     except todos.TodoError as exc:
         raise _todo_error(exc)
     return RedirectResponse(f"/todos/{todo.id}", status_code=303)
@@ -331,7 +337,8 @@ def todo_edit(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX_I
         raise _todo_error(exc)
     if "application/json" in request.headers.get("accept", ""):
         # Saved in the background from the task page (D-032); the header reminder follows the status.
-        return JSONResponse({"ok": True, "id": todo_id, "status": status, "counts": todos.counts(session),
+        return JSONResponse({"ok": True, "id": todo_id, "status": status, "wip": todos.counts(session)["in_progress"],
+                             "counts": todos.counts(session, todos.get_todo(session, now_utc(), todo_id)[0].kind),
                              "in_progress": _in_progress(session), "detail_html": str(render_markdown(detail.strip()))})
     return RedirectResponse("/todos" if back == "list" else f"/todos/{todo_id}", status_code=303)
 
@@ -387,10 +394,13 @@ def todo_status(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX
         raise _todo_error(exc)
     if "application/json" in request.headers.get("accept", ""):
         return JSONResponse({"ok": True, "id": todo_id, "status": status, "previous": previous,
-                             "counts": todos.counts(session), "in_progress": _in_progress(session)})
+                             "counts": todos.counts(session, found[0].kind), "wip": todos.counts(session)["in_progress"],
+                             "in_progress": _in_progress(session)})
     if back == "page" and request.headers.get("referer", "").startswith(f"{request.url.scheme}://{request.headers.get('host')}/"):
         return RedirectResponse(request.headers["referer"], status_code=303)
-    return RedirectResponse("/todos" if back == "list" else f"/todos/{todo_id}", status_code=303)
+    if back == "list":
+        return RedirectResponse("/todos?kind=waiting" if found and found[0].kind == "waiting" else "/todos", status_code=303)
+    return RedirectResponse(f"/todos/{todo_id}", status_code=303)
 
 
 @app.post("/todos/events/{event_id}/undo")
@@ -401,6 +411,17 @@ def todo_undo(request: Request, event_id: Annotated[int, PathParam(ge=1, le=MAX_
     except todos.TodoError as exc:
         raise _todo_error(exc)
     return RedirectResponse(f"/todos/{todo.id}", status_code=303)
+
+
+@app.get("/person", response_class=HTMLResponse)
+def person_page(request: Request, name: str = Query(..., max_length=todos.PERSON_MAX), session: Session = Depends(get_session),
+                cfg: Config = Depends(get_config)):
+    """Briefing before talking to someone (D-038)."""
+    found = briefing_service.briefing(session, now_utc(), name)
+    if found is None:
+        raise HTTPException(status_code=404, detail="unknown person")
+    return render(request, cfg, "person.html", b=found, today=now_utc().astimezone(LOCAL_TZ).date(),
+                  days_since=(now_utc() - found.last_talk).days if found.last_talk else None)
 
 
 @app.get("/stats", response_class=HTMLResponse)

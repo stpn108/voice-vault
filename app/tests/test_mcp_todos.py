@@ -209,3 +209,11 @@ def test_d030_claude_names_people_and_filters_by_them(client):
     call(client, "update_todo", {"id": todo_id, "people": []})
     assert "No open tasks" in text_of(call(client, "list_todos", {"person": "Jochen Rill"}))
     assert "error" in call(client, "add_todo", {"title": "Bad", "people": "Jochen"}).json()
+
+
+
+def test_d038_claude_records_what_others_promised_as_waiting(client):
+    add(client, title="Change-Ticket einreichen", kind="waiting", people=["Jochen Rill"])
+    assert "No open tasks" in text_of(call(client, "list_todos"))
+    listed = text_of(call(client, "list_todos", {"kind": "waiting"}))
+    assert "waiting/open" in listed and "Jochen Rill" in listed

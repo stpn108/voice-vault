@@ -41,7 +41,7 @@
 
   function show(result) {
     list.replaceChildren.apply(list, result.in_progress.map(row));
-    var count = result.counts.in_progress;
+    var count = result.wip;
     badge.querySelector("b").textContent = count;
     badge.hidden = count === 0;
     if (count === 0 && panel.matches(":popover-open")) { panel.hidePopover(); }

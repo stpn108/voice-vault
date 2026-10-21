@@ -582,3 +582,20 @@ def test_d030_speaker_names_come_from_the_transcript_without_plaud_labels(db_ses
     svc.create_todo(db_session, NOW, title="Ask Anna", actor="owner", people=["Anna"])
     assert svc.speakers_of(db_session, rec.id) == ["Dennis", "Jochen Rill"]
     assert svc.known_people(db_session) == ["Anna", "Dennis", "Jochen Rill"]
+
+
+
+# --- waiting for others (D-038) --------------------------------------------------------------------
+def test_d038_waiting_entries_are_kept_apart_from_the_owners_tasks(db_session):
+    svc.create_todo(db_session, NOW, title="Send the concept", actor="owner")
+    svc.create_todo(db_session, NOW, title="Send the concept", actor="claude", kind="waiting", people=["Jochen"])
+    assert [r.kind for r in svc.list_todos(db_session, LATER)[0]] == ["mine"]
+    assert [r.kind for r in svc.list_todos(db_session, LATER, kind="waiting")[0]] == ["waiting"]
+    assert svc.counts(db_session)["open"] == 1 and svc.counts(db_session, "waiting")["open"] == 1
+    with pytest.raises(svc.DuplicateTodoError):  # duplicates are checked within the same kind
+        svc.create_todo(db_session, NOW, title="Send the concept", actor="claude", kind="waiting")
+
+
+def test_d038_unknown_kind_is_rejected(db_session):
+    with pytest.raises(svc.TodoError, match="kind"):
+        svc.create_todo(db_session, NOW, title="x", actor="owner", kind="theirs")

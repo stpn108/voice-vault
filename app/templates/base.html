@@ -198,6 +198,18 @@
   .chart-card table { border-collapse: collapse; margin-top: .4rem; width: 100%; }
   .chart-card th, .chart-card td { border-bottom: 1px solid var(--line); padding: .2rem .4rem; text-align: right; }
   .chart-card th:first-child, .chart-card td:first-child { text-align: left; }
+  .kinds { display: flex; gap: .3rem; margin-top: 1.4rem; border-bottom: 1px solid var(--line); }
+  a.kind-link { padding: .45rem .8rem; color: var(--muted); text-decoration: none; font-weight: 550; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  a.kind-link small { margin-left: .4rem; color: var(--faint); font-weight: 500; }
+  a.kind-link.current { color: var(--text); border-bottom-color: var(--accent); }
+  li.task[data-kind="waiting"] .btn-start, li.task[data-kind="waiting"] .btn-pause { display: none; }
+  .briefing-head { display: flex; align-items: baseline; gap: .8rem; flex-wrap: wrap; margin: 1.2rem 0 .4rem; }
+  .briefing-head h1 { margin: 0; }
+  .briefing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr)); gap: 1rem; }
+  .briefing-grid .card { padding: 1rem 1.1rem; } .briefing-grid h2 { margin: 0 0 .6rem; }
+  .brief-list { list-style: none; margin: 0; padding: 0; } .brief-list li { padding: .45rem 0; border-top: 1px solid var(--line); }
+  .brief-list li:first-child { border-top: 0; } .brief-list a { color: var(--text); text-decoration: none; font-weight: 500; }
+  .brief-list a:hover { color: var(--accent); } .brief-list .muted { font-size: .85rem; }
   .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: .8rem; }
   a.tile { display: block; padding: 1rem 1.1rem; text-decoration: none; color: var(--text); }
   a.tile:hover { border-color: var(--accent); } a.tile strong { display: block; margin-bottom: .3rem; } a.tile span { color: var(--muted); font-size: .9rem; }
@@ -230,7 +242,7 @@
 </head>
 <body>
 {% set path = request.url.path %}
-{% set nav = "todos" if path.startswith("/todos") else "topics" if path.startswith("/topics") else "digests" if path.startswith("/digests") else "stats" if path.startswith("/stats") else "admin" if path.startswith(("/admin", "/cleanup")) else "recordings" %}
+{% set nav = "todos" if path.startswith(("/todos", "/person")) else "topics" if path.startswith("/topics") else "digests" if path.startswith("/digests") else "stats" if path.startswith("/stats") else "admin" if path.startswith(("/admin", "/cleanup")) else "recordings" %}
 <header class="top"><div class="wrap">
   <a class="brand" href="/"><i></i><span>voice-vault</span></a>
   <a class="nav {% if nav == 'recordings' %}current{% endif %}" href="/">{{ t("ui_nav_recordings") }}</a>
