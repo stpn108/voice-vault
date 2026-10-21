@@ -336,7 +336,7 @@ def todo_edit(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX_I
     return RedirectResponse("/todos" if back == "list" else f"/todos/{todo_id}", status_code=303)
 
 
-TOPIC_TAGS = 8  # topic tags offered on the task page; every other topic is suggested in the text field
+TOPIC_TAGS = 6  # topic tags offered on the task page; every other topic is suggested in the text field
 
 
 @app.post("/todos/{todo_id}/topic")

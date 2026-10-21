@@ -126,7 +126,7 @@
   button.ghost:hover { background: var(--surface); color: var(--danger); }
 
   /* task page */
-  .split { display: grid; grid-template-columns: 1fr 17rem; gap: 1.25rem; align-items: start; }
+  .split { display: grid; grid-template-columns: minmax(0, 1fr) 21rem; gap: 1.25rem; align-items: start; }
   .field { display: block; margin-bottom: .9rem; } .field > span { display: block; font-size: .78rem; color: var(--muted); font-weight: 600; margin-bottom: .25rem; }
   .field select, .field input { width: 100%; }
   input.title-input { width: 100%; font-size: 1.35rem; font-weight: 700; letter-spacing: -.02em; border-color: transparent; background: transparent; padding: .3rem .5rem; margin: 0 0 .6rem -.5rem; }
@@ -205,13 +205,15 @@
   .orphan-samples li { margin: .15rem 0; }
   .notice.ok { padding: .6rem .9rem; border-radius: .6rem; border: 0; background: color-mix(in srgb, var(--ok) 12%, transparent); color: var(--ok); margin: 0 0 1rem; font-weight: 500; }
   .tags { display: flex; flex-wrap: wrap; gap: .4rem; margin: .25rem 0 .55rem; }
-  .tag { position: relative; cursor: pointer; }
+  .tag { position: relative; cursor: pointer; max-width: 100%; min-width: 0; }
   .tag input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
-  .tag span { display: inline-flex; align-items: center; gap: .3rem; padding: .25rem .7rem; border-radius: 999px; font-size: .85rem;
-    border: 1px dashed var(--faint); color: var(--muted); background: transparent; white-space: nowrap; transition: background .12s, color .12s; user-select: none; }
-  .tag span::before { content: "+"; font-weight: 600; }
+  .tag span { display: inline-flex; align-items: center; gap: .3rem; max-width: 100%; padding: .2rem .6rem;
+    font-size: .8rem; line-height: 1.35; border: 1px solid var(--line); border-radius: .8rem; color: var(--muted); background: var(--hover);
+    transition: background .12s, color .12s, border-color .12s; user-select: none; }
+  .tag span::before { content: "+"; font-weight: 600; flex: none; }
+  .tag span { white-space: normal; overflow-wrap: anywhere; }
   .tag:hover span { border-color: var(--accent); color: var(--accent); }
-  .tag input:checked + span { border: 1px solid var(--accent); background: var(--accent); color: #fff; }
+  .tag input:checked + span { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 600; }
   .tag input:checked + span::before { content: "✓"; }
   .tag input:checked + span:hover::before { content: "×"; }
   .tag input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
