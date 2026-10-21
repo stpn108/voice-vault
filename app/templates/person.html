@@ -11,13 +11,13 @@
 <div class="briefing-grid">
   <section class="card">
     <h2>{{ t("ui_brief_mine") }} <span class="count muted">{{ b.mine | length }}</span></h2>
-    {% if b.mine %}<ul class="brief-list">{% for row in b.mine %}<li><a href="/todos/{{ row.id }}">{{ row.title }}</a>
+    {% if b.mine %}<ul class="brief-list">{% for row in b.mine %}<li><a href="/todos/{{ row.id }}?person={{ b.name | urlencode }}">{{ row.title }}</a>
       <div class="muted">{{ t("todo_status_" ~ row.status) }} · {{ t("todo_prio_" ~ row.priority) }}{% if row.topic %} · {{ row.topic }}{% endif %}{% if row.due_date %} · <span class="due {% if row.due_date < today %}overdue{% endif %}">{{ t("ui_overdue") if row.due_date < today else t("ui_due") }} {{ row.due_date.strftime("%d.%m.") }}</span>{% endif %}</div></li>{% endfor %}</ul>
     {% else %}<p class="muted">{{ t("ui_brief_none") }}</p>{% endif %}
   </section>
   <section class="card">
     <h2>{{ t("ui_brief_waiting", name=b.name) }} <span class="count muted">{{ b.waiting | length }}</span></h2>
-    {% if b.waiting %}<ul class="brief-list">{% for row in b.waiting %}<li><a href="/todos/{{ row.id }}">{{ row.title }}</a>
+    {% if b.waiting %}<ul class="brief-list">{% for row in b.waiting %}<li><a href="/todos/{{ row.id }}?person={{ b.name | urlencode }}">{{ row.title }}</a>
       <div class="muted">{{ t("ui_brief_since_today") if row.age_days == 0 else t("ui_brief_since_one") if row.age_days == 1 else t("ui_brief_since", days=row.age_days) }}{% if row.topic %} · {{ row.topic }}{% endif %}{% if row.due_date %} · <span class="due {% if row.due_date < today %}overdue{% endif %}">{{ t("ui_overdue") if row.due_date < today else t("ui_due") }} {{ row.due_date.strftime("%d.%m.") }}</span>{% endif %}</div></li>{% endfor %}</ul>
     {% else %}<p class="muted">{{ t("ui_brief_none") }}</p>{% endif %}
   </section>

@@ -308,7 +308,7 @@ def todo_add(request: Request, title: str = Form("", max_length=todos.TITLE_MAX)
 
 @app.get("/todos/{todo_id}", response_class=HTMLResponse)
 def todo_detail(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX_ID)], session: Session = Depends(get_session),
-                cfg: Config = Depends(get_config)):
+                person: str = Query("", max_length=todos.PERSON_MAX), cfg: Config = Depends(get_config)):
     found = todos.get_todo(session, now_utc(), todo_id)
     if found is None:
         raise HTTPException(status_code=404, detail="task not found")
@@ -320,7 +320,9 @@ def todo_detail(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX
     # Topics as tags (D-036): the task's topic first, then the busiest topics the routine may still use.
     allowed = [t.name for t, *_ in todos.list_topics(session) if not t.excluded]
     topic_candidates = ([row.topic] if row.topic else []) + [n for n in allowed if n.lower() != (row.topic or "").lower()]
-    return render(request, cfg, "todo.html", row=row, events=events, undoable=undoable, candidates=candidates,
+    # Opened from a person's briefing or a person filter: the breadcrumb leads back there (D-040).
+    via_person = next((p for p in row.people if p.lower() == " ".join(person.split()).lower()), None)
+    return render(request, cfg, "todo.html", row=row, events=events, undoable=undoable, candidates=candidates, via_person=via_person,
                   topic_candidates=topic_candidates[:TOPIC_TAGS], known_topics=allowed,
                   speakers=speakers, known=todos.known_people(session), statuses=todos.STATUSES, priorities=todos.PRIORITIES)
 

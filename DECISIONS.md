@@ -472,3 +472,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner request after the back-fill of D-038 showed every entry as zero days old. |
 | **Rejected alternatives** | (A) setting `created_at` of back-filled entries to the recording time: rewrites when something was recorded and breaks the history; (B) a person drop-down: one more click than a visible bar with counts. |
 | **Status** | **FINAL** |
+
+### D-040: A task opened from a person leads back to that person (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-21 |
+| **Decision** | Links to a task from a person's briefing, and from the task list filtered by a person, carry `?person=<name>`. The task page then shows the breadcrumb "Aufgaben / <Person> / <Task>", the person linking to the briefing. The name is only used if it is one of the task's people (any case, shown in the task's spelling); otherwise the usual breadcrumb ("Meine Aufgaben" or "Wartet auf") is shown. |
+| **In plain words** | From a task you opened in Jochen's briefing, the path at the top leads back to Jochen. |
+| **Reasoning** | Owner request. Checking the name against the task's people keeps the link from showing arbitrary text. |
+| **Rejected alternatives** | (A) the browser's Referer: not sent reliably and lost after an autosave; (B) a session cookie for the last page: hidden state for a visible path. |
+| **Status** | **FINAL** |

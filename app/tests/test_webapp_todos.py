@@ -546,3 +546,14 @@ def test_d039_waiting_view_offers_people_to_filter_by_and_prefills_who(client, m
     assert "Timeline" in filtered and "Change ticket" not in filtered
     assert 'name="person" placeholder="Von wem" maxlength="80" list="list-people" required value="Ian Wright"' in filtered
     assert 'href="/person?name=Ian%20Wright"' in filtered
+
+
+
+def test_d040_a_task_opened_from_a_person_leads_back_to_that_person(client, make_todo):
+    todo = make_todo(title="Change ticket", kind="waiting", people=["Jochen Rill"])
+    assert f'href="/todos/{todo}?person=Jochen%20Rill"' in client.get("/person?name=Jochen%20Rill").text
+    html = client.get(f"/todos/{todo}?person=jochen%20rill").text
+    crumbs = html[html.index('class="crumbs"'):html.index("</nav>", html.index('class="crumbs"'))]
+    assert 'href="/todos">Aufgaben</a>' in crumbs and 'href="/person?name=Jochen%20Rill">Jochen Rill</a>' in crumbs
+    other = client.get(f"/todos/{todo}?person=Somebody").text  # a name not on the task is ignored
+    assert "/person?name=Somebody" not in other and 'href="/todos?kind=waiting"' in other
