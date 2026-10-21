@@ -333,7 +333,7 @@ def test_d031_a_tap_on_a_tag_saves_the_people_at_once(client, make_todo):
     assert removed["people"] == ["Anna"]
     cleared = client.post(url, data={"csrf": webapp.csrf_token()}, headers={"Accept": "application/json"}).json()
     assert cleared["people"] == []
-    assert 'data-people-url="/todos/%d/people"' % todo in client.get(f"/todos/{todo}").text
+    assert 'data-url="/todos/%d/people"' % todo in client.get(f"/todos/{todo}").text
 
 
 @pytest.mark.parametrize("data, status", [
@@ -347,8 +347,8 @@ def test_d031_tag_saves_are_checked(client, make_todo, data, status):
 
 
 def test_d031_the_tag_script_is_served(client):
-    response = client.get("/static/people.js")
-    assert response.status_code == 200 and "data-people-url" in response.text and "textContent" in response.text
+    response = client.get("/static/tags.js")
+    assert response.status_code == 200 and "data-url" in response.text and "textContent" in response.text
     assert "insertReplacementText" in response.text  # a pick from the suggestion list is taken at once
 
 
@@ -444,3 +444,36 @@ def test_d035_stats_json_cannot_break_out_of_its_script_block(client, make_todo)
 def test_d035_chart_scripts_are_served(client, path):
     response = client.get(path)
     assert response.status_code == 200 and "javascript" in response.headers["content-type"]
+
+
+
+# --- topic as a tag (D-036) ----------------------------------------------------------------------
+def test_d036_a_tap_on_a_topic_tag_sets_replaces_and_clears_the_topic(client, make_todo):
+    make_todo(title="Other task", topic="Budget")
+    todo = make_todo(title="Discuss budget", topic="Travel")
+    html = client.get(f"/todos/{todo}").text
+    assert 'type="radio" name="topic" value="Travel" checked' in html and 'value="Budget"' in html
+    url = f"/todos/{todo}/topic"
+    answer = client.post(url, data={"csrf": webapp.csrf_token(), "topic": "Budget"}, headers={"Accept": "application/json"})
+    assert answer.json() == {"ok": True, "topic": "Budget"}
+    cleared = client.post(url, data={"csrf": webapp.csrf_token()}, headers={"Accept": "application/json"}).json()
+    assert cleared["topic"] is None
+
+
+def test_d036_excluded_topics_are_not_offered_and_cannot_be_set(client, make_todo, session_factory):
+    make_todo(title="Other task", topic="Secret")
+    with session_factory() as s:
+        svc.set_topic_excluded(s, "Secret", True)
+    todo = make_todo(title="Discuss budget")
+    assert 'value="Secret"' not in client.get(f"/todos/{todo}").text
+    response = client.post(f"/todos/{todo}/topic", data={"csrf": webapp.csrf_token(), "topic": "Secret"},
+                           headers={"Accept": "application/json"})
+    assert response.status_code == 400
+
+
+def test_d036_a_typed_topic_wins_over_the_ticked_one_without_scripts(client, make_todo, session_factory):
+    todo = make_todo(title="Discuss budget", topic="Travel")
+    post(client, f"/todos/{todo}", title="Discuss budget", priority="3", status="open", topic="Travel",
+         topic_more="Finance")
+    with session_factory() as s:
+        assert svc.get_todo(s, now_utc(), todo)[0].topic == "Finance"

@@ -428,3 +428,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner request; the owner preferred a chart library over hand-drawn SVG for hover tooltips and legends. Vendoring keeps the strict CSP and works offline. |
 | **Rejected alternatives** | (A) server-drawn SVG: no dependency, but plainer interaction; (B) loading Chart.js from a CDN: needs a CSP exception and a third party on every page view; (C) storing weekly snapshots: the event log already allows replaying the past. |
 | **Status** | **FINAL** |
+
+### D-036: The topic of a task is picked as a tag, one per task (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-21 |
+| **Decision** | The task page shows the topic like the people (D-031): tags for the current topic and the busiest non-excluded topics (8 in all), a text field suggesting every non-excluded topic. Under the tags are radio buttons; `/static/tags.js` (replaces `people.js` and serves both fields) lets a tap on the set topic clear it, a tap on another replace it, and saves through `POST /todos/{id}/topic` (JSON answer). Typed or picked topics become the tag at once. An excluded topic is refused (400) and the tag flips back. Without JavaScript the radio buttons and the text field (which wins if filled) are saved with the form. The data model stays: one topic per task. |
+| **In plain words** | Topics work like the name tags now: tap to set, tap again to remove, type a new one. A task still has one topic. |
+| **Reasoning** | Owner request for the same mechanics as the people tags. One topic per task is kept because the topic page, the timeline, exclusion, the statistics and the MCP tools build on it. |
+| **Rejected alternatives** | (A) several topics per task: a data model change across topic pages, timelines, exclusion and MCP, not asked for explicitly; (B) all topics as tags: the list grows without bound. |
+| **Status** | **FINAL** |

@@ -35,7 +35,8 @@
   function save(field) {
     if (!form.reportValidity()) { mark(field, "failed"); show("failed"); return; }
     var data = new FormData(form);
-    data.delete("people_more");  // names typed there are handled by people.js
+    data.delete("people_more");  // names typed there are handled by tags.js
+    data.delete("topic_more");
     show("saving");
     // One save at a time, in the order the fields were left.
     queue = queue.then(function () {
@@ -60,7 +61,7 @@
 
   form.addEventListener("change", function (event) {
     var field = event.target;
-    if (!field.name || field.name === "people" || field.name === "people_more") { return; }
+    if (!field.name || field.closest(".tags") || /_more$/.test(field.name)) { return; }  // tags.js saves those
     save(field);
   });
   // Enter in a one-line field leaves it instead of posting the whole page.

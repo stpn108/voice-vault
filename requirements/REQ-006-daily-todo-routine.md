@@ -65,6 +65,8 @@ Once a day Claude reads the recordings that are new since its last run, adds the
     Given the header link "Verwaltung", then `/admin` lists the admin tools as tiles (people, cleanup; later tools are added there). On "Personen" the owner sees every name from tasks and kept transcripts with its counts and can rename it (onto an existing name it merges), or delete it after a confirmation that shows the counts (refused with 409 if they changed). A deleted name goes from every task (logged, undoable per task); its transcript passages become "Unbekannt N". The section "Ohne Namen" lists the unnamed speakers of each kept recording with text samples, and the owner gives them a name. Discarded recordings and Plaud are never changed. Claude has no tool for any of this.
 22. **Statistics (D-035).**
     Given the header link "Statistik", then `/stats` shows open tasks, tasks in progress, the net of the last four weeks and this week's conversation hours, and four charts over the last twelve weeks: new versus finished tasks, open tasks by priority at each week's end, open tasks per person (top 12) and conversation hours. Each chart has a table view. Tasks of excluded topics are left out.
+23. **Topic as a tag (D-036).**
+    Given the task page, then the topic is picked like the people: the task's topic and up to seven more topics (busiest first, excluded ones never) are tags; a tap sets the topic or replaces it, a tap on the set topic clears it, a typed or picked topic becomes the tag; each tap is saved at once. A task keeps exactly one topic or none.
 
 ## Out of scope
 

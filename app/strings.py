@@ -98,6 +98,7 @@ TEXTS = {
     "ui_created_by": {"de": "angelegt von", "en": "created by"},
     "ui_recording": {"de": "Aufnahme", "en": "Recording"},
     "ui_save": {"de": "Speichern", "en": "Save"},
+    "ui_topic_more": {"de": "Thema eintippen, Enter", "en": "Type a topic, press Enter"},
     "ui_detail_edit": {"de": "Zum Bearbeiten klicken", "en": "Click to edit"},
     "ui_detail_empty": {"de": "Noch keine Details. Klicken zum Schreiben.", "en": "No details yet. Click to write."},
     "ui_saving": {"de": "Speichert …", "en": "Saving …"},

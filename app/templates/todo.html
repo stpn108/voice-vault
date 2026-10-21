@@ -23,9 +23,13 @@
       <label class="field"><span>{{ t("ui_status") }}</span><select name="status">{% for s in statuses %}<option value="{{ s }}" {% if s == row.status %}selected{% endif %}>{{ t("todo_status_" ~ s) }}</option>{% endfor %}</select></label>
       <label class="field"><span>{{ t("ui_col_prio") }}</span><select name="priority">{% for p in priorities %}<option value="{{ p }}" {% if p == row.priority %}selected{% endif %}>{{ t("todo_prio_" ~ p) }}</option>{% endfor %}</select></label>
       <label class="field"><span>{{ t("ui_col_due") }}</span><input type="date" name="due" value="{{ row.due_date.isoformat() if row.due_date else '' }}"></label>
-      <label class="field"><span>{{ t("ui_topic") }}</span><input type="text" name="topic" value="{{ row.topic or '' }}" maxlength="120"></label>
+      <div class="field"><span>{{ t("ui_topic") }}</span>
+        <div class="tags" data-url="/todos/{{ row.id }}/topic" data-field="topic" data-single>{% for name in topic_candidates %}<label class="tag"><input type="radio" name="topic" value="{{ name }}" {% if row.topic and name.lower() == row.topic.lower() %}checked{% endif %}><span>{{ name }}</span></label>{% endfor %}</div>
+        <input type="text" name="topic_more" list="known-topics" maxlength="120" placeholder="{{ t('ui_topic_more') }}" aria-label="{{ t('ui_topic_more') }}">
+        <datalist id="known-topics">{% for name in known_topics %}<option value="{{ name }}">{% endfor %}</datalist>
+      </div>
       <div class="field"><span>{{ t("ui_people") }}</span>
-        <div class="tags" data-people-url="/todos/{{ row.id }}/people">{% for name in candidates %}<label class="tag"><input type="checkbox" name="people" value="{{ name }}" {% if name in row.people %}checked{% endif %}><span>{{ name }}</span></label>{% endfor %}</div>
+        <div class="tags" data-url="/todos/{{ row.id }}/people" data-field="people">{% for name in candidates %}<label class="tag"><input type="checkbox" name="people" value="{{ name }}" {% if name in row.people %}checked{% endif %}><span>{{ name }}</span></label>{% endfor %}</div>
         <input type="text" name="people_more" list="known-people" maxlength="400" placeholder="{{ t('ui_people_more') }}" aria-label="{{ t('ui_people_more') }}">
         <datalist id="known-people">{% for name in known %}<option value="{{ name }}">{% endfor %}</datalist>
         <small class="muted">{{ t("ui_people_help") }}</small>
@@ -47,6 +51,6 @@
   </li>
   {% endfor %}
 </ul>
-<script src="/static/people.js" defer></script>
+<script src="/static/tags.js" defer></script>
 <script src="/static/task.js" defer></script>
 {% endblock %}

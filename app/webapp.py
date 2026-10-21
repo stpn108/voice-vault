@@ -304,7 +304,11 @@ def todo_detail(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX
     speakers = todos.speakers_of(session, row.recording_id)
     # The speakers of the task's recording are offered as checkboxes; the people already named stay ticked.
     candidates = row.people + [s for s in speakers if s.lower() not in {p.lower() for p in row.people}]
+    # Topics as tags (D-036): the task's topic first, then the busiest topics the routine may still use.
+    allowed = [t.name for t, *_ in todos.list_topics(session) if not t.excluded]
+    topic_candidates = ([row.topic] if row.topic else []) + [n for n in allowed if n.lower() != (row.topic or "").lower()]
     return render(request, cfg, "todo.html", row=row, events=events, undoable=undoable, candidates=candidates,
+                  topic_candidates=topic_candidates[:TOPIC_TAGS], known_topics=allowed,
                   speakers=speakers, known=todos.known_people(session), statuses=todos.STATUSES, priorities=todos.PRIORITIES)
 
 
@@ -313,10 +317,11 @@ def todo_edit(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX_I
               detail: str = Form("", max_length=todos.DETAIL_MAX), priority: int = Form(3),
               due: str = Form("", max_length=10), topic: str = Form("", max_length=todos.TOPIC_MAX),
               status: str = Form("open", max_length=12), people: list[str] = Form([]),
-              people_more: str = Form("", max_length=400), csrf: str = Form(""),
-              back: str = Form("", max_length=20), session: Session = Depends(get_session)):
+              people_more: str = Form("", max_length=400), topic_more: str = Form("", max_length=todos.TOPIC_MAX),
+              csrf: str = Form(""), back: str = Form("", max_length=20), session: Session = Depends(get_session)):
     require_csrf(request, csrf)
     names = people + people_more.split(",")
+    topic = topic_more.strip() or topic
     try:
         todos.update_todo(session, now_utc(), todo_id, actor="owner", title=title, detail=detail,
                           priority=priority, due=due, topic=topic, status=status, people=names)
@@ -329,6 +334,26 @@ def todo_edit(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX_I
         return JSONResponse({"ok": True, "id": todo_id, "status": status, "counts": todos.counts(session),
                              "in_progress": _in_progress(session), "detail_html": str(render_markdown(detail.strip()))})
     return RedirectResponse("/todos" if back == "list" else f"/todos/{todo_id}", status_code=303)
+
+
+TOPIC_TAGS = 8  # topic tags offered on the task page; every other topic is suggested in the text field
+
+
+@app.post("/todos/{todo_id}/topic")
+def todo_topic(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX_ID)],
+               topic: str = Form("", max_length=todos.TOPIC_MAX), csrf: str = Form(""),
+               session: Session = Depends(get_session)):
+    """Topic tag on the task page: a tap sets, replaces or (with nothing ticked) clears the topic (D-036)."""
+    require_csrf(request, csrf)
+    try:
+        todos.update_todo(session, now_utc(), todo_id, actor="owner", topic=topic)
+    except todos.TodoError as exc:
+        if "no task" in str(exc):
+            raise HTTPException(status_code=404, detail=str(exc))
+        raise _todo_error(exc)
+    if "application/json" in request.headers.get("accept", ""):
+        return JSONResponse({"ok": True, "topic": todos.get_todo(session, now_utc(), todo_id)[0].topic})
+    return RedirectResponse(f"/todos/{todo_id}", status_code=303)
 
 
 @app.post("/todos/{todo_id}/people")
