@@ -28,6 +28,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 import recording_service as svc
 import todo_service as todos
 import people_admin
+import stats_service
 import topic_admin
 from config import Config, load_config
 from database import engine, migrate_schema
@@ -375,6 +376,12 @@ def todo_undo(request: Request, event_id: Annotated[int, PathParam(ge=1, le=MAX_
     except todos.TodoError as exc:
         raise _todo_error(exc)
     return RedirectResponse(f"/todos/{todo.id}", status_code=303)
+
+
+@app.get("/stats", response_class=HTMLResponse)
+def stats_page(request: Request, session: Session = Depends(get_session), cfg: Config = Depends(get_config)):
+    return render(request, cfg, "stats.html", data=stats_service.figures(session, now_utc()),
+                  priorities=todos.PRIORITIES)
 
 
 # --- administration (D-034) -------------------------------------------------------------------

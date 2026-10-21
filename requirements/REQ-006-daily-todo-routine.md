@@ -63,6 +63,8 @@ Once a day Claude reads the recordings that are new since its last run, adds the
     Given Markdown in a task's details, a recording summary or an overview, then it is shown formatted (headings, nested and numbered lists, task boxes, quotes, rules, tables, bold, italics, code) and never as raw HTML. On the task page a click on the details opens the text for editing; leaving it saves and shows it formatted again.
 21. **Administration and people care (D-034).**
     Given the header link "Verwaltung", then `/admin` lists the admin tools as tiles (people, cleanup; later tools are added there). On "Personen" the owner sees every name from tasks and kept transcripts with its counts and can rename it (onto an existing name it merges), or delete it after a confirmation that shows the counts (refused with 409 if they changed). A deleted name goes from every task (logged, undoable per task); its transcript passages become "Unbekannt N". The section "Ohne Namen" lists the unnamed speakers of each kept recording with text samples, and the owner gives them a name. Discarded recordings and Plaud are never changed. Claude has no tool for any of this.
+22. **Statistics (D-035).**
+    Given the header link "Statistik", then `/stats` shows open tasks, tasks in progress, the net of the last four weeks and this week's conversation hours, and four charts over the last twelve weeks: new versus finished tasks, open tasks by priority at each week's end, open tasks per person (top 12) and conversation hours. Each chart has a table view. Tasks of excluded topics are left out.
 
 ## Out of scope
 

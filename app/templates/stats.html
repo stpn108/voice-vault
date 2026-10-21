@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}{{ t("ui_nav_stats") }}{% endblock %}
+{% block content %}
+<div class="head" style="margin-top:1.6rem"><h1>{{ t("ui_nav_stats") }}</h1></div>
+<div class="stat-tiles">
+  <div class="card stat-tile"><b>{{ data.tiles.open }}</b><span>{{ t("ui_stats_open") }}</span></div>
+  <div class="card stat-tile"><b>{{ data.tiles.in_progress }}</b><span>{{ t("todo_status_in_progress") }}</span></div>
+  <div class="card stat-tile"><b>{{ "%+d" % data.tiles.net_4_weeks }}</b><span>{{ t("ui_stats_net") }}</span></div>
+  <div class="card stat-tile"><b>{{ data.tiles.hours_week }} h</b><span>{{ t("ui_stats_hours_week") }}</span></div>
+</div>
+<div class="charts">
+  <section class="card chart-card">
+    <h2>{{ t("ui_stats_flow") }}</h2><p class="sub muted">{{ t("ui_stats_flow_sub") }}</p>
+    <div class="chart-box"><canvas id="chart-flow" role="img" aria-label="{{ t('ui_stats_flow') }}"></canvas></div>
+    <details><summary>{{ t("ui_stats_table") }}</summary><table>
+      <tr><th></th><th>{{ t("ui_stats_created") }}</th><th>{{ t("ui_stats_finished") }}</th></tr>
+      {% for label in data.labels %}<tr><td>{{ label }}</td><td>{{ data.flow.created[loop.index0] }}</td><td>{{ data.flow.finished[loop.index0] }}</td></tr>{% endfor %}
+    </table></details>
+  </section>
+  <section class="card chart-card">
+    <h2>{{ t("ui_stats_open_prio") }}</h2><p class="sub muted">{{ t("ui_stats_open_prio_sub") }}</p>
+    <div class="chart-box"><canvas id="chart-priority" role="img" aria-label="{{ t('ui_stats_open_prio') }}"></canvas></div>
+    <details><summary>{{ t("ui_stats_table") }}</summary><table>
+      <tr><th></th>{% for p in priorities %}<th>{{ t("todo_prio_" ~ p) }}</th>{% endfor %}</tr>
+      {% for label in data.labels %}{% set i = loop.index0 %}<tr><td>{{ label }}</td>{% for p in priorities %}<td>{{ data.open_by_priority[p | string][i] }}</td>{% endfor %}</tr>{% endfor %}
+    </table></details>
+  </section>
+  <section class="card chart-card">
+    <h2>{{ t("ui_stats_people") }}</h2><p class="sub muted">{{ t("ui_stats_people_sub") }}</p>
+    {% if data.people.names %}
+    <div class="chart-box"><canvas id="chart-people" role="img" aria-label="{{ t('ui_stats_people') }}"></canvas></div>
+    <details><summary>{{ t("ui_stats_table") }}</summary><table>
+      {% for name in data.people.names %}<tr><td>{{ name }}</td><td>{{ data.people.open[loop.index0] }}</td></tr>{% endfor %}
+    </table></details>
+    {% else %}<p class="muted">{{ t("ui_stats_people_empty") }}</p>{% endif %}
+  </section>
+  <section class="card chart-card">
+    <h2>{{ t("ui_stats_hours") }}</h2><p class="sub muted">{{ t("ui_stats_hours_sub") }}</p>
+    <div class="chart-box"><canvas id="chart-hours" role="img" aria-label="{{ t('ui_stats_hours') }}"></canvas></div>
+    <details><summary>{{ t("ui_stats_table") }}</summary><table>
+      {% for label in data.labels %}<tr><td>{{ label }}</td><td>{{ data.hours[loop.index0] }} h</td></tr>{% endfor %}
+    </table></details>
+  </section>
+</div>
+<script type="application/json" id="stats-data">{{ {"data": data, "text": {
+  "created": t("ui_stats_created"), "finished": t("ui_stats_finished"), "hours": t("ui_stats_hours_unit"),
+  "open": t("ui_stats_open"), "priorities": {"1": t("todo_prio_1"), "2": t("todo_prio_2"), "3": t("todo_prio_3"), "4": t("todo_prio_4")}}} | tojson }}</script>
+<script src="/static/vendor/chart-4.4.7.umd.min.js" defer></script>
+<script src="/static/stats.js" defer></script>
+{% endblock %}

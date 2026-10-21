@@ -9,12 +9,14 @@
     --bg: #f7f8fa; --surface: #ffffff; --text: #181b23; --muted: #6a7285; --faint: #9aa1b2;
     --line: #e6e8ee; --hover: #f1f3f8; --accent: #4263eb; --accent-soft: #eaeeff;
     --danger: #e03131; --ok: #2f9e44; --warn: #e8590c; --progress: #f59f00; --progress-text: #a35200;
+    --series-1: #2a78d6; --series-2: #eb6834;
     --shadow: 0 1px 2px rgba(20,24,40,.04), 0 4px 16px rgba(20,24,40,.04);
     --radius: .9rem; }
   @media (prefers-color-scheme: dark) { :root {
     --bg: #0f1116; --surface: #171a21; --text: #e8eaf0; --muted: #9aa2b5; --faint: #667085;
     --line: #262b36; --hover: #1e222c; --accent: #91a7ff; --accent-soft: #232a4a;
-    --danger: #ff8787; --ok: #69db7c; --warn: #ffa94d; --progress: #fcc419; --progress-text: #ffd43b; --shadow: none; } }
+    --danger: #ff8787; --ok: #69db7c; --warn: #ffa94d; --progress: #fcc419; --progress-text: #ffd43b; --shadow: none;
+    --series-1: #3987e5; --series-2: #d95926; } }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
   html { -webkit-text-size-adjust: 100%; }
@@ -182,6 +184,16 @@
   .save-state.failed { color: var(--danger); font-weight: 600; }
   .field.saved input, .field.saved select, .field.saved textarea { border-color: var(--ok); transition: border-color .4s; }
   .field.failed input, .field.failed select, .field.failed textarea { border-color: var(--danger); }
+  .stat-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: .8rem; margin-bottom: 1.2rem; }
+  .stat-tile { padding: .9rem 1.1rem; } .stat-tile b { display: block; font-size: 1.8rem; font-weight: 650; line-height: 1.1; }
+  .stat-tile span { color: var(--muted); font-size: .85rem; }
+  .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 28rem), 1fr)); gap: 1rem; }
+  .chart-card { padding: 1rem 1.1rem; } .chart-card h2 { margin: 0 0 .2rem; } .chart-card p.sub { margin: 0 0 .6rem; font-size: .85rem; }
+  .chart-box { position: relative; height: 16rem; }
+  .chart-card details { margin-top: .6rem; font-size: .85rem; } .chart-card summary { cursor: pointer; color: var(--muted); }
+  .chart-card table { border-collapse: collapse; margin-top: .4rem; width: 100%; }
+  .chart-card th, .chart-card td { border-bottom: 1px solid var(--line); padding: .2rem .4rem; text-align: right; }
+  .chart-card th:first-child, .chart-card td:first-child { text-align: left; }
   .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: .8rem; }
   a.tile { display: block; padding: 1rem 1.1rem; text-decoration: none; color: var(--text); }
   a.tile:hover { border-color: var(--accent); } a.tile strong { display: block; margin-bottom: .3rem; } a.tile span { color: var(--muted); font-size: .9rem; }
@@ -212,13 +224,14 @@
 </head>
 <body>
 {% set path = request.url.path %}
-{% set nav = "todos" if path.startswith("/todos") else "topics" if path.startswith("/topics") else "digests" if path.startswith("/digests") else "admin" if path.startswith(("/admin", "/cleanup")) else "recordings" %}
+{% set nav = "todos" if path.startswith("/todos") else "topics" if path.startswith("/topics") else "digests" if path.startswith("/digests") else "stats" if path.startswith("/stats") else "admin" if path.startswith(("/admin", "/cleanup")) else "recordings" %}
 <header class="top"><div class="wrap">
   <a class="brand" href="/"><i></i><span>voice-vault</span></a>
   <a class="nav {% if nav == 'recordings' %}current{% endif %}" href="/">{{ t("ui_nav_recordings") }}</a>
   <a class="nav {% if nav == 'todos' %}current{% endif %}" href="/todos">{{ t("ui_nav_todos") }}</a>
   <a class="nav {% if nav == 'topics' %}current{% endif %}" href="/topics">{{ t("ui_nav_topics") }}</a>
   <a class="nav {% if nav == 'digests' %}current{% endif %}" href="/digests">{{ t("ui_nav_digests") }}</a>
+  <a class="nav {% if nav == 'stats' %}current{% endif %}" href="/stats">{{ t("ui_nav_stats") }}</a>
   <span class="spacer"></span>
   <button class="wip-badge" type="button" popovertarget="wip" data-wip-count {% if not in_progress %}hidden{% endif %}>{{ t("ui_wip") }} <b>{{ wip_count }}</b></button>
   <a class="nav {% if nav == 'admin' %}current{% endif %}" href="/admin">{{ t("ui_nav_admin") }}</a>

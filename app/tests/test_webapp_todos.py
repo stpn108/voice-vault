@@ -420,3 +420,27 @@ def test_d034_admin_changes_need_the_csrf_token(client, make_todo):
     make_todo(title="Discuss budget", people=["Anna"])
     response = client.post("/admin/people/rename", data={"csrf": "bad", "old": "Anna", "new": "Bea"})
     assert response.status_code == 403
+
+
+# --- statistics (D-035) --------------------------------------------------------------------------
+def test_d035_stats_page_renders_figures_tables_and_local_scripts(client, make_todo):
+    make_todo(title="Discuss budget", people=["Anna"], priority=1)
+    response = client.get("/stats")
+    html = response.text
+    assert response.status_code == 200 and 'href="/stats"' in html
+    assert '<script src="/static/vendor/chart-4.4.7.umd.min.js" defer></script>' in html
+    assert '<script type="application/json" id="stats-data">' in html and "<td>Anna</td>" in html
+    assert "script-src 'self'" in response.headers["content-security-policy"]
+
+
+def test_d035_stats_json_cannot_break_out_of_its_script_block(client, make_todo):
+    make_todo(title="x", people=["</script><script>alert(1)</script>"])
+    html = client.get("/stats").text
+    block = html[html.index('id="stats-data">'):]
+    assert "</script><script>alert(1)" not in block.split("</script>", 1)[0]
+
+
+@pytest.mark.parametrize("path", ["/static/stats.js", "/static/vendor/chart-4.4.7.umd.min.js"])
+def test_d035_chart_scripts_are_served(client, path):
+    response = client.get(path)
+    assert response.status_code == 200 and "javascript" in response.headers["content-type"]

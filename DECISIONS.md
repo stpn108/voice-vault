@@ -417,3 +417,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner request, with the note that more admin tasks will come. One registry keeps the tiles and the navigation stable when tools are added. Task changes reuse the logged path, so a slip on a task can be undone; transcript labels have no history, hence the confirmation for deleting. |
 | **Rejected alternatives** | (A) a people table with ids: the names live on tasks (D-030) and in segment labels; a table would have to be kept in sync with both; (B) clearing deleted speakers to an empty label: two people of one recording would merge into one unknown; (C) writing the names back to Plaud: no write API is used by this project and the recordings are deleted there after import; (D) one nav link per admin tool: the header fills up. |
 | **Status** | **FINAL** |
+
+### D-035: Statistics page with Chart.js served from this server (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-21 |
+| **Decision** | New nav item "Statistik" (`/stats`), figures from the new read-only module `stats_service`: four tiles and four bar charts over the last 12 ISO weeks (local time, 04:00 day boundary): (1) new tasks versus tasks finished (done or dropped) per week, a finished task counted in the week of its last status change; (2) open tasks (open or in progress) at each week's end, stacked by priority, replayed from the status changes in `todo_events` (undo included) with today's priority; (3) open tasks per person, top 12; (4) conversation hours per week from `recordings.duration_ms`, discarded recordings included. Tasks of excluded topics are left out. Charts use Chart.js 4.4.7 (MIT), vendored as `static/vendor/chart-4.4.7.umd.min.js`; no CDN at runtime, the CSP stays `script-src 'self'`. The data goes into the page as a `<script type="application/json">` block (Jinja `tojson` escapes `<`, `>`, `&`), drawn by `/static/stats.js`. Every chart has a table view in a `<details>`. Colours: series blue/orange from the reference categorical palette, priorities in the colours the task list uses. |
+| **In plain words** | "Statistik" shows whether the task pile grows, how urgent the open tasks are, with whom you have most open, and how many hours you spent in conversations, week by week. |
+| **Reasoning** | Owner request; the owner preferred a chart library over hand-drawn SVG for hover tooltips and legends. Vendoring keeps the strict CSP and works offline. |
+| **Rejected alternatives** | (A) server-drawn SVG: no dependency, but plainer interaction; (B) loading Chart.js from a CDN: needs a CSP exception and a third party on every page view; (C) storing weekly snapshots: the event log already allows replaying the past. |
+| **Status** | **FINAL** |
