@@ -429,10 +429,20 @@ def undo_event(session: Session, now: dt.datetime, event_id: int, actor: str = "
 
 def _rows(session: Session, todos: list, now: dt.datetime) -> list:
     topics = {t.id: t.name for t in session.scalars(select(Topic))}
+    # The age counts from the conversation the task came from, else from when it was written down (D-039).
+    ids = {t.recording_id for t in todos if t.recording_id}
+    talked = {rec_id: started for rec_id, started in session.execute(
+        select(Recording.id, Recording.started_at).where(Recording.id.in_(ids)))} if ids else {}
+
+    def since(todo: Todo) -> dt.datetime:
+        created = as_utc(todo.created_at)
+        started = talked.get(todo.recording_id)
+        return min(created, as_utc(started)) if started else created
+
     return [
         TodoRow(t.id, t.title, t.detail, t.priority, t.status, t.due_date, topics.get(t.topic_id), t.recording_id,
                 t.created_by, as_utc(t.created_at), as_utc(t.done_at) if t.done_at else None,
-                max((now - as_utc(t.created_at)).days, 0), t.topic_id, sorted(_names_of(t), key=str.lower), t.kind)
+                max((now - since(t)).days, 0), t.topic_id, sorted(_names_of(t), key=str.lower), t.kind)
         for t in todos
     ]
 

@@ -13,12 +13,17 @@
   <span class="muted" style="font-size:.85rem">{{ t("ui_sort") }}</span>
   {% for s in sorts %}<a class="chip {% if s == sort %}current{% endif %}" href="/todos?status={{ status }}&amp;sort={{ s }}{{ keep }}">{{ t("ui_sort_" ~ s) }}</a>{% endfor %}
 </div>
-{% if topic or person %}<p class="sub" style="margin:-.5rem 0 1rem">{% if topic %}{{ t("ui_topic") }}: <strong>{{ topic }}</strong> · {% endif %}{% if person %}{{ t("ui_person") }}: <strong>{{ person }}</strong> · {% endif %}<a href="/todos?status={{ status }}&amp;sort={{ sort }}{{ '&kind=waiting' if kind == 'waiting' else '' }}">{{ t("ui_filter_clear") }}</a></p>{% endif %}
+{% if kind == "waiting" and owed %}<div class="owed" aria-label="{{ t('ui_waiting_who') }}">
+  <a class="owed-chip {% if not person %}current{% endif %}" href="/todos?kind=waiting&amp;status={{ status }}&amp;sort={{ sort }}{{ '&topic=' ~ topic | urlencode if topic else '' }}">{{ t("ui_all") }}</a>
+  {% for name, count in owed %}<a class="owed-chip {% if person and name.lower() == person.lower() %}current{% endif %}" href="/todos?kind=waiting&amp;status={{ status }}&amp;sort={{ sort }}&amp;person={{ name | urlencode }}{{ '&topic=' ~ topic | urlencode if topic else '' }}">{{ name }}<small>{{ count }}</small></a>{% endfor %}
+  {% if person %}<a class="owed-brief" href="/person?name={{ person | urlencode }}">{{ t("ui_waiting_briefing") }} →</a>{% endif %}
+</div>{% endif %}
+{% if topic or (person and kind != "waiting") %}<p class="sub" style="margin:-.5rem 0 1rem">{% if topic %}{{ t("ui_topic") }}: <strong>{{ topic }}</strong> · {% endif %}{% if person and kind != "waiting" %}{{ t("ui_person") }}: <strong>{{ person }}</strong> · {% endif %}<a href="/todos?status={{ status }}&amp;sort={{ sort }}{{ '&kind=waiting' if kind == 'waiting' else '' }}">{{ t("ui_filter_clear") }}</a></p>{% endif %}
 <form class="card quick" method="post" action="/todos">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <input type="hidden" name="kind" value="{{ kind }}">
   <input type="text" name="title" placeholder="{{ t('ui_todo_new_' ~ kind) }}" maxlength="300" required>
-  {% if kind == "waiting" %}<input type="text" name="person" placeholder="{{ t('ui_waiting_who') }}" maxlength="80" list="list-people" required>{% endif %}
+  {% if kind == "waiting" %}<input type="text" name="person" placeholder="{{ t('ui_waiting_who') }}" maxlength="80" list="list-people" required value="{{ person }}">{% endif %}
   <select name="priority" aria-label="{{ t('ui_col_prio') }}">{% for p in priorities %}<option value="{{ p }}" {% if p == 3 %}selected{% endif %}>{{ t("todo_prio_" ~ p) }}</option>{% endfor %}</select>
   <input type="date" name="due" aria-label="{{ t('ui_col_due') }}">
   <input type="text" name="topic" placeholder="{{ t('ui_topic') }}" maxlength="120">
@@ -44,7 +49,7 @@
       <div class="task-meta">
         {% for s in statuses %}<span class="pill status-chip s-{{ s }}">{{ t("todo_status_" ~ s) }}</span>{% endfor %}
         {% if row.topic %}<a href="/todos?status={{ status }}&amp;sort={{ sort }}&amp;topic={{ row.topic | urlencode }}">{{ row.topic }}</a>{% endif %}
-        <span>{{ row.age_days }} {{ t("ui_days") }}</span>
+        <span>{{ row.age_days }} {{ t("ui_day") if row.age_days == 1 else t("ui_days") }}</span>
         {% set active = row.status in ('open', 'in_progress') %}{% if row.due_date %}<span class="due {% if active and row.due_date < today %}overdue{% endif %}">{{ t("ui_overdue") if active and row.due_date < today else t("ui_due") }} {{ row.due_date.strftime("%d.%m.") }}</span>{% endif %}
         {% if not grouped %}<span>{{ t("todo_prio_" ~ row.priority) }}</span>{% endif %}
       </div>

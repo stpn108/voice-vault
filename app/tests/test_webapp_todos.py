@@ -533,3 +533,16 @@ def test_d038_briefing_shows_tasks_waiting_topics_and_conversations(client, make
 
 def test_d038_briefing_of_an_unknown_person_is_404(client):
     assert client.get("/person?name=Nobody").status_code == 404
+
+
+
+def test_d039_waiting_view_offers_people_to_filter_by_and_prefills_who(client, make_todo):
+    make_todo(title="Change ticket", kind="waiting", people=["Jochen Rill"])
+    make_todo(title="Concept", kind="waiting", people=["Jochen Rill"])
+    make_todo(title="Timeline", kind="waiting", people=["Ian Wright"])
+    html = client.get("/todos?kind=waiting").text
+    assert html.index(">Jochen Rill<small>2</small>") < html.index(">Ian Wright<small>1</small>")
+    filtered = client.get("/todos?kind=waiting&person=Ian%20Wright").text
+    assert "Timeline" in filtered and "Change ticket" not in filtered
+    assert 'name="person" placeholder="Von wem" maxlength="80" list="list-people" required value="Ian Wright"' in filtered
+    assert 'href="/person?name=Ian%20Wright"' in filtered

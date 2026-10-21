@@ -11,6 +11,7 @@ import hmac
 import logging
 import os
 import secrets
+from collections import Counter
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, Iterator
@@ -277,11 +278,17 @@ def todo_list(request: Request, status: str = Query("open", max_length=12), topi
                                        kind=kind, limit=todos.LIST_LIMIT_MAX, sort=sort)
     # What others owe the owner is not started or put back, so that list has no "in progress" tab (D-038).
     statuses = [s for s in todos.STATUSES if kind == "mine" or s != "in_progress"]
+    # "Wartet auf": who owes how much, as a bar of people to filter by (D-039).
+    owed = Counter()
+    if kind == "waiting":
+        for row in todos.list_todos(session, now_utc(), kind="waiting", limit=todos.LIST_LIMIT_MAX)[0]:
+            owed.update(row.people)
     return render(request, cfg, "todos.html", rows=rows, truncated=truncated, status=status, topic=topic, person=person,
                   kind=kind, kinds=todos.KINDS, kind_counts={k: todos.counts(session, k)["open"] for k in todos.KINDS},
                   sort=sort, sorts=todos.SORTS, today=now_utc().astimezone(LOCAL_TZ).date(),
                   counts=todos.counts(session, kind), statuses=statuses, priorities=todos.PRIORITIES,
-                  known_people=todos.known_people(session) if kind == "waiting" else [])
+                  known_people=todos.known_people(session) if kind == "waiting" else [],
+                  owed=sorted(owed.items(), key=lambda pair: (-pair[1], pair[0].lower())))
 
 
 @app.post("/todos")

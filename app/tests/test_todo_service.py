@@ -599,3 +599,12 @@ def test_d038_waiting_entries_are_kept_apart_from_the_owners_tasks(db_session):
 def test_d038_unknown_kind_is_rejected(db_session):
     with pytest.raises(svc.TodoError, match="kind"):
         svc.create_todo(db_session, NOW, title="x", actor="owner", kind="theirs")
+
+
+
+def test_d039_age_counts_from_the_conversation_not_from_writing_it_down(db_session):
+    rec = add_recording(db_session, 1, started=NOW - dt.timedelta(days=10))
+    svc.create_todo(db_session, NOW, title="From the talk", actor="claude", recording_id=rec.id)
+    svc.create_todo(db_session, NOW, title="Written today", actor="owner")
+    ages = {r.title: r.age_days for r in svc.list_todos(db_session, NOW + dt.timedelta(hours=1))[0]}
+    assert ages == {"From the talk": 10, "Written today": 0}
