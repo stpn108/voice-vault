@@ -439,3 +439,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner request for the same mechanics as the people tags. One topic per task is kept because the topic page, the timeline, exclusion, the statistics and the MCP tools build on it. |
 | **Rejected alternatives** | (A) several topics per task: a data model change across topic pages, timelines, exclusion and MCP, not asked for explicitly; (B) all topics as tags: the list grows without bound. |
 | **Status** | **FINAL** |
+
+### D-037: Task rows: title / status, topic, age / people; no author marker (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-21 |
+| **Decision** | Each row of the task list has three lines: the title; then a status chip (open neutral, in progress amber, done green, dropped neutral), the topic and the age, followed by the due date and, in lists not grouped by priority, the priority; then the people tags, only if there are any. The "Claude" marker for tasks the routine created is gone from the list (the task page still says who created it). All four status chips are rendered and CSS shows the one matching `data-status`, so starting or putting back a task in place changes the chip without a reload. |
+| **In plain words** | Each task in the list shows name, then status, topic and age, then the people. "Claude" no longer appears there. |
+| **Reasoning** | Owner request. The due date and priority stay on the second line because "overdue" is the one warning in the list. |
+| **Rejected alternatives** | (A) dropping due date and priority from the row: an overdue task would no longer stand out; (B) the status chip only for tasks in progress: the owner asked for the status in every row. |
+| **Status** | **FINAL** |

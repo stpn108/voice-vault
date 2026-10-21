@@ -477,3 +477,11 @@ def test_d036_a_typed_topic_wins_over_the_ticked_one_without_scripts(client, mak
          topic_more="Finance")
     with session_factory() as s:
         assert svc.get_todo(s, now_utc(), todo)[0].topic == "Finance"
+
+
+def test_d037_list_rows_show_status_topic_age_then_people_and_no_author(client, make_todo):
+    make_todo(title="Discuss budget", topic="Budget", people=["Anna"], actor="claude")
+    html = client.get("/todos").text
+    row = html[html.index("Discuss budget"):html.index("</li>", html.index("Discuss budget"))]
+    assert '<span class="by">' not in row and ">Claude<" not in row
+    assert row.index("s-open") < row.index(">Budget<") < row.index(" Tage") < row.index("task-people") < row.index(">Anna<")

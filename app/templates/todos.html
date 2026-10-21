@@ -36,15 +36,15 @@
     </form>
     <div class="task-main">
       <a class="task-title" href="/todos/{{ row.id }}">{{ row.title }}</a>
+      {# Layout (D-037): title / status, topic, age (then due date, priority) / people #}
       <div class="task-meta">
-        <span class="pill progress-chip">{{ t("todo_status_in_progress") }}</span>
-        {% set active = row.status in ('open', 'in_progress') %}{% if row.due_date %}<span class="due {% if active and row.due_date < today %}overdue{% endif %}">{{ t("ui_overdue") if active and row.due_date < today else t("ui_due") }} {{ row.due_date.strftime("%d.%m.") }}</span>{% endif %}
+        {% for s in statuses %}<span class="pill status-chip s-{{ s }}">{{ t("todo_status_" ~ s) }}</span>{% endfor %}
         {% if row.topic %}<a href="/todos?status={{ status }}&amp;sort={{ sort }}&amp;topic={{ row.topic | urlencode }}">{{ row.topic }}</a>{% endif %}
-        {% for name in row.people %}<a class="person" href="/todos?status={{ status }}&amp;sort={{ sort }}&amp;person={{ name | urlencode }}">{{ name }}</a>{% endfor %}
-        {% if not grouped %}<span>{{ t("todo_prio_" ~ row.priority) }}</span>{% endif %}
-        {% if row.created_by == "claude" %}<span class="by">Claude</span>{% endif %}
         <span>{{ row.age_days }} {{ t("ui_days") }}</span>
+        {% set active = row.status in ('open', 'in_progress') %}{% if row.due_date %}<span class="due {% if active and row.due_date < today %}overdue{% endif %}">{{ t("ui_overdue") if active and row.due_date < today else t("ui_due") }} {{ row.due_date.strftime("%d.%m.") }}</span>{% endif %}
+        {% if not grouped %}<span>{{ t("todo_prio_" ~ row.priority) }}</span>{% endif %}
       </div>
+      {% if row.people %}<div class="task-people">{% for name in row.people %}<a class="person" href="/todos?status={{ status }}&amp;sort={{ sort }}&amp;person={{ name | urlencode }}">{{ name }}</a>{% endfor %}</div>{% endif %}
     </div>
     {% if row.status in ("open", "in_progress") %}
     <form class="task-actions" data-quick method="post" action="/todos/{{ row.id }}/status">

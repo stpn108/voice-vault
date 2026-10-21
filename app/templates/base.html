@@ -115,7 +115,7 @@
   .task-main { flex: 1; min-width: 0; }
   .task-title { font-weight: 550; color: var(--text); text-decoration: none; }
   .task-title:hover { color: var(--accent); }
-  .task-meta { display: flex; flex-wrap: wrap; gap: .2rem .85rem; font-size: .82rem; color: var(--muted); margin-top: .1rem; }
+  .task-meta { display: flex; flex-wrap: wrap; align-items: center; gap: .2rem .85rem; font-size: .82rem; color: var(--muted); margin-top: .1rem; }
   .task-meta a { color: var(--muted); text-decoration: none; } .task-meta a:hover { color: var(--accent); }
   .due.overdue { color: var(--danger); font-weight: 600; }
   .by { color: var(--accent); }
@@ -160,9 +160,13 @@
   .segment:last-child { border-bottom: 0; } .segment .who { font-weight: 600; } .segment .at { color: var(--faint); font-size: .85rem; padding-top: .1rem; }
   .notice { border: 1px solid color-mix(in srgb, var(--warn) 50%, var(--line)); background: color-mix(in srgb, var(--warn) 10%, transparent); padding: .6rem 1rem; border-radius: .6rem; margin-bottom: 1rem; }
   .actions { margin-top: 1.4rem; display: flex; gap: .7rem; align-items: center; flex-wrap: wrap; }
-  .progress-chip, .state-progress { background: var(--progress); color: #1a1300; font-weight: 600; }
-  .progress-chip { display: none; }
-  li.task[data-status="in_progress"] .progress-chip { display: inline-flex; }
+  .status-chip { display: none; } .task-meta .pill { padding: .05rem .5rem; font-size: .75rem; }
+  li.task[data-status="open"] .s-open, li.task[data-status="in_progress"] .s-in_progress,
+  li.task[data-status="done"] .s-done, li.task[data-status="dropped"] .s-dropped { display: inline-flex; }
+  .s-open, .s-dropped { background: var(--hover); color: var(--muted); border: 1px solid var(--line); }
+  .s-in_progress, .state-progress { background: var(--progress); color: #1a1300; font-weight: 600; }
+  .s-done { background: color-mix(in srgb, var(--ok) 15%, transparent); color: var(--ok); font-weight: 600; }
+  .task-people { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .35rem; }
   li.task[data-status="in_progress"] .btn-start, li.task[data-status="open"] .btn-pause { display: none; }
   li.task[data-status="in_progress"] { box-shadow: inset 4px 0 0 var(--progress); background: color-mix(in srgb, var(--progress) 9%, var(--surface)); }
   button.wip-badge { font: inherit; font-size: .85rem; cursor: pointer; border: 1px solid var(--progress);
