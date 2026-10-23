@@ -505,3 +505,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner report: after renaming a speaker, Plaud reprocessed the recording; it was apparently missing from the list for a cycle, was marked as trashed and "deleted" (the permanent delete call on a file outside the trash changed nothing), and stayed at Plaud while the UI said deleted. The later names could not come in. |
 | **Rejected alternatives** | (A) asking the recording's detail for an is_trash flag: not known to be in the answer; the trash listing is the same, known endpoint; (B) never assuming trashed: a lost answer to our own trash call would leave the recording in Plaud's trash for ever. |
 | **Status** | **FINAL** |
+
+### D-043: Naming an unnamed speaker also replaces the placeholder in that recording's summary (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-23 |
+| **Decision** | Amends D-034. "Zuweisen" under Verwaltung → Personen → "Ohne Namen" replaces the placeholder label (for example "Speaker 2") in the transcript passages and now also in the stored summary of the same recording, whole label only (`Speaker 2` does not touch `Speaker 20`), case as stored. Other recordings and Plaud are not changed. Renaming or deleting a real name (D-034) still leaves summaries alone. If Plaud later sends a changed summary, the re-import replaces the stored one as before. |
+| **In plain words** | When you give "Speaker 2" a name, the summary of that recording shows the name too. |
+| **Reasoning** | Owner request: Plaud writes the summary before the owner names the speakers, so it keeps "Speaker 2"; for recordings already deleted at Plaud it cannot be regenerated there. |
+| **Rejected alternatives** | (A) replacing real names in summaries on rename: "Stefan" is part of "Stefan Heinze", free text would be corrupted; (B) asking Claude to rewrite the summary: changes more than the name. |
+| **Status** | **FINAL** |

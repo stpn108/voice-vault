@@ -193,6 +193,13 @@ def assign_speaker(session: Session, recording_id: int, label: str, name: str) -
                              .values(speaker=name))
     if not result.rowcount:
         raise PeopleError("this speaker has no passages in the recording (any more)")
+    # Plaud's summary was written while the speaker was still "Speaker 2"; the placeholder is replaced
+    # there too (D-043). Only the whole label: "Speaker 2" never touches "Speaker 20".
+    if label.strip():
+        placeholder = re.compile(r"(?<!\w)" + re.escape(label.strip()) + r"(?!\w)")
+        rec.summary, replaced = placeholder.subn(name, rec.summary or "")
+    else:
+        replaced = 0
     session.commit()
-    log.info("Speaker named recording=%s segments=%s", recording_id, result.rowcount)
+    log.info("Speaker named recording=%s segments=%s summary_mentions=%s", recording_id, result.rowcount, replaced)
     return result.rowcount

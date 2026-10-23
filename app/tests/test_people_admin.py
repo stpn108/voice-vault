@@ -97,3 +97,17 @@ def test_d034_discarded_recordings_are_left_alone(db_session, world):
     assert gone.id not in [o.recording_id for o in admin.orphans(db_session)]
     with pytest.raises(admin.PeopleError, match="no recording"):
         admin.assign_speaker(db_session, gone.id, "Speaker 1", "Anna")
+
+
+
+def test_d043_naming_a_speaker_also_fixes_the_summary_of_that_recording(db_session, world):
+    first, second, _ = world
+    first.summary = "**Teilnehmer:** [Dennis] [Speaker 1]\n- Speaker 1 übernimmt das Ticket. Speaker 10 nicht."
+    second.summary = "Speaker 1 in einer anderen Aufnahme"
+    db_session.commit()
+    admin.assign_speaker(db_session, first.id, "Speaker 1", "Stephan Simmang")
+    db_session.refresh(first)
+    db_session.refresh(second)
+    assert first.summary == ("**Teilnehmer:** [Dennis] [Stephan Simmang]\n- Stephan Simmang übernimmt das Ticket. "
+                             "Speaker 10 nicht.")
+    assert second.summary == "Speaker 1 in einer anderen Aufnahme"
