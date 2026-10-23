@@ -17,6 +17,9 @@ from utils import LOCAL_TZ, now_utc, setup_logging
 
 setup_logging()
 log = logging.getLogger(__name__)
+# APScheduler logs every run at INFO; with the 20-second poll for "Jetzt abholen" that floods the log.
+# The cycle logs its own start and end (D-042).
+logging.getLogger("apscheduler").setLevel(logging.WARNING)
 
 
 def build_scheduler(job: SyncJob, interval_minutes: int) -> BlockingScheduler:

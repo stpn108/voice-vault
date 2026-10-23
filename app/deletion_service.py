@@ -76,14 +76,29 @@ def run_deletion(session_factory: Callable[[], Session], client: PlaudClient, cf
             select(Recording).where(Recording.trashed_at.is_(None))
         ).all()
         listing_usable = imported is None or bool(imported.seen)
+        trash_ids = None  # read from Plaud only when a recording is missing from the list
         for rec in pending:
             reasons = unmet_trash_conditions(rec, now, cfg)
             if not reasons and imported is not None:
                 if not listing_usable:
                     reasons.append("plaud_list_empty")
                 elif rec.plaud_id not in imported.seen:
-                    # Not listed outside the trash any more: it was probably trashed already and the
-                    # answer got lost. Remember that, so the permanent delete can follow; never call Plaud.
+                    # Not listed outside the trash any more. Treated as trashed only if Plaud's trash
+                    # really holds it (a lost answer to our trash call); a recording that is merely missing
+                    # for a cycle, e.g. while Plaud reprocesses it, is left alone (D-042).
+                    if trash_ids is None:
+                        try:
+                            trash_ids = client.list_trash_ids()
+                        except PlaudAuthError:
+                            raise
+                        except PlaudError as exc:
+                            log.warning("Plaud trash cannot be read reason=%s", exc)
+                            trash_ids = set()
+                    if rec.plaud_id not in trash_ids:
+                        stats.held_back += 1
+                        log.warning("Not in the Plaud list and not in the trash, leaving it alone plaud_id=%s",
+                                    rec.plaud_id)
+                        continue
                     if cfg.delete_enabled:
                         rec.trashed_at = now
                         session.commit()

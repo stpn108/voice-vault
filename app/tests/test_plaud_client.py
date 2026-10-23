@@ -506,3 +506,10 @@ def test_d026_without_any_transcript_the_import_fails_instead_of_storing_nothing
     client, _ = polish_client({"id": "abc123"})
     with pytest.raises(PlaudError, match="no readable transcript"):
         client.fetch_segments(d)
+
+
+def test_d042_trash_ids_are_read_from_the_trash_listing():
+    def handler(request):
+        assert request.url.params["is_trash"] == "1"
+        return ok(data_file_list=[{"id": "abc123"}, {"id": "bad id!"}, "junk"])
+    assert make_client(handler).list_trash_ids() == {"abc123"}

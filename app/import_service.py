@@ -143,6 +143,12 @@ def import_recording(session: Session, client: PlaudClient, item: PlaudRecording
         existing.trashed_at = None
         session.commit()
         log.warning("Recording is back outside the Plaud trash, permanent delete cancelled plaud_id=%s", item.plaud_id)
+    elif existing is not None and existing.deleted_at is not None:
+        # Marked as deleted, but Plaud still lists it (D-042): the delete did not happen. Forget it, so
+        # the recording is imported, verified and deleted again like any other.
+        existing.trashed_at = existing.deleted_at = None
+        session.commit()
+        log.warning("Recording marked as deleted is still at Plaud, deleting it again later plaud_id=%s", item.plaud_id)
     if existing is not None and existing.discarded_at is not None:
         # Discarded in the UI (REQ-002): never fetch or store it again.
         stats.skipped += 1

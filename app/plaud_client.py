@@ -262,6 +262,23 @@ class PlaudClient:
             return text
 
     # -- endpoints ----------------------------------------------------
+    def list_trash_ids(self) -> set[str]:
+        """Ids of the recordings in the Plaud trash (D-042)."""
+        ids: set[str] = set()
+        for page in range(MAX_PAGES):
+            data = self._request("GET", "/file/simple/web", params={
+                "skip": page * PAGE_SIZE, "limit": PAGE_SIZE, "is_trash": 1,
+                "sort_by": "start_time", "is_desc": "true",
+            })
+            items = data.get("data_file_list") or data.get("data") or []
+            for item in items:
+                plaud_id = str(item.get("id") or item.get("file_id") or "") if isinstance(item, dict) else ""
+                if ID_RE.fullmatch(plaud_id):
+                    ids.add(plaud_id)
+            if len(items) < PAGE_SIZE:
+                break
+        return ids
+
     def list_recordings(self) -> list[PlaudRecording]:
         """All recordings outside the Plaud trash, newest first."""
         result: list[PlaudRecording] = []

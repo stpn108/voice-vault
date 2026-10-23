@@ -145,15 +145,44 @@ def test_review_a_discarded_recording_still_listed_is_trashed_without_confirmati
 
 def test_review_a_recording_missing_from_the_list_is_remembered_as_trashed_without_calling_plaud(session_factory):
     imported = ImportStats(seen={"another"}, confirmed={"another"})
-    stats, plaud = deletion(session_factory, imported)
+    stats, plaud = deletion(session_factory, imported, plaud=FakePlaud(in_trash={"r1"}))
     assert plaud.trashed == [] and stats.assumed_trashed == 1
     assert stored(session_factory)[0].trashed_at is not None
+
+
+def test_d042_a_recording_missing_from_the_list_but_not_in_the_trash_is_left_alone(session_factory):
+    imported = ImportStats(seen={"another"}, confirmed={"another"})
+    stats, plaud = deletion(session_factory, imported)
+    assert plaud.trashed == [] and plaud.deleted == [] and stats.assumed_trashed == 0 and stats.held_back == 1
+    assert stored(session_factory)[0].trashed_at is None
+
+
+def test_d042_an_unreadable_trash_leaves_missing_recordings_alone(session_factory):
+    class NoTrash(FakePlaud):
+        def list_trash_ids(self):
+            raise PlaudError("HTTP 500")
+    imported = ImportStats(seen={"another"}, confirmed={"another"})
+    stats, plaud = deletion(session_factory, imported, plaud=NoTrash())
+    assert stats.assumed_trashed == 0 and stored(session_factory)[0].trashed_at is None
+
+
+def test_d042_a_recording_marked_deleted_but_still_listed_is_taken_up_again(session_factory):
+    client = FakeClient()
+    client.add()
+    run_import(session_factory, client, lambda: OLD_NOW)
+    with session_factory() as s:
+        rec = s.scalar(select(Recording))
+        rec.trashed_at = rec.deleted_at = OLD_NOW - dt.timedelta(hours=1)
+        s.commit()
+    run_import(session_factory, client, lambda: OLD_NOW)
+    rec = stored(session_factory)[0]
+    assert rec.trashed_at is None and rec.deleted_at is None
 
 
 def test_review_shadow_mode_changes_nothing_for_missing_recordings(session_factory):
     shadow = dataclasses.replace(CFG, delete_enabled=False)
     imported = ImportStats(seen={"another"}, confirmed={"another"})
-    stats, plaud = deletion(session_factory, imported, cfg=shadow)
+    stats, plaud = deletion(session_factory, imported, cfg=shadow, plaud=FakePlaud(in_trash={"r1"}))
     assert stored(session_factory)[0].trashed_at is None and stats.shadow == 1
 
 

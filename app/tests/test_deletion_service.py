@@ -29,8 +29,12 @@ def make_recording(**overrides):
 
 
 class FakePlaud:
-    def __init__(self, fail=None):
+    def __init__(self, fail=None, in_trash=()):
         self.trashed, self.deleted, self.fail = [], [], fail
+        self.in_trash = set(in_trash)
+
+    def list_trash_ids(self):
+        return set(self.in_trash) | set(self.trashed)
 
     def trash(self, ids):
         if self.fail:

@@ -494,3 +494,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner requests. The web container has no Plaud credentials and must not run the cycle itself; a request row keeps the single cycle in the app container. Starting the Claude routine from the server would need an Anthropic credential on the server, so the button fetches from Plaud only. |
 | **Rejected alternatives** | (A) running the import inside the web request: duplicates the Plaud client and could overlap with the scheduled cycle; (B) a lower poll interval: 20 seconds is fast enough and cheap; (C) triggering the Claude routine from the button: would store an account credential on the server. |
 | **Status** | **FINAL** |
+
+### D-042: A recording missing from Plaud's list is only taken as trashed if Plaud's trash holds it (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-23 |
+| **Decision** | Amends D-019. Before, a stored recording that was not in Plaud's list (outside the trash) was marked as trashed without asking Plaud, and the permanent delete followed. Now the deletion reads Plaud's trash listing (`/file/simple/web?is_trash=1`, once per cycle and only if a recording is missing) and marks a missing recording as trashed only if it is there. If it is neither listed nor in the trash, or the trash cannot be read, it is held back and logged (`Not in the Plaud list and not in the trash, leaving it alone`). A recording marked as deleted that Plaud lists again outside the trash gets `trashed_at` and `deleted_at` cleared, so it is imported, verified and deleted again like any other. APScheduler's own run messages are logged at WARNING only, so the 20-second poll of D-041 does not flood the log. |
+| **In plain words** | voice-vault no longer believes a recording is gone just because Plaud did not show it for a moment. Recordings wrongly marked as deleted are picked up again. |
+| **Reasoning** | Owner report: after renaming a speaker, Plaud reprocessed the recording; it was apparently missing from the list for a cycle, was marked as trashed and "deleted" (the permanent delete call on a file outside the trash changed nothing), and stayed at Plaud while the UI said deleted. The later names could not come in. |
+| **Rejected alternatives** | (A) asking the recording's detail for an is_trash flag: not known to be in the answer; the trash listing is the same, known endpoint; (B) never assuming trashed: a lost answer to our own trash call would leave the recording in Plaud's trash for ever. |
+| **Status** | **FINAL** |
