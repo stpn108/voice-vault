@@ -483,3 +483,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner request. Checking the name against the task's people keeps the link from showing arbitrary text. |
 | **Rejected alternatives** | (A) the browser's Referer: not sent reliably and lost after an autosave; (B) a session cookie for the last page: hidden state for a visible path. |
 | **Status** | **FINAL** |
+
+### D-041: Speaker rule 60 %, "Jetzt abholen", topic sorting and topic suggestions (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-23 |
+| **Decision** | (1) Amends D-024: `MIN_SPEAKERS_NAMED_PERCENT` defaults to 60. In a one-on-one only the owner's label is often named by Plaud; 1 of 2 (50 %) no longer passes, both names are needed; 2 of 3 (67 %) passes. The 7-day limit stays. (2) "Jetzt abholen" on the recordings page writes a row to the new table `sync_requests` (`POST /sync`, CSRF as usual; refused while one is open or less than two minutes old). The app container polls every 20 seconds and moves the next run of the cycle job to now (`modify_job`), so the cycle runs in its own job and `max_instances=1` still prevents two at once. The page says when the owner last fetched by hand. (3) `/topics?sort=activity|name|open`: last activity (default), name, open tasks. (4) The "exclude a topic" field suggests the names of the topics not yet excluded (datalist); typing a new name still pre-excludes it. |
+| **In plain words** | A one-on-one now waits until your counterpart is named too. "Jetzt abholen" fetches new recordings at once. Topics sort by date, name or open tasks, and excluding a topic suggests the names. |
+| **Reasoning** | Owner requests. The web container has no Plaud credentials and must not run the cycle itself; a request row keeps the single cycle in the app container. Starting the Claude routine from the server would need an Anthropic credential on the server, so the button fetches from Plaud only. |
+| **Rejected alternatives** | (A) running the import inside the web request: duplicates the Plaud client and could overlap with the scheduled cycle; (B) a lower poll interval: 20 seconds is fast enough and cheap; (C) triggering the Claude routine from the button: would store an account credential on the server. |
+| **Status** | **FINAL** |

@@ -348,3 +348,13 @@ def test_d022_the_confirmation_says_so_when_plaud_deletes_right_away(client, see
     html = client.get(f"/recordings/{rec_id}/discard").text
     webapp.app.dependency_overrides.pop(webapp.get_config)
     assert "sofort in den Papierkorb und gleich danach endgültig" in html and "0 Stunden" not in html
+
+
+# --- fetch now (D-041) -----------------------------------------------------------------------------
+def test_d041_fetch_now_asks_once_and_refuses_a_second_request_at_once(client):
+    first = client.post("/sync", data={"csrf": webapp.csrf_token()}, follow_redirects=False)
+    assert first.status_code == 303 and first.headers["location"] == "/?sync=requested"
+    second = client.post("/sync", data={"csrf": webapp.csrf_token()}, follow_redirects=False)
+    assert second.headers["location"] == "/?sync=pending"
+    assert "Abholen angestoßen" in client.get("/?sync=requested").text
+    assert client.post("/sync", data={"csrf": "bad"}).status_code == 403

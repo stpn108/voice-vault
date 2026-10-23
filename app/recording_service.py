@@ -13,7 +13,7 @@ from typing import Optional
 from sqlalchemy import and_, exists, or_, select
 from sqlalchemy.orm import Session
 
-from database import Recording, Segment
+from database import Recording, Segment, SyncRequest
 from utils import as_utc
 
 log = logging.getLogger(__name__)
@@ -214,3 +214,33 @@ def ids_fingerprint(ids: list) -> str:
 
 def discard_ids(session: Session, ids: list, now: dt.datetime) -> int:
     return sum(1 for rec_id in ids if discard(session, rec_id, now))
+
+
+# --- "fetch now" (D-041) ---------------------------------------------------------------------------
+SYNC_REQUEST_GAP = dt.timedelta(minutes=2)  # one request per two minutes is enough; more would only queue up
+
+
+def request_sync(session: Session, now: dt.datetime) -> bool:
+    """Ask the app container for an import cycle now. False if one was asked for a moment ago."""
+    last = session.scalars(select(SyncRequest).order_by(SyncRequest.id.desc()).limit(1)).first()
+    if last is not None and (last.started_at is None or as_utc(last.requested_at) > now - SYNC_REQUEST_GAP):
+        return False
+    session.add(SyncRequest(requested_at=now))
+    session.commit()
+    log.info("Import requested by the owner")
+    return True
+
+
+def claim_sync_request(session: Session, now: dt.datetime) -> bool:
+    """Called by the scheduler: True once per open request, which is then marked as started."""
+    pending = session.scalars(select(SyncRequest).where(SyncRequest.started_at.is_(None))
+                              .order_by(SyncRequest.id)).all()
+    for request in pending:
+        request.started_at = now
+    session.commit()
+    return bool(pending)
+
+
+def last_sync_request(session: Session):
+    return session.scalars(select(SyncRequest).order_by(SyncRequest.id.desc()).limit(1)).first()
+

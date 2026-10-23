@@ -226,3 +226,15 @@ def test_make_excerpt_never_exceeds_the_limit_by_more_than_the_ellipsis():
 def test_the_list_carries_the_cleaned_excerpt(db_session):
     add_recording(db_session, 1, summary="## Heading\n- **point** one\n- point two")
     assert list_page(db_session).rows[0].excerpt == "Heading \u00b7 point one \u00b7 point two"
+
+
+def test_d041_a_sync_request_is_claimed_once_and_the_next_waits_two_minutes(db_session):
+    import datetime as dt
+    import recording_service as rs
+    now = dt.datetime(2026, 10, 23, 9, 0, tzinfo=dt.timezone.utc)
+    assert rs.request_sync(db_session, now) is True
+    assert rs.request_sync(db_session, now) is False            # still open
+    assert rs.claim_sync_request(db_session, now) is True
+    assert rs.claim_sync_request(db_session, now) is False
+    assert rs.request_sync(db_session, now + dt.timedelta(minutes=1)) is False
+    assert rs.request_sync(db_session, now + dt.timedelta(minutes=3)) is True

@@ -126,3 +126,22 @@ def test_req_004_rejected_refresh_token_aborts_cycle_and_mails(stubs):
     job, mails = make_job(client)
     job.run()
     assert stubs == [] and len(mails) == 1
+
+
+def test_d041_a_request_from_the_web_ui_moves_the_next_cycle_to_now(monkeypatch, session_factory):
+    import main
+    import recording_service as rs
+    from utils import now_utc
+
+    class FakeScheduler:
+        moved = None
+
+        def modify_job(self, job_id, **kwargs):
+            self.moved = job_id
+
+    monkeypatch.setattr(main, "session_factory", session_factory)
+    scheduler = FakeScheduler()
+    assert main.poll_sync_requests(scheduler) is False and scheduler.moved is None
+    with session_factory() as s:
+        rs.request_sync(s, now_utc())
+    assert main.poll_sync_requests(scheduler) is True and scheduler.moved == "plaud_sync"

@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from config import load_config
 from database import engine, migrate_schema
 from plaud_client import build_client
+from recording_service import claim_sync_request
 from sync_job import SyncJob
 from utils import LOCAL_TZ, now_utc, setup_logging
 
@@ -25,7 +26,25 @@ def build_scheduler(job: SyncJob, interval_minutes: int) -> BlockingScheduler:
         job.run, "interval", minutes=interval_minutes, id="plaud_sync",
         max_instances=1, coalesce=True, next_run_time=now_utc(),
     )
+    # "Jetzt abholen" in the web UI (D-041): a request in the database moves the next cycle to now.
+    # The cycle job itself runs it, so max_instances=1 still keeps two cycles from overlapping.
+    scheduler.add_job(
+        lambda: poll_sync_requests(scheduler), "interval", seconds=SYNC_POLL_SECONDS, id="sync_requests",
+        max_instances=1, coalesce=True,
+    )
     return scheduler
+
+
+SYNC_POLL_SECONDS = 20
+
+
+def poll_sync_requests(scheduler) -> bool:
+    with session_factory() as session:
+        if not claim_sync_request(session, now_utc()):
+            return False
+    log.info("Import requested in the web UI, starting the cycle now")
+    scheduler.modify_job("plaud_sync", next_run_time=now_utc())
+    return True
 
 
 def session_factory() -> Session:

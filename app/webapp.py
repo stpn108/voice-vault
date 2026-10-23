@@ -187,12 +187,21 @@ def require_csrf(request: Request, token: str) -> None:
 
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request, q: str = Query("", max_length=200), cursor: str = Query("", max_length=200),
-          session: Session = Depends(get_session), cfg: Config = Depends(get_config)):
+          sync: str = Query("", max_length=10), session: Session = Depends(get_session), cfg: Config = Depends(get_config)):
     try:
         page = svc.list_recordings(session, now_utc(), _stability(cfg), q, cursor or None)
     except ValueError:
         raise HTTPException(status_code=400, detail="invalid cursor")
-    return render(request, cfg, "list.html", page=page, q=q)
+    return render(request, cfg, "list.html", page=page, q=q, sync=sync if sync in ("requested", "pending") else "",
+                  last_sync=svc.last_sync_request(session))
+
+
+@app.post("/sync")
+def sync_now(request: Request, csrf: str = Form(""), session: Session = Depends(get_session)):
+    """"Jetzt abholen": ask the app container for an import cycle now (D-041)."""
+    require_csrf(request, csrf)
+    started = svc.request_sync(session, now_utc())
+    return RedirectResponse("/?sync=" + ("requested" if started else "pending"), status_code=303)
 
 
 @app.get("/recordings/{recording_id}", response_class=HTMLResponse)
@@ -513,9 +522,21 @@ def admin_people_assign(request: Request, recording_id: int = Form(..., ge=1, le
     return RedirectResponse("/admin/people?done=assigned", status_code=303)
 
 
+TOPIC_SORTS = ("activity", "name", "open")
+
+
 @app.get("/topics", response_class=HTMLResponse)
-def topic_list(request: Request, session: Session = Depends(get_session), cfg: Config = Depends(get_config)):
-    return render(request, cfg, "topics.html", topics=todos.list_topics(session))
+def topic_list(request: Request, sort: str = Query("activity", max_length=10), session: Session = Depends(get_session),
+               cfg: Config = Depends(get_config)):
+    if sort not in TOPIC_SORTS:
+        raise HTTPException(status_code=400, detail="invalid sort")
+    topics = todos.list_topics(session)
+    if sort == "activity":
+        topics.sort(key=lambda row: row[3], reverse=True)
+    elif sort == "name":
+        topics.sort(key=lambda row: row[0].name.lower())
+    return render(request, cfg, "topics.html", topics=topics, sort=sort, sorts=TOPIC_SORTS,
+                  allowed=[row[0].name for row in sorted(topics, key=lambda row: row[0].name.lower()) if not row[0].excluded])
 
 
 @app.post("/topics/exclude")

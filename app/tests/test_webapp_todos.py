@@ -557,3 +557,25 @@ def test_d040_a_task_opened_from_a_person_leads_back_to_that_person(client, make
     assert 'href="/todos">Aufgaben</a>' in crumbs and 'href="/person?name=Jochen%20Rill">Jochen Rill</a>' in crumbs
     other = client.get(f"/todos/{todo}?person=Somebody").text  # a name not on the task is ignored
     assert "/person?name=Somebody" not in other and 'href="/todos?kind=waiting"' in other
+
+
+@pytest.mark.parametrize("sort, first", [("name", "Alpha"), ("open", "Zulu"), ("activity", "Mike")])
+def test_d041_topics_can_be_sorted(client, make_todo, session_factory, sort, first):
+    import datetime as dt
+    from database import Todo
+    make_todo(title="a1", topic="Zulu")
+    make_todo(title="a2 task", topic="Zulu")
+    make_todo(title="b1", topic="Alpha")
+    newest = make_todo(title="c1", topic="Mike")
+    with session_factory() as s:
+        s.get(Todo, newest).updated_at = now_utc() + dt.timedelta(hours=1)
+        s.commit()
+    html = client.get(f"/topics?sort={sort}").text
+    positions = {name: html.index(f">{name}</a>") for name in ("Alpha", "Mike", "Zulu")}
+    assert min(positions, key=positions.get) == first
+
+
+def test_d041_excluding_a_topic_suggests_the_known_names(client, make_todo):
+    make_todo(title="a1", topic="Windows-Patching")
+    html = client.get("/topics").text
+    assert 'list="topic-names"' in html and '<option value="Windows-Patching">' in html

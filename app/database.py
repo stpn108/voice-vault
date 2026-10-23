@@ -177,6 +177,14 @@ class OAuthToken(Base):
     )
 
 
+class SyncRequest(Base):
+    """The owner asked for an import cycle now (D-041); the app's scheduler picks it up."""
+    __tablename__ = "sync_requests"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    requested_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
+    started_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class PlaudSession(Base):
     """The one current Plaud token pair (single row, id=1). Secret: never log or export."""
     __tablename__ = "plaud_sessions"

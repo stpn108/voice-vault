@@ -403,9 +403,14 @@ def test_d024_without_enough_names_the_import_waits_at_most_the_configured_days(
     assert (stats.confirmed == {"r1"}) is imported and (stats.waiting_for_names == 1) is not imported
 
 
-def test_d024_half_of_the_speakers_named_is_enough_by_default():
-    segments = [{"speaker": s, "start_ms": 0, "end_ms": 1, "text": "x"} for s in ("Dennis", "Speaker 2")]
-    assert import_service.speakers_named_enough(segments, load_config().min_speakers_named_percent)
+@pytest.mark.parametrize("labels, enough", [
+    (("Dennis", "Speaker 2"), False),             # a one-on-one with only the owner named waits (D-041)
+    (("Dennis", "Jochen Rill"), True),
+    (("Dennis", "Jochen Rill", "Speaker 3"), True),  # two of three: 67 percent
+])
+def test_d041_a_one_on_one_needs_both_names_by_default(labels, enough):
+    segments = [{"speaker": s, "start_ms": 0, "end_ms": 1, "text": "x"} for s in labels]
+    assert import_service.speakers_named_enough(segments, load_config().min_speakers_named_percent) is enough
 
 
 def test_d024_a_wait_of_zero_days_imports_at_once(session_factory):
