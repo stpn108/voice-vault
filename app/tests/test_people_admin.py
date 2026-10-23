@@ -111,3 +111,26 @@ def test_d043_naming_a_speaker_also_fixes_the_summary_of_that_recording(db_sessi
     assert first.summary == ("**Teilnehmer:** [Dennis] [Stephan Simmang]\n- Stephan Simmang übernimmt das Ticket. "
                              "Speaker 10 nicht.")
     assert second.summary == "Speaker 1 in einer anderen Aufnahme"
+
+
+
+def test_d044_an_excluded_person_is_not_suggested_and_not_set_by_claude(db_session, world):
+    first, _, task = world
+    admin.set_person_excluded(db_session, "jochen rill", True)
+    assert "Jochen Rill" not in svc.known_people(db_session)
+    assert svc.speakers_of(db_session, first.id) == []
+    made = svc.create_todo(db_session, NOW, title="Something else entirely", actor="claude", people=["Jochen Rill", "Anna"])
+    assert svc.get_todo(db_session, NOW, made.id)[0].people == ["Anna"]
+    # Claude cannot take off a name the owner set himself either
+    svc.update_todo(db_session, NOW, task.id, actor="claude", people=["Anna"])
+    assert svc.get_todo(db_session, NOW, task.id)[0].people == ["Anna", "Jochen Rill"]
+    rows = {r.name: r.excluded for r in admin.people(db_session)}
+    assert rows["Jochen Rill"] is True
+    admin.set_person_excluded(db_session, "Jochen Rill", False)
+    assert "Jochen Rill" in svc.known_people(db_session)
+
+
+def test_d044_the_owner_may_still_set_an_excluded_name(db_session, world):
+    admin.set_person_excluded(db_session, "Eve", True)
+    made = svc.create_todo(db_session, NOW, title="Talk to Eve", actor="owner", people=["Eve"])
+    assert svc.get_todo(db_session, NOW, made.id)[0].people == ["Eve"]

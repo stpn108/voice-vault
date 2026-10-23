@@ -217,3 +217,26 @@ def test_d038_claude_records_what_others_promised_as_waiting(client):
     assert "No open tasks" in text_of(call(client, "list_todos"))
     listed = text_of(call(client, "list_todos", {"kind": "waiting"}))
     assert "waiting/open" in listed and "Jochen Rill" in listed
+
+
+
+def test_d044_claude_is_told_that_excluded_names_were_left_out_without_naming_them(client, session_factory):
+    import people_admin
+    with session_factory() as s:
+        people_admin.set_person_excluded(s, "Secret Person", True)
+    response = call(client, "add_todo", {"title": "Prepare the board deck", "people": ["Secret Person", "Anna"]})
+    text = text_of(response)
+    assert "1 name(s) left out" in text and "Secret Person" not in text
+    assert "Secret Person" not in text_of(call(client, "list_todos"))
+
+
+
+def test_d044_names_the_owner_set_but_excluded_are_hidden_from_claude(client, session_factory):
+    import people_admin
+    import todo_service as svc
+    from utils import now_utc
+    with session_factory() as s:
+        svc.create_todo(s, now_utc(), title="Talk about the review", actor="owner", people=["Secret Person", "Anna"])
+        people_admin.set_person_excluded(s, "Secret Person", True)
+    listed = text_of(call(client, "list_todos"))
+    assert "people Anna" in listed and "Secret Person" not in listed

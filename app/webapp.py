@@ -455,7 +455,7 @@ ADMIN_TOOLS = [
     {"path": "/admin/people", "title": "ui_admin_people", "text": "ui_admin_people_text"},
     {"path": "/cleanup", "title": "ui_cleanup", "text": "ui_admin_cleanup_text"},
 ]
-PEOPLE_MESSAGES = ("renamed", "deleted", "assigned")
+PEOPLE_MESSAGES = ("renamed", "deleted", "assigned", "excluded", "allowed")
 
 
 def _people_error(exc: people_admin.PeopleError) -> HTTPException:
@@ -485,6 +485,17 @@ def admin_people_rename(request: Request, old: str = Form(..., max_length=todos.
     except (people_admin.PeopleError, todos.TodoError) as exc:
         raise _people_error(exc) if isinstance(exc, people_admin.PeopleError) else _todo_error(exc)
     return RedirectResponse("/admin/people?done=renamed", status_code=303)
+
+
+@app.post("/admin/people/exclude")
+def admin_people_exclude(request: Request, name: str = Form(..., max_length=todos.PERSON_MAX), excluded: str = Form("1"),
+                         csrf: str = Form(""), session: Session = Depends(get_session)):
+    require_csrf(request, csrf)
+    try:
+        people_admin.set_person_excluded(session, name, excluded == "1")
+    except people_admin.PeopleError as exc:
+        raise _people_error(exc)
+    return RedirectResponse("/admin/people?done=" + ("excluded" if excluded == "1" else "allowed"), status_code=303)
 
 
 @app.get("/admin/people/delete", response_class=HTMLResponse)

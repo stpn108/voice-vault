@@ -104,6 +104,14 @@ class Todo(Base):
     kind: Mapped[str] = mapped_column(String(10), default="mine", server_default="mine", index=True)
 
 
+class ExcludedPerson(Base):
+    """A name the owner excluded (D-044): never suggested, never set by Claude."""
+    __tablename__ = "excluded_people"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(80), unique=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class TodoEvent(Base):
     """One change to a task: who, when, from which recording, and the old and new values."""
     __tablename__ = "todo_events"

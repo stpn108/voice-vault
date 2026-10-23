@@ -14,7 +14,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 import todo_service
-from database import Recording, Segment, Todo
+from database import ExcludedPerson, Recording, Segment, Todo
 from import_service import UNNAMED_SPEAKER
 
 log = logging.getLogger(__name__)
@@ -34,6 +34,7 @@ class PersonRow:
     tasks: int = 0
     recordings: int = 0
     segments: int = 0
+    excluded: bool = False
 
 
 @dataclass
@@ -86,7 +87,22 @@ def people(session: Session) -> list:
         for name in stored.split("\n"):
             if name:
                 row(name).tasks += 1
-    return sorted(rows.values(), key=lambda r: r.name.lower())
+    for name in session.scalars(select(ExcludedPerson.name)):
+        row(name).excluded = True
+    return sorted(rows.values(), key=lambda r: (r.excluded, r.name.lower()))
+
+
+def set_person_excluded(session: Session, name: str, excluded: bool) -> str:
+    """Exclude a name (never suggested, never set by Claude) or allow it again (D-044)."""
+    name = _clean(name)
+    found = session.scalar(select(ExcludedPerson).where(func.lower(ExcludedPerson.name) == name.lower()))
+    if excluded and found is None:
+        session.add(ExcludedPerson(name=name))
+    elif not excluded and found is not None:
+        session.delete(found)
+    session.commit()
+    log.info("Person %s", "excluded" if excluded else "allowed again")
+    return name
 
 
 def person(session: Session, name: str):

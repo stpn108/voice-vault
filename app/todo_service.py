@@ -16,7 +16,7 @@ from typing import Optional
 from sqlalchemy import func, literal, select
 from sqlalchemy.orm import Session
 
-from database import Digest, Recording, Segment, TextVersion, Todo, TodoEvent, Topic, TopicNote
+from database import Digest, ExcludedPerson, Recording, Segment, TextVersion, Todo, TodoEvent, Topic, TopicNote
 from import_service import UNNAMED_SPEAKER
 from utils import as_utc, day_bounds, local_day
 
@@ -148,13 +148,25 @@ def _names_of(todo: Todo) -> list:
     return [n for n in (todo.people or "").split("\n") if n]
 
 
+def excluded_people(session: Session) -> set:
+    """Lower-case names the owner excluded (D-044)."""
+    return {name.lower() for name in session.scalars(select(ExcludedPerson.name))}
+
+
+def without_excluded(session: Session, names: list) -> tuple:
+    """(names Claude may set, names dropped because the owner excluded them)."""
+    hidden = excluded_people(session)
+    return [n for n in names if n.lower() not in hidden], [n for n in names if n.lower() in hidden]
+
+
 def speakers_of(session: Session, recording_id: Optional[int]) -> list:
-    """The names given to the speakers of a recording; Plaud's "Speaker 1" labels are left out."""
+    """The names given to the speakers of a recording; Plaud's "Speaker 1" labels and excluded names are left out."""
     if recording_id is None:
         return []
     labels = session.scalars(select(Segment.speaker).where(Segment.recording_id == recording_id).distinct()).all()
-    return sorted({" ".join(s.split()) for s in labels if s and len(s) <= PERSON_MAX and not UNNAMED_SPEAKER.match(s)},
-                  key=str.lower)
+    hidden = excluded_people(session)
+    return sorted({" ".join(s.split()) for s in labels if s and len(s) <= PERSON_MAX and not UNNAMED_SPEAKER.match(s)
+                   and " ".join(s.split()).lower() not in hidden}, key=str.lower)
 
 
 def known_people(session: Session) -> list:
@@ -165,7 +177,8 @@ def known_people(session: Session) -> list:
     by_key = {n.lower(): n for n in names}
     for stored in session.scalars(select(Todo.people).where(Todo.people != "")):
         by_key.update({n.lower(): n for n in stored.split("\n") if n})
-    return sorted(by_key.values(), key=str.lower)
+    hidden = excluded_people(session)
+    return sorted((n for key, n in by_key.items() if key not in hidden), key=str.lower)
 
 
 # --- topics -----------------------------------------------------------------------------
@@ -313,6 +326,8 @@ def create_todo(session: Session, now: dt.datetime, *, title: str, actor: str, p
     note = _text(note, "note", NOTE_MAX)
     priority = _priority(priority)
     people = _people(people)
+    if actor == "claude":
+        people = without_excluded(session, people)[0]
     due_date = _due(due)
     recording_id = _visible_recording(session, recording_id)
     open_tasks = session.scalar(select(func.count()).select_from(Todo).where(Todo.status.in_(ACTIVE)))
@@ -379,6 +394,11 @@ def update_todo(session: Session, now: dt.datetime, todo_id: int, *, actor: str,
     wanted = _requested_changes({"title": title, "detail": detail, "priority": priority, "due": due,
                                  "topic": topic, "status": status, "people": people})
     current = _snapshot(session, todo)
+    if actor == "claude" and "people" in wanted:
+        # Claude neither sets an excluded name nor takes off one the owner put there himself.
+        hidden = excluded_people(session)
+        wanted["people"] = [n for n in wanted["people"] if n.lower() not in hidden] + \
+            [n for n in current["people"] if n.lower() in hidden]
     changes = {k: v for k, v in wanted.items() if _differs(k, v, current[k])}
     if not changes:
         return todo, False

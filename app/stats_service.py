@@ -87,7 +87,9 @@ def figures(session: Session, now: dt.datetime) -> dict:
     for task in tasks:
         if task.status in todos.ACTIVE:
             people.update(n for n in (task.people or "").split("\n") if n)
-    top_people = sorted(people.items(), key=lambda pair: (-pair[1], pair[0].lower()))[:PEOPLE_MAX]
+    hidden = todos.excluded_people(session)
+    top_people = sorted(((n, c) for n, c in people.items() if n.lower() not in hidden),
+                        key=lambda pair: (-pair[1], pair[0].lower()))[:PEOPLE_MAX]
 
     hours = [0.0] * WEEKS
     first = day_bounds(weeks[0])[0]

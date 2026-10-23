@@ -579,3 +579,14 @@ def test_d041_excluding_a_topic_suggests_the_known_names(client, make_todo):
     make_todo(title="a1", topic="Windows-Patching")
     html = client.get("/topics").text
     assert 'list="topic-names"' in html and '<option value="Windows-Patching">' in html
+
+
+
+def test_d044_people_page_excludes_and_allows_a_name(client, make_todo):
+    make_todo(title="Discuss budget", people=["Anna"])
+    assert post(client, "/admin/people/exclude", name="Anna", excluded="1").headers["location"] == "/admin/people?done=excluded"
+    html = client.get("/admin/people").text
+    assert "ausgeschlossen" in html and "Zulassen" in html
+    todo = make_todo(title="Other")
+    assert 'value="Anna"' not in client.get(f"/todos/{todo}").text.split('id="known-people"')[1].split("</datalist>")[0]
+    assert post(client, "/admin/people/exclude", name="Anna", excluded="0").headers["location"] == "/admin/people?done=allowed"

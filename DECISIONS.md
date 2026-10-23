@@ -516,3 +516,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner request: Plaud writes the summary before the owner names the speakers, so it keeps "Speaker 2"; for recordings already deleted at Plaud it cannot be regenerated there. |
 | **Rejected alternatives** | (A) replacing real names in summaries on rename: "Stefan" is part of "Stefan Heinze", free text would be corrupted; (B) asking Claude to rewrite the summary: changes more than the name. |
 | **Status** | **FINAL** |
+
+### D-044: The owner can exclude people (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-23 |
+| **Decision** | New table `excluded_people` (name, unique, any case). Under Verwaltung → Personen each name has "Ausschließen"/"Zulassen", and a field excludes a name in advance. An excluded name is not offered as a tag or in the name field, is left out of the statistics' per-person chart, and is never set by Claude: `add_todo`/`update_todo` drop it (the answer says how many names were left out, without naming them), Claude cannot take off an excluded name the owner set himself, and `list_todos`/`get_topic` do not show excluded names to Claude. The owner can still type an excluded name onto a task. Existing entries, the briefing and the transcripts are not changed. |
+| **In plain words** | Names you exclude are no longer suggested and Claude does not record them, for example your own name or people you do not want in the system. |
+| **Reasoning** | Owner request; mirrors excluded topics. The owner's own name appears as a speaker in nearly every recording and is useless as a tag. |
+| **Rejected alternatives** | (A) deleting the name (D-034): it would come back with the next recording; (B) refusing Claude's whole write when an excluded name is in it: a task for the owner must not get lost because of one name. |
+| **Status** | **FINAL** |

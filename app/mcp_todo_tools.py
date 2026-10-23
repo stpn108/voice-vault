@@ -131,14 +131,15 @@ def _day(value) -> str:
     return value.strftime("%Y-%m-%d %H:%M") if value else "-"
 
 
-def _line(row: svc.TodoRow) -> str:
+def _line(row: svc.TodoRow, hidden: frozenset = frozenset()) -> str:
     parts = [f"#{row.id}", f"P{row.priority}", row.status if row.kind == "mine" else f"waiting/{row.status}", row.title]
     if row.due_date:
         parts.append(f"due {row.due_date.isoformat()}")
     if row.topic:
         parts.append(f"topic {row.topic}")
-    if row.people:
-        parts.append("people " + ", ".join(row.people))
+    shown = [n for n in row.people if n.lower() not in hidden]  # excluded people stay invisible to Claude (D-044)
+    if shown:
+        parts.append("people " + ", ".join(shown))
     if row.recording_id:
         parts.append(f"recording {row.recording_id}")
     parts.append(f"age {row.age_days}d")
@@ -165,6 +166,11 @@ def people_arg(arguments: dict) -> list:
     return value
 
 
+def _dropped_note(dropped: list) -> str:
+    # The names are not repeated: an excluded person is not to be recorded, not even in this answer.
+    return f" {len(dropped)} name(s) left out: the owner excluded these people." if dropped else ""
+
+
 def _guarded(action):
     try:
         return action()
@@ -181,7 +187,8 @@ def list_todos_tool(session, arguments, now, stability_minutes):
     rows, truncated = svc.list_todos(session, now, status=status, topic=topic, person=person, kind=kind, limit=limit)
     if not rows:
         return text_result(f"No {status} tasks." if kind == "mine" else f"No {status} entries waiting on others.")
-    lines = [_line(r) for r in rows]
+    hidden = frozenset(svc.excluded_people(session))
+    lines = [_line(r, hidden) for r in rows]
     if truncated:
         lines.append(f"(more tasks exist than the limit of {limit}; narrow with topic or raise limit)")
     return text_result("\n".join(lines))
@@ -203,9 +210,11 @@ def add_todo_tool(session, arguments, now, stability_minutes):
         kind=enum_arg(arguments, "kind", svc.KINDS, "mine"),
         allow_similar=bool_arg(arguments, "allow_similar"))
 
+    dropped = svc.without_excluded(session, kwargs["people"])[1]
+
     def run():
         todo = svc.create_todo(session, now, **kwargs)
-        return text_result(f"Created task #{todo.id}: {todo.title}")
+        return text_result(f"Created task #{todo.id}: {todo.title}" + _dropped_note(dropped))
     return _guarded(run)
 
 
@@ -225,10 +234,13 @@ def update_todo_tool(session, arguments, now, stability_minutes):
     recording_id = _optional_id(arguments, "recording_id")
     note = str_arg(arguments, "note", svc.NOTE_MAX)
 
+    dropped = svc.without_excluded(session, changes.get("people", []))[1]
+
     def run():
         todo, changed = svc.update_todo(session, now, todo_id, actor="claude", recording_id=recording_id,
                                         note=note, **changes)
-        return text_result(f"Updated task #{todo.id}." if changed else f"Task #{todo.id} already matched; nothing changed.")
+        text = f"Updated task #{todo.id}." if changed else f"Task #{todo.id} already matched; nothing changed."
+        return text_result(text + _dropped_note(dropped))
     return _guarded(run)
 
 
@@ -257,7 +269,8 @@ def get_topic_tool(session, arguments, now, stability_minutes):
     if topic.excluded:
         return text_result(f"Unknown topic '{name}'.", is_error=True)
     rows, _ = svc.list_todos(session, now, status="open", topic=topic.name, limit=svc.LIST_LIMIT_MAX)
-    lines = [f"Topic: {topic.name}", "", "Open tasks:"] + ([_line(r) for r in rows] or ["(none)"])
+    hidden = frozenset(svc.excluded_people(session))
+    lines = [f"Topic: {topic.name}", "", "Open tasks:"] + ([_line(r, hidden) for r in rows] or ["(none)"])
     lines += ["", "Timeline (newest first):"]
     for e in entries:
         source = f" [recording {e['recording_id']}]" if e["recording_id"] else ""
