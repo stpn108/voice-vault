@@ -145,3 +145,18 @@ def test_d041_a_request_from_the_web_ui_moves_the_next_cycle_to_now(monkeypatch,
     with session_factory() as s:
         rs.request_sync(s, now_utc())
     assert main.poll_sync_requests(scheduler) is True and scheduler.moved == "plaud_sync"
+
+
+
+def test_d045_every_cycle_marks_the_fetch_requests_it_served_as_done(monkeypatch, session_factory):
+    import recording_service as rs
+    from import_service import ImportStats
+    monkeypatch.setattr("sync_job.run_import", lambda *a, **k: ImportStats(imported=3))
+    monkeypatch.setattr("sync_job.run_deletion", lambda *a, **k: None)
+    with session_factory() as s:
+        rs.request_sync(s, NOW)
+        rs.claim_sync_request(s, NOW)
+    job, _ = make_job(FakeClient(), session_factory=session_factory)
+    job.run()
+    with session_factory() as s:
+        assert rs.sync_state(s, NOW) == {"state": "done", "new": 3}

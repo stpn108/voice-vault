@@ -191,6 +191,8 @@ class SyncRequest(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     requested_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
     started_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    new_recordings: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
 
 class PlaudSession(Base):
@@ -270,6 +272,12 @@ def _migrate_006_todos_kind(conn):
         conn.execute(sqltext("CREATE INDEX IF NOT EXISTS ix_todos_kind ON todos (kind);"))
 
 
+def _migrate_007_sync_requests_finished(conn):
+    if conn.dialect.name == "postgresql":
+        conn.execute(sqltext("ALTER TABLE IF EXISTS sync_requests ADD COLUMN IF NOT EXISTS finished_at TIMESTAMP WITH TIME ZONE;"))
+        conn.execute(sqltext("ALTER TABLE IF EXISTS sync_requests ADD COLUMN IF NOT EXISTS new_recordings INTEGER NOT NULL DEFAULT 0;"))
+
+
 MIGRATIONS: list = [
     ("001_recordings_discarded_at", _migrate_001_recordings_discarded_at),
     ("002_recordings_analyzed_at", _migrate_002_recordings_analyzed_at),
@@ -277,6 +285,7 @@ MIGRATIONS: list = [
     ("004_todos_status_length", _migrate_004_todos_status_length),
     ("005_todos_people", _migrate_005_todos_people),
     ("006_todos_kind", _migrate_006_todos_kind),
+    ("007_sync_requests_finished", _migrate_007_sync_requests_finished),
 ]
 
 # Advisory lock key: serialises schema setup when several replicas start at

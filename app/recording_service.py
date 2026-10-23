@@ -216,14 +216,19 @@ def discard_ids(session: Session, ids: list, now: dt.datetime) -> int:
     return sum(1 for rec_id in ids if discard(session, rec_id, now))
 
 
-# --- "fetch now" (D-041) ---------------------------------------------------------------------------
+# --- "fetch now" (D-041, D-045) ----------------------------------------------------------------------
 SYNC_REQUEST_GAP = dt.timedelta(minutes=2)  # one request per two minutes is enough; more would only queue up
+SYNC_REQUEST_STALE = dt.timedelta(minutes=10)  # an unfinished request older than this is given up (app down?)
+
+
+def _open(request: SyncRequest, now: dt.datetime) -> bool:
+    return request.finished_at is None and as_utc(request.requested_at) > now - SYNC_REQUEST_STALE
 
 
 def request_sync(session: Session, now: dt.datetime) -> bool:
-    """Ask the app container for an import cycle now. False if one was asked for a moment ago."""
-    last = session.scalars(select(SyncRequest).order_by(SyncRequest.id.desc()).limit(1)).first()
-    if last is not None and (last.started_at is None or as_utc(last.requested_at) > now - SYNC_REQUEST_GAP):
+    """Ask the app container for an import cycle now. False if one is running or was asked for a moment ago."""
+    last = last_sync_request(session)
+    if last is not None and (_open(last, now) or as_utc(last.requested_at) > now - SYNC_REQUEST_GAP):
         return False
     session.add(SyncRequest(requested_at=now))
     session.commit()
@@ -241,6 +246,26 @@ def claim_sync_request(session: Session, now: dt.datetime) -> bool:
     return bool(pending)
 
 
+def finish_sync_requests(session: Session, now: dt.datetime, new_recordings: int) -> None:
+    """Called at the end of every cycle: the requests it served are done."""
+    for request in session.scalars(select(SyncRequest).where(SyncRequest.started_at.is_not(None),
+                                                             SyncRequest.finished_at.is_(None))):
+        request.finished_at = now
+        request.new_recordings = new_recordings
+    session.commit()
+
+
 def last_sync_request(session: Session):
     return session.scalars(select(SyncRequest).order_by(SyncRequest.id.desc()).limit(1)).first()
 
+
+def sync_state(session: Session, now: dt.datetime) -> dict:
+    """What the recordings page shows: idle, waiting (not picked up yet), running or done."""
+    last = last_sync_request(session)
+    if last is None:
+        return {"state": "idle", "new": 0}
+    if last.finished_at is not None:
+        return {"state": "done", "new": last.new_recordings}
+    if not _open(last, now):
+        return {"state": "idle", "new": 0}
+    return {"state": "running" if last.started_at else "waiting", "new": 0}

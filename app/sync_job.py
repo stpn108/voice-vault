@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from config import Config
 from deletion_service import run_deletion
 from import_service import run_import
+from recording_service import finish_sync_requests
 from notify import send_mail
 from plaud_client import PlaudAuthError, PlaudClient, PlaudError
 from utils import now_utc
@@ -62,10 +63,12 @@ class SyncJob:
 
     def run(self) -> None:
         log.info("Cycle start delete_enabled=%s", self._cfg.delete_enabled)
+        new_recordings = 0
         try:
             self.check_token()
             imported = run_import(self._session_factory, self._client, self._now_fn,
                                   self._cfg.min_speakers_named_percent, self._cfg.speaker_naming_wait_days)
+            new_recordings = imported.imported
             self._count_failures(imported.failed > 0)
             run_deletion(self._session_factory, self._client, self._cfg, self._now_fn, imported)
         except PlaudAuthError as exc:
@@ -78,7 +81,16 @@ class SyncJob:
         except Exception as exc:  # noqa: BLE001 - the scheduler would only log it; count it and tell the owner
             log.error("Cycle aborted: unexpected %s", type(exc).__name__)
             self._count_failures(True)
+        self._finish_requests(new_recordings)
         log.info("Cycle end")
+
+    def _finish_requests(self, new_recordings: int) -> None:
+        """Tell the web UI that a fetch it asked for is through (D-045)."""
+        try:
+            with self._session_factory() as session:
+                finish_sync_requests(session, self._now_fn(), new_recordings)
+        except Exception as exc:  # noqa: BLE001 - a status line must never break the cycle
+            log.warning("Could not mark the fetch request as done: %s", type(exc).__name__)
 
     def _count_failures(self, failed: bool) -> None:
         """Mail once a day when several cycles in a row had a problem; a log line alone goes unnoticed."""

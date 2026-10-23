@@ -351,10 +351,18 @@ def test_d022_the_confirmation_says_so_when_plaud_deletes_right_away(client, see
 
 
 # --- fetch now (D-041) -----------------------------------------------------------------------------
-def test_d041_fetch_now_asks_once_and_refuses_a_second_request_at_once(client):
+def test_d045_fetch_now_shows_a_running_notice_that_the_script_hides_when_done(client, session_factory):
+    import recording_service as rs
+    from utils import now_utc
     first = client.post("/sync", data={"csrf": webapp.csrf_token()}, follow_redirects=False)
-    assert first.status_code == 303 and first.headers["location"] == "/?sync=requested"
-    second = client.post("/sync", data={"csrf": webapp.csrf_token()}, follow_redirects=False)
-    assert second.headers["location"] == "/?sync=pending"
-    assert "Abholen angestoßen" in client.get("/?sync=requested").text
+    assert first.status_code == 303 and first.headers["location"] == "/"
+    html = client.get("/").text
+    assert 'id="sync-notice"' in html and '<script src="/static/sync.js" defer></script>' in html
+    assert client.get("/sync/status").json() == {"state": "waiting", "new": 0}
+    with session_factory() as s:
+        rs.claim_sync_request(s, now_utc())
+        rs.finish_sync_requests(s, now_utc(), 1)
+    assert client.get("/sync/status").json() == {"state": "done", "new": 1}
+    assert 'id="sync-notice"' not in client.get("/").text
     assert client.post("/sync", data={"csrf": "bad"}).status_code == 403
+    assert "/sync/status" in client.get("/static/sync.js").text

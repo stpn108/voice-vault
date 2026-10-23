@@ -527,3 +527,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner request; mirrors excluded topics. The owner's own name appears as a speaker in nearly every recording and is useless as a tag. |
 | **Rejected alternatives** | (A) deleting the name (D-034): it would come back with the next recording; (B) refusing Claude's whole write when an excluded name is in it: a task for the owner must not get lost because of one name. |
 | **Status** | **FINAL** |
+
+### D-045: The "fetching" notice disappears when the fetch is through (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-23 |
+| **Decision** | Amends D-041. `sync_requests` gets `finished_at` and `new_recordings` (migration `007_sync_requests_finished`). Every cycle, at its end and whatever its outcome, marks the requests it served as finished with the number of newly imported recordings. The recordings page shows "Abholen läuft …" while the last request is waiting or running; `/static/sync.js` asks `GET /sync/status` every three seconds and then hides the notice ("nothing new") or reloads the list (new recordings). A request not finished within ten minutes (app container down) counts as given up: the notice goes and a new request is allowed. While one runs, a second click does nothing. |
+| **In plain words** | After "Jetzt abholen" the page says it is fetching, and the line goes away by itself when it is done; with new recordings the list reloads. |
+| **Reasoning** | Owner request; the fixed notice of D-041 stayed after the fetch. |
+| **Rejected alternatives** | (A) a fixed timer: the cycle takes from seconds to minutes; (B) server-sent events: more moving parts than polling a tiny status for a minute. |
+| **Status** | **FINAL** |

@@ -228,13 +228,28 @@ def test_the_list_carries_the_cleaned_excerpt(db_session):
     assert list_page(db_session).rows[0].excerpt == "Heading \u00b7 point one \u00b7 point two"
 
 
-def test_d041_a_sync_request_is_claimed_once_and_the_next_waits_two_minutes(db_session):
+def test_d041_a_sync_request_is_claimed_once_and_the_next_waits_until_it_is_done(db_session):
     import datetime as dt
     import recording_service as rs
     now = dt.datetime(2026, 10, 23, 9, 0, tzinfo=dt.timezone.utc)
+    assert rs.sync_state(db_session, now)["state"] == "idle"
     assert rs.request_sync(db_session, now) is True
+    assert rs.sync_state(db_session, now)["state"] == "waiting"
     assert rs.request_sync(db_session, now) is False            # still open
     assert rs.claim_sync_request(db_session, now) is True
     assert rs.claim_sync_request(db_session, now) is False
-    assert rs.request_sync(db_session, now + dt.timedelta(minutes=1)) is False
-    assert rs.request_sync(db_session, now + dt.timedelta(minutes=3)) is True
+    assert rs.sync_state(db_session, now)["state"] == "running"
+    assert rs.request_sync(db_session, now + dt.timedelta(minutes=3)) is False  # still running
+    rs.finish_sync_requests(db_session, now + dt.timedelta(minutes=4), 2)
+    assert rs.sync_state(db_session, now) == {"state": "done", "new": 2}
+    assert rs.request_sync(db_session, now + dt.timedelta(minutes=5)) is True
+
+
+def test_d045_a_request_nobody_picked_up_is_given_up_after_ten_minutes(db_session):
+    import datetime as dt
+    import recording_service as rs
+    now = dt.datetime(2026, 10, 23, 9, 0, tzinfo=dt.timezone.utc)
+    rs.request_sync(db_session, now)
+    later = now + dt.timedelta(minutes=11)
+    assert rs.sync_state(db_session, later)["state"] == "idle"
+    assert rs.request_sync(db_session, later) is True

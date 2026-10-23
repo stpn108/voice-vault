@@ -11,8 +11,9 @@
     <button type="submit" title="{{ t('ui_sync_hint') }}">{{ t("ui_sync") }}</button>
   </form>
 </div>
-{% if sync %}<p class="notice ok">{{ t("ui_sync_" ~ sync) }}</p>
-{% elif last_sync and last_sync.started_at %}<p class="muted" style="font-size:.85rem;margin:-.4rem 0 1rem">{{ t("ui_sync_last", at=last_sync.started_at | localtime) }}</p>{% endif %}
+{% if sync.state in ("waiting", "running") %}<p class="notice ok" id="sync-notice" data-done="{{ t('ui_sync_done') }}" data-done-new="{{ t('ui_sync_done_new') }}">{{ t("ui_sync_requested") }}</p>
+<script src="/static/sync.js" defer></script>
+{% elif last_sync and last_sync.finished_at %}<p class="muted" style="font-size:.85rem;margin:-.4rem 0 1rem">{{ t("ui_sync_last", at=last_sync.finished_at | localtime) }}</p>{% endif %}
 {% if page.rows %}
 <div class="list">
   {% for row in page.rows %}
