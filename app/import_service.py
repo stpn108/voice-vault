@@ -30,8 +30,16 @@ class ImportStats:
     verified: int = 0
     # What this cycle saw at Plaud and verified; the deletion step trashes nothing else (D-019).
     waiting_for_names: int = 0
+    secret: int = 0
     seen: set = field(default_factory=set, repr=False)
     confirmed: set = field(default_factory=set, repr=False)
+
+
+SECRET_PREFIX = "#secret"  # recordings whose title starts with this stay at Plaud only (D-046)
+
+
+def is_secret(title: str) -> bool:
+    return (title or "").lstrip().lower().startswith(SECRET_PREFIX)
 
 
 def clean_text(value) -> str:
@@ -137,6 +145,12 @@ def verify_import(session: Session, plaud_id: str, expected_hash: str, expected_
 def import_recording(session: Session, client: PlaudClient, item: PlaudRecording,
                      now: dt.datetime, stats: ImportStats, min_named_percent: int = 0,
                      naming_wait_days: int = 7) -> None:
+    if is_secret(item.title):
+        # Marked secret by the owner: not downloaded, not stored, and therefore never deleted at Plaud.
+        stats.secret += 1
+        stats.skipped += 1
+        log.info("Secret recording, not downloading plaud_id=%s", item.plaud_id)
+        return
     existing = session.scalar(select(Recording).where(Recording.plaud_id == item.plaud_id))
     if existing is not None and existing.trashed_at is not None and existing.deleted_at is None:
         # Listed outside the Plaud trash again: the owner restored it there. It must not be deleted for good.
@@ -154,6 +168,13 @@ def import_recording(session: Session, client: PlaudClient, item: PlaudRecording
         stats.skipped += 1
         return
     detail = client.get_detail(item.plaud_id)
+    if is_secret(detail.title):
+        # The list may lag behind a rename; the detail is metadata only, no content was fetched yet.
+        stats.seen.discard(item.plaud_id)
+        stats.secret += 1
+        stats.skipped += 1
+        log.info("Secret recording, not downloading plaud_id=%s", item.plaud_id)
+        return
     if not detail.is_processed:
         if existing is not None and existing.is_plaud_processed:
             existing.is_plaud_processed = False
@@ -255,7 +276,8 @@ def run_import(session_factory: Callable[[], Session], client: PlaudClient,
     """Import every recording still at Plaud. A PlaudAuthError aborts the run."""
     stats = ImportStats()
     items = client.list_recordings()
-    stats.seen = {item.plaud_id for item in items}
+    # Secret recordings are invisible to the deletion as well: it never touches them at Plaud (D-046).
+    stats.seen = {item.plaud_id for item in items if not is_secret(item.title)}
     log.info("Plaud list recordings=%d", len(items))
     for item in items:
         with session_factory() as session:

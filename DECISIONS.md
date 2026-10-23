@@ -538,3 +538,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner request; the fixed notice of D-041 stayed after the fetch. |
 | **Rejected alternatives** | (A) a fixed timer: the cycle takes from seconds to minutes; (B) server-sent events: more moving parts than polling a tiny status for a minute. |
 | **Status** | **FINAL** |
+
+### D-046: Recordings titled "#secret…" stay at Plaud only (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-23 |
+| **Decision** | A recording whose Plaud title starts with `#secret` (any case, leading spaces ignored) is skipped by the import before any content is fetched: the title from the list is checked first, and the detail's title again (it may be newer after a rename; the detail is metadata only). Nothing is downloaded or stored, the log says `Secret recording, not downloading` with the id only. Such recordings are also left out of the set of listed recordings the deletion works on, so voice-vault never trashes or deletes them at Plaud, not even a recording discarded here earlier. A recording stored before it was renamed keeps its stored copy and is no longer updated or deleted at Plaud. |
+| **In plain words** | Name a recording "#secret …" in Plaud and voice-vault leaves it alone: not fetched, not stored, not deleted there. |
+| **Reasoning** | Owner request: some conversations must not leave Plaud. A title prefix is something the owner can set in the Plaud app in seconds. |
+| **Rejected alternatives** | (A) a Plaud tag or folder: not read by this project, the title is; (B) importing and hiding it: the content would still be on the server. |
+| **Status** | **FINAL** |

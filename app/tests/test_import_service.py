@@ -1,4 +1,5 @@
 """Import (REQ-001 criteria 1, 2, 5): store, verify by read-back, re-import on change."""
+import dataclasses
 import datetime as dt
 
 import pytest
@@ -242,3 +243,41 @@ def test_req_002_discarded_recording_is_never_fetched_or_stored_again(session_fa
         row = s.scalar(select(Rec))
         assert row.summary == "" and s.query(Segment).count() == 0
     assert stats.skipped == 1 and stats.imported == 0
+
+
+
+# --- secret recordings (D-046) -----------------------------------------------------------------------
+@pytest.mark.parametrize("title", ["#secret Bewerbungsgespräch", "  #SECRET", "#Secret: Vorstand"])
+def test_d046_recordings_titled_secret_are_not_downloaded_or_stored(session_factory, title):
+    client = FakeClient()
+    client.add(title=title)
+    fetched = []
+    client.fetch_segments = lambda detail: fetched.append(detail) or []
+    stats = run_import(session_factory, client, lambda: NOW)
+    assert stats.secret == 1 and stats.imported == 0 and fetched == [] and "r1" not in stats.confirmed
+    with session_factory() as s:
+        assert s.scalar(select(Recording)) is None
+
+
+def test_d046_a_title_only_containing_secret_is_imported(session_factory):
+    client = FakeClient()
+    client.add(title="Kein #secret am Anfang")
+    assert run_import(session_factory, client, lambda: NOW).imported == 1
+
+
+def test_d046_a_rename_seen_only_in_the_detail_also_stops_the_download(session_factory):
+    client = FakeClient()
+    client.add(title="Team Sync")
+    detail = client.get_detail
+    client.get_detail = lambda plaud_id: dataclasses.replace(detail(plaud_id), title="#secret")
+    stats = run_import(session_factory, client, lambda: NOW)
+    assert stats.secret == 1 and stats.imported == 0
+
+
+
+def test_d046_secret_recordings_are_invisible_to_the_deletion(session_factory):
+    client = FakeClient()
+    client.add("r1", title="#secret Vorstand")
+    client.add("r2", title="Team Sync")
+    stats = run_import(session_factory, client, lambda: NOW)
+    assert stats.seen == {"r2"}

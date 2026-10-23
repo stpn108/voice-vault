@@ -14,7 +14,7 @@ Requirements: `requirements/`. Decisions: `DECISIONS.md` (D-001 to D-004).
    log and, if SMTP is set, one mail per day. Expired or rejected (HTTP 401):
    the cycle stops and nothing is deleted.
 2. Import every recording still at Plaud whose transcript and summary Plaud
-   reports as finished and in which at least `MIN_SPEAKERS_NAMED_PERCENT` (default 60)
+   reports as finished (titles starting with `#secret` are never fetched and stay at Plaud, D-046) and in which at least `MIN_SPEAKERS_NAMED_PERCENT` (default 60)
    of the speakers carry a real name instead of "Speaker 2". Name the speakers in Plaud; until then
    nothing is stored and nothing is deleted (the log says `Waiting for speaker names`). After
    `SPEAKER_NAMING_WAIT_DAYS` (default 7) from the end of the recording it is imported with the names it
