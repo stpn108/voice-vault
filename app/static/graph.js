@@ -7,6 +7,8 @@
   var withTopics = JSON.parse(source.textContent).data.nodes.some(function (n) { return n.kind === "topic"; });
   if (fcose) { cytoscape.use(window.cytoscapeFcose); }
   var payload = JSON.parse(source.textContent);
+  // A person's own Mindmap (D-058): read-only, the person fixed in the middle, nothing is saved.
+  var personal = Boolean(payload.data.person);
   var css = getComputedStyle(document.documentElement);
   function v(name) { return css.getPropertyValue(name).trim(); }
 
@@ -18,12 +20,13 @@
     // Spread out from the start (D-053): nodes stacked at one point make Cytoscape mark their lines as
     // undrawable, and it keeps that until a node moves.
     // A box the owner placed or resized keeps that (D-054).
+    if (personal && n.kind === "person") { n.x = 0; n.y = 0; }
     var data = { id: n.id, short: n.label.length > 70 ? n.label.slice(0, 67) + "…" : n.label, full: n.label,
                  status: n.status, kind: n.kind, url: n.url, priority: n.priority || 3, saved: n.x !== undefined };
     if (n.w) { data.w = n.w; data.h = n.h; }
     return { data: data, position: n.x !== undefined ? { x: n.x, y: n.y } : { x: Math.random() * 1500, y: Math.random() * 1000 } };
   }).concat(payload.data.edges.map(function (e, i) {
-    return { data: { id: "e" + i, source: e.source, target: e.target, type: e.type } };
+    return { data: { id: "e" + i, source: e.source, target: e.target, type: e.type, score: e.score || 0, why: e.why || null } };
   }));
 
   // Text and size: a box the owner made bigger shows the whole title and wraps at its own width.
@@ -54,12 +57,19 @@
         "shape": "round-rectangle", "padding": "16px", "border-width": 0,
         "width": function (n) { return n.data("w") || Math.max(80, labelOf(n).length * 8.6); },
         "height": function (n) { return n.data("h") || 20; } } },
+      { selector: "node[kind = 'person']", style: { "font-size": "17px", "font-weight": 700, "color": v("--surface"),
+        "background-color": v("--text"), "shape": "ellipse", "padding": "22px", "border-width": 0,
+        "width": function (n) { return Math.max(90, labelOf(n).length * 10); }, "height": 30 } },
       // "bezier" draws a single edge straight and always finds its end points; "unbundled-bezier" failed at some
       // angles and left lines out (D-053).
       { selector: "edge", style: { "width": 2.5, "line-color": v("--accent"), "curve-style": "bezier", "opacity": 0.8,
         "transition-property": "opacity", "transition-duration": "120ms" } },
       { selector: "edge[type = 'topic']", style: { "width": 1.5, "line-color": v("--faint"), "line-style": "dotted",
         "curve-style": "straight", "opacity": 0.9 } },
+      { selector: "edge[type = 'person']", style: { "width": 2, "line-color": v("--muted"), "curve-style": "straight", "opacity": 0.7 } },
+      // A probable connection: dashed, the stronger the evidence the thicker (D-058).
+      { selector: "edge[type = 'inferred']", style: { "line-style": "dashed", "line-color": v("--series-2") || v("--warn"),
+        "width": function (e) { return Math.min(7, 1 + e.data("score")); }, "curve-style": "bezier", "opacity": 0.75 } },
       { selector: "edge[type = 'link']:active, edge[type = 'link']:selected", style: { "line-color": v("--danger"), "opacity": 1 } },
       { selector: ".faded", style: { "opacity": 0.12 } },
       { selector: ".deg2", style: { "opacity": 0.75 } },
@@ -82,6 +92,7 @@
                     edgeElasticity: function (e) { return e.data("type") === "topic" ? 0.6 : 0.35; },
                     gravity: 0.3, gravityRange: 2.5, numIter: 5000, padding: 30 };
     if (fixed && fixed.length) { options.fixedNodeConstraint = fixed; }
+    if (personal) { options.idealEdgeLength = function (e) { return e.data("type") === "inferred" ? 160 : 110; }; }
     return options;
   }
 
@@ -124,8 +135,8 @@
     data.set("layout", JSON.stringify(entries));
     fetch("/todos/graph/layout", { method: "POST", body: data, credentials: "same-origin", headers: { "Accept": "application/json" } });
   }
-  if (fresh.length) { remember(fresh, false); }
-  cy.on("dragfree", "node", function (event) { remember(event.target, false); });
+  if (fresh.length && !personal) { remember(fresh, false); }
+  if (!personal) { cy.on("dragfree", "node", function (event) { remember(event.target, false); }); }
 
   // Readable from the start: fit, but never so small that the text cannot be read (D-050).
   function view() {
@@ -208,6 +219,31 @@
     fullButton.setAttribute("aria-pressed", document.fullscreenElement ? "true" : "false");
     afterResize();
   });
+
+  // Pointing at a probable connection says why it is drawn (D-058).
+  var why = document.querySelector("[data-graph-status]");
+  cy.on("mouseover", "edge[type = 'inferred']", function (event) {
+    var counts = event.target.data("why") || {};
+    why.textContent = why.getAttribute("data-why").replace("{talks}", counts.talks || 0)
+      .replace("{links}", counts.links || 0).replace("{people}", counts.people || 0);
+    why.hidden = false;
+  });
+  cy.on("mouseout", "edge[type = 'inferred']", function () { why.hidden = true; });
+  // Zoom buttons at the edge (D-049).
+  document.querySelectorAll("[data-zoom]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      var how = button.getAttribute("data-zoom");
+      if (how === "fit") { cy.animate({ fit: { padding: 40 } }, { duration: 200 }); return; }
+      var level = cy.zoom() * (how === "in" ? 1.3 : 1 / 1.3);
+      var box = cy.container().getBoundingClientRect();
+      cy.animate({ zoom: { level: level, renderedPosition: { x: box.width / 2, y: box.height / 2 } } }, { duration: 150 });
+    });
+  });
+
+  if (personal) {
+    cy.on("tap", "node", function (event) { window.location.href = event.target.data("url"); });
+    return;
+  }
 
   // --- resizing a box (D-054): a corner handle appears on hover; dragging it sets the box's size ---
   var handle = document.querySelector("[data-node-resize]");
@@ -303,17 +339,6 @@
       nudge();
       cy.animate({ fit: { padding: 30 } }, { duration: 250 });
       remember(cy.nodes(), false);
-    });
-  });
-
-  // Zoom buttons at the edge (D-049).
-  document.querySelectorAll("[data-zoom]").forEach(function (button) {
-    button.addEventListener("click", function () {
-      var how = button.getAttribute("data-zoom");
-      if (how === "fit") { cy.animate({ fit: { padding: 40 } }, { duration: 200 }); return; }
-      var level = cy.zoom() * (how === "in" ? 1.3 : 1 / 1.3);
-      var box = cy.container().getBoundingClientRect();
-      cy.animate({ zoom: { level: level, renderedPosition: { x: box.width / 2, y: box.height / 2 } } }, { duration: 150 });
     });
   });
 

@@ -134,3 +134,21 @@ def test_d044_the_owner_may_still_set_an_excluded_name(db_session, world):
     admin.set_person_excluded(db_session, "Eve", True)
     made = svc.create_todo(db_session, NOW, title="Talk to Eve", actor="owner", people=["Eve"])
     assert svc.get_todo(db_session, NOW, made.id)[0].people == ["Eve"]
+
+
+def test_d057_the_profile_follows_a_renamed_name_and_goes_with_a_deleted_one(db_session, world):
+    import person_service as ps
+    ps.update_profile(db_session, NOW, "Anna", actor="owner", role="CFO", current_work="Budget")
+    ps.set_topic_note(db_session, NOW, "Anna", "Budget", "from Anna", actor="owner")
+    ps.set_topic_note(db_session, NOW, "Anna", "SOC", "SOC from Anna", actor="owner")
+    ps.update_profile(db_session, NOW, "Jochen Rill", actor="owner", role="CISO")
+    ps.set_topic_note(db_session, NOW, "Jochen Rill", "Budget", "from Jochen", actor="owner")
+    admin.rename_person(db_session, NOW, "Anna", "Jochen Rill")
+    merged = ps.profile(db_session, "Jochen Rill")
+    assert (merged.role, merged.current_work) == ("CISO", "Budget") and ps.profile(db_session, "Anna") is None
+    assert sorted((t.name, n.note) for t, n in ps.clusters(db_session, "Jochen Rill")) == [
+        ("Budget", "from Jochen"), ("SOC", "SOC from Anna")]
+    admin.rename_person(db_session, NOW, "Jochen Rill", "Jochen")
+    assert ps.profile(db_session, "Jochen").role == "CISO" and len(ps.clusters(db_session, "Jochen")) == 2
+    admin.delete_person(db_session, NOW, "Jochen")
+    assert ps.profile(db_session, "Jochen") is None and ps.clusters(db_session, "Jochen") == []

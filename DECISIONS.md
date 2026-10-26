@@ -659,3 +659,26 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner request; a line per secret recording every ten minutes clutters the log. The title stays out of the log on purpose. |
 | **Rejected alternatives** | (A) storing which secret recordings were named: a table only for a log line; (B) logging the title once: the owner marked it secret. |
 | **Status** | **FINAL** |
+
+### D-057: Living person profile, kept by the routine, corrected by the owner (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-26 |
+| **Decision** | Each person has one profile (`person_profiles`): role and unit, what the person works on, what to raise next time. Per person and topic there is one note (`person_topic_notes`) on where the topic stands with that person, rewritten as a whole each time. Claude reads it with `get_person` and writes it with `update_person` and `set_person_topic`; the owner edits every field on the briefing page, each field saves when it is left. Every replaced text goes to `text_versions` (kinds `person`, `person_topic`). Excluded people get no profile: writes are refused, the card and the mind map are not shown. Claude can delete nothing. In "Verwaltung → Personen" the profile follows a renamed name; on a merge the target's own texts and topic notes win and its empty fields take the old ones; deleting a name deletes its profile and topic notes. |
+| **Content rule** | Only what serves the work: role, work, shared topics, next points. The tool descriptions tell Claude to leave out private life, health and judgments about the person's own pay, performance or career moves, and when in doubt to leave it out. This is guidance for what goes into the profile, not a filter: the recordings stay untouched, nothing is cut out automatically, and a slip is visible on the page and corrected there. |
+| **In plain words** | The briefing shows who the person is, what they are working on and where your shared topics stand. The routine fills it in, you correct it. |
+| **Reasoning** | Owner request: "a living profile with topic clusters per person, together with Wartet auf". Owner chose role and unit plus current work as the core facts and automatic upkeep by the routine. The content rule follows the owner's objection that excluding personnel topics automatically breaks easily: a fuzzy rule enforced in code would cut wrongly in both directions, so it stays an instruction, and the owner sees and fixes every result. |
+| **Rejected alternatives** | (A) free-form notes per person: grow into a dossier without structure; (B) a log of every conversation per topic: the topic notes already are that log, the profile holds the current state; (C) automatic filtering of personnel topics: unreliable, and silent mistakes; (D) no rule at all: a permanent profile with judgments about a colleague is the part that becomes a problem if the data ever leaves the owner's hands. |
+| **Status** | **FINAL** |
+
+### D-058: A person's own mind map with probable topic connections (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-26 |
+| **Decision** | `/person/graph?name=` draws the person in the middle, their topics around them (profile notes, topics of tasks with the person, topics of conversations they spoke in) and their open tasks and promises at their topic. Two topics are "probably connected" when counted evidence reaches a score of 2: score = 2 × shared conversations (topic notes of the same recording) + 2 × links between tasks of the two topics + number of people on both topics, not counting the person the map is about. Such pairs get a dashed line, wider the higher the score; pointing at it shows the three counts. The map is read-only: no saved positions, no resizing, no linking; it is laid out fresh each time. |
+| **In plain words** | The person's map shows which of your topics with them hang together, and why the app thinks so. |
+| **Reasoning** | Owner request: "how topics most probably connect". Counting is explainable and stable; the owner can check every line. The person themself is on all their topics and would connect everything, so they do not count. |
+| **Rejected alternatives** | (A) letting Claude guess connections: not explainable, changes between runs; (B) text similarity of notes: needs a model or library and gives lines nobody can explain; (C) saving positions per person: one more layout table for a view that is looked at now and then. |
+| **Status** | **FINAL** |

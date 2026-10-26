@@ -240,3 +240,20 @@ def test_d044_names_the_owner_set_but_excluded_are_hidden_from_claude(client, se
         people_admin.set_person_excluded(s, "Secret Person", True)
     listed = text_of(call(client, "list_todos"))
     assert "people Anna" in listed and "Secret Person" not in listed
+
+
+def test_d057_claude_keeps_the_profile_and_reads_it_back(client):
+    add(client, title="Write offer", people=["Jochen Rill"], topic="Budget")
+    assert not is_error(call(client, "update_person", {"name": "Jochen Rill", "role": "Head of SOC, Group"}))
+    assert not is_error(call(client, "set_person_topic", {"name": "Jochen Rill", "topic": "Budget", "note": "Approved"}))
+    text = text_of(call(client, "get_person", {"name": "jochen rill"}))
+    for part in ("Role and unit: Head of SOC, Group", "- Budget", "Approved", "Write offer"):
+        assert part in text, part
+
+
+def test_d057_claude_cannot_profile_an_excluded_person(client, session_factory):
+    import people_admin
+    with session_factory() as s:
+        people_admin.set_person_excluded(s, "Secret Person", True)
+    assert is_error(call(client, "update_person", {"name": "Secret Person", "role": "x"}))
+    assert is_error(call(client, "get_person", {"name": "Secret Person"}))

@@ -10,11 +10,11 @@ import logging
 import re
 from dataclasses import dataclass
 
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 import todo_service
-from database import ExcludedPerson, Recording, Segment, Todo
+from database import ExcludedPerson, PersonProfile, PersonTopicNote, Recording, Segment, Todo
 from import_service import UNNAMED_SPEAKER
 
 log = logging.getLogger(__name__)
@@ -150,6 +150,8 @@ def delete_person(session: Session, now: dt.datetime, name: str) -> dict:
         todo_service.update_todo(session, now, todo.id, actor="owner", note=f"name '{found.name}' deleted",
                                  people=[n for n in current if n.lower() != found.name.lower()])
     segments = _relabel(session, found.name, lambda recording_id: _next_unknown(session, recording_id))
+    session.execute(delete(PersonTopicNote).where(PersonTopicNote.person == found.name.lower()))
+    session.execute(delete(PersonProfile).where(func.lower(PersonProfile.name) == found.name.lower()))
     session.commit()
     log.info("Person deleted tasks=%s segments=%s", len(tasks), segments)
     return {"name": found.name, "tasks": len(tasks), "segments": segments}
@@ -170,9 +172,32 @@ def rename_person(session: Session, now: dt.datetime, old: str, new: str) -> dic
         todo_service.update_todo(session, now, todo.id, actor="owner", note=f"'{found.name}' renamed to '{new}'",
                                  people=renamed)
     segments = _relabel(session, found.name, lambda recording_id: new)
+    _move_profile(session, found.name, new)
     session.commit()
     log.info("Person renamed tasks=%s segments=%s", len(tasks), segments)
     return {"name": new, "tasks": len(tasks), "segments": segments}
+
+
+def _move_profile(session: Session, old: str, new: str) -> None:
+    """The profile follows the name (D-057). On a merge the target's own texts and topic notes win; an empty
+    field of the target takes the old one."""
+    source = session.scalar(select(PersonProfile).where(func.lower(PersonProfile.name) == old.lower()))
+    target = session.scalar(select(PersonProfile).where(func.lower(PersonProfile.name) == new.lower()))
+    if source is not None and (target is None or target is source):
+        source.name = new
+    elif source is not None:
+        for field in ("role", "current_work", "next_points"):
+            if not getattr(target, field):
+                setattr(target, field, getattr(source, field))
+        session.delete(source)
+    taken = set(session.scalars(select(PersonTopicNote.topic_id).where(PersonTopicNote.person == new.lower())))
+    for note in session.scalars(select(PersonTopicNote).where(PersonTopicNote.person == old.lower())).all():
+        if old.lower() == new.lower():
+            continue
+        if note.topic_id in taken:
+            session.delete(note)
+        else:
+            note.person = new.lower()
 
 
 def orphans(session: Session) -> list:

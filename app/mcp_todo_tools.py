@@ -3,6 +3,7 @@
 These tools write, but only to the task tables and the analyzed flag. Every change is
 attributed to "claude" and logged by todo_service. There is deliberately no delete tool.
 """
+import person_service as people
 import todo_service as svc
 from mcp_args import ToolArgumentError, bool_arg, enum_arg, int_arg, str_arg, text_result
 
@@ -321,7 +322,100 @@ def list_digests_tool(session, arguments, now, stability_minutes):
     return _guarded(run)
 
 
+# --- living person profiles (D-057) ------------------------------------------------------------------
+PROFILE_RULES = (" Work only: role and unit, what the person works on, where shared topics stand, what to raise "
+                 "next time. This only limits what goes into the profile, the recordings stay as they are: leave out "
+                 "private life, health, and judgments about the person's own pay, performance or career moves. When "
+                 "in doubt, leave it out; the owner adds it on the page. If a tool says the person is excluded, "
+                 "record nothing about them.")
+
+TOOLS += [
+    {
+        "name": "get_person",
+        "description": "A person's living profile: role and unit, current work, points for the next conversation, "
+                       "the topic clusters with the owner, and the owner's open tasks and what the person owes him."
+                       + UNTRUSTED,
+        "inputSchema": {**_props(name={"type": "string", "maxLength": svc.PERSON_MAX}), "required": ["name"]},
+        "annotations": READ,
+    },
+    {
+        "name": "update_person",
+        "description": "Change a person's profile; only the given fields change, the old text is kept for the "
+                       "owner. role: role and unit in one line. current_work: what the person is working on now. "
+                       "next_points: what the owner should raise in the next conversation (replace the whole text)."
+                       + PROFILE_RULES,
+        "inputSchema": {**_props(
+            name={"type": "string", "maxLength": svc.PERSON_MAX},
+            role={"type": "string", "maxLength": 200},
+            current_work={"type": "string", "maxLength": 800},
+            next_points={"type": "string", "maxLength": 1000}), "required": ["name"]},
+        "annotations": WRITE,
+    },
+    {
+        "name": "set_person_topic",
+        "description": "Where one topic stands with this person, in two or three sentences, rewritten as a whole "
+                       "each time (not a log): decisions, open questions, who drives what. One note per person and "
+                       "topic; reuse topic names from list_topics." + PROFILE_RULES,
+        "inputSchema": {**_props(
+            name={"type": "string", "maxLength": svc.PERSON_MAX},
+            topic={"type": "string", "maxLength": svc.TOPIC_MAX},
+            note={"type": "string", "maxLength": 800},
+            recording_id=_ID), "required": ["name", "topic", "note"]},
+        "annotations": WRITE,
+    },
+]
+
+
+def _person_guard(action):
+    try:
+        return action()
+    except (svc.TodoError, people.PersonError) as exc:
+        return text_result(str(exc), is_error=True)
+
+
+def get_person_tool(session, arguments, now, stability_minutes):
+    name = str_arg(arguments, "name", svc.PERSON_MAX)
+    if not name.strip() or name.strip().lower() in svc.excluded_people(session):
+        return text_result(f"Unknown person '{name}'.", is_error=True)
+    found = people.profile(session, name)
+    from briefing_service import briefing
+    brief = briefing(session, now, name)
+    if found is None and brief is None:
+        return text_result(f"Unknown person '{name}'.", is_error=True)
+    hidden = frozenset(svc.excluded_people(session))
+    lines = [f"Person: {found.name if found else brief.name}",
+             f"Role and unit: {found.role if found and found.role else '(unknown)'}",
+             f"Current work: {found.current_work if found and found.current_work else '(unknown)'}",
+             f"Next conversation: {found.next_points if found and found.next_points else '(nothing noted)'}",
+             "", "Topics with the owner:"]
+    lines += [f"- {topic.name} ({_day(note.updated_at)}): {note.note}" for topic, note in people.clusters(session, name)] \
+        or ["(none)"]
+    if brief is not None:
+        lines += ["", "Owner's open tasks with this person:"] + ([_line(r, hidden) for r in brief.mine] or ["(none)"])
+        lines += ["", "What this person owes the owner:"] + ([_line(r, hidden) for r in brief.waiting] or ["(none)"])
+    return text_result("\n".join(lines))
+
+
+def update_person_tool(session, arguments, now, stability_minutes):
+    name = str_arg(arguments, "name", svc.PERSON_MAX)
+    fields = {key: str_arg(arguments, key, limit) for key, limit in
+              (("role", 200), ("current_work", 800), ("next_points", 1000)) if key in arguments}
+    return _person_guard(lambda: (people.update_profile(session, now, name, actor="claude", **fields),
+                                  text_result(f"Profile of {name.strip()} updated."))[1])
+
+
+def set_person_topic_tool(session, arguments, now, stability_minutes):
+    name = str_arg(arguments, "name", svc.PERSON_MAX)
+    topic = str_arg(arguments, "topic", svc.TOPIC_MAX)
+    note = str_arg(arguments, "note", 800)
+    recording_id = _optional_id(arguments, "recording_id")
+    return _person_guard(lambda: (people.set_topic_note(session, now, name, topic, note, actor="claude",
+                                                        recording_id=recording_id),
+                                  text_result(f"Saved where '{topic.strip()}' stands with {name.strip()}."))[1])
+
+
 HANDLERS = {
+    "get_person": get_person_tool, "update_person": update_person_tool, "set_person_topic": set_person_topic_tool,
     "list_todos": list_todos_tool, "add_todo": add_todo_tool, "update_todo": update_todo_tool,
     "list_topics": list_topics_tool, "get_topic": get_topic_tool, "add_topic_note": add_topic_note_tool,
     "mark_recording_analyzed": mark_recording_analyzed_tool, "save_digest": save_digest_tool,

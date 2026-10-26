@@ -73,6 +73,10 @@ Once a day Claude reads the recordings that are new since its last run, adds the
     Given the topic page, then the owner sorts by last activity, name or open tasks, and the field for excluding a topic suggests the existing topic names while typing.
 26. **Linked tasks and graph (D-047).**
     Given two tasks in the list, when the owner draws a line from one task's dot to the other, then they are linked (undo offered) and both show it; the task page lists and removes links and adds one by picking a task. Given the graph page, then linked open tasks are shown as a graph; finished tasks, topics as nodes and unlinked tasks can be switched on; clicking a line removes the link.
+27. **Living person profile (D-057).**
+    Given a person's briefing, then a profile card shows role and unit, what the person works on, what to raise next time and one note per shared topic; Claude keeps them up to date through `update_person` and `set_person_topic`, the owner corrects any field on the page (saved when leaving it), and each replaced text is kept. Given an excluded person, then no profile is shown or written.
+28. **A person's own mind map (D-058).**
+    Given the briefing, when the owner opens "Mindmap dieser Person", then the person sits in the middle, their topics around them and their tasks and promises at the topics; topics that probably belong together are joined by a dashed line whose width follows the evidence (shared conversations, linked tasks, shared people other than this person), and pointing at the line says why.
 
 ## Out of scope
 

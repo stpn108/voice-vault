@@ -32,11 +32,12 @@ import recording_service as svc
 import todo_service as todos
 import briefing_service
 import people_admin
+import person_service
 import stats_service
 import task_links
 import topic_admin
 from config import Config, load_config
-from database import engine, migrate_schema
+from database import Topic, engine, migrate_schema
 from markdown_lite import render_markdown
 from strings import get_text
 from utils import LOCAL_TZ, now_utc, setup_logging
@@ -517,8 +518,43 @@ def person_page(request: Request, name: str = Query(..., max_length=todos.PERSON
     found = briefing_service.briefing(session, now_utc(), name)
     if found is None:
         raise HTTPException(status_code=404, detail="unknown person")
+    excluded = found.name.lower() in todos.excluded_people(session)
     return render(request, cfg, "person.html", b=found, today=now_utc().astimezone(LOCAL_TZ).date(),
-                  days_since=(now_utc() - found.last_talk).days if found.last_talk else None)
+                  days_since=(now_utc() - found.last_talk).days if found.last_talk else None, excluded=excluded,
+                  profile=None if excluded else person_service.profile(session, found.name),
+                  clusters=[] if excluded else person_service.clusters(session, found.name))
+
+
+@app.post("/person/profile")
+def person_profile_save(request: Request, name: str = Form(..., max_length=todos.PERSON_MAX),
+                        field: str = Form(..., max_length=20), value: str = Form("", max_length=2000),
+                        csrf: str = Form(""), session: Session = Depends(get_session)):
+    """One field of the living profile, saved when the owner leaves it (D-057). `field` is a profile field
+    or "topic:<id>" for the note on a shared topic."""
+    require_csrf(request, csrf)
+    try:
+        if field in ("role", "current_work", "next_points"):
+            person_service.update_profile(session, now_utc(), name, actor="owner", **{field: value})
+        elif field.startswith("topic:") and field[6:].isdigit():
+            topic = session.get(Topic, int(field[6:]))
+            if topic is None:
+                raise HTTPException(status_code=404, detail="unknown topic")
+            person_service.set_topic_note(session, now_utc(), name, topic.name, value, actor="owner")
+        else:
+            raise HTTPException(status_code=400, detail="unknown field")
+    except (person_service.PersonError, todos.TodoError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return JSONResponse({"ok": True})
+
+
+@app.get("/person/graph", response_class=HTMLResponse)
+def person_graph_page(request: Request, name: str = Query(..., max_length=todos.PERSON_MAX),
+                      session: Session = Depends(get_session), cfg: Config = Depends(get_config)):
+    """The person's own Mindmap: their topics, tasks and promises, and topics that probably belong together (D-058)."""
+    data = person_service.person_graph(session, now_utc(), name)
+    if data is None or data["person"].lower() in todos.excluded_people(session):
+        raise HTTPException(status_code=404, detail="unknown person")
+    return render(request, cfg, "graph.html", data=data, person=data["person"], done=0, topics=1, everything=0, waiting=1)
 
 
 @app.get("/stats", response_class=HTMLResponse)

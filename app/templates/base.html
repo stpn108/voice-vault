@@ -265,6 +265,15 @@
   .graph-legend .lg-urgent { border: 2.5px solid var(--danger); }
   .graph-legend .lg-high { border: 2.5px solid var(--warn); }
   .graph-legend .lg-topic { background: var(--accent); border-color: var(--accent); }
+  .graph-legend .lg-inferred { background: none; border: 0; border-top: 2px dashed var(--series-2); border-radius: 0; height: 0; }
+  .profile-card { padding: 1rem 1.1rem; margin-bottom: 1rem; }
+  .profile-head { display: flex; align-items: center; gap: .8rem; margin-bottom: .4rem; } .profile-head h2 { margin: 0; flex: 1; }
+  .profile-card textarea, .profile-card input[type=text] { width: 100%; }
+  .clusters { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); gap: .6rem; margin-top: .3rem; }
+  .cluster { border: 1px solid var(--line); border-radius: .6rem; padding: .5rem .6rem; background: var(--bg); }
+  .cluster-head { display: flex; justify-content: space-between; gap: .5rem; font-size: .85rem; margin-bottom: .3rem; }
+  .cluster-head a { font-weight: 600; color: var(--text); text-decoration: none; }
+  .cluster textarea { border: 0; background: transparent; padding: 0; resize: vertical; font-size: .9rem; }
   .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: .8rem; }
   a.tile { display: block; padding: 1rem 1.1rem; text-decoration: none; color: var(--text); }
   a.tile:hover { border-color: var(--accent); } a.tile strong { display: block; margin-bottom: .3rem; } a.tile span { color: var(--muted); font-size: .9rem; }

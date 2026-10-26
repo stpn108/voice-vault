@@ -168,14 +168,14 @@ is why no tool can delete anything.
 
 The UI (`/todos`, `/topics`, `/digests`) shows a prioritized task list you check off, the history
 of each topic and the daily overviews. Through MCP Claude can use `list_todos`, `add_todo`,
-`update_todo` (status `in_progress`, `done`, `dropped` or `open`; `people` to talk to), `list_topics`, `get_topic`, `add_topic_note`,
+`update_todo` (status `in_progress`, `done`, `dropped` or `open`; `people` to talk to), `get_person`, `update_person`, `set_person_topic`, `list_topics`, `get_topic`, `add_topic_note`,
 `mark_recording_analyzed`, `save_digest` and `list_digests`. Every change is logged with who made
 it and can be undone on the task page. Claude can delete nothing. You can delete a topic on its page,
 after a confirmation: its notes go, its tasks stay. The task list sorts by priority, due date, age, topic
 or title. "Statistik" (`/stats`) charts task flow, open tasks by priority, open tasks per person and conversation hours
 (Chart.js 4.4.7, vendored in `app/static/vendor`). The header link "Verwaltung" (`/admin`) collects the admin tools: "Personen" (delete, rename or merge
 names, name the unnamed speakers of stored transcripts) and "Aufräumen". "Wartet auf" in the task list holds what other people promised you; a click on a name opens a briefing on that
-person (`/person`). A task can name the people you have to talk to: the task page shows the speaker names of its
+person (`/person`) with a living profile (role and unit, current work, what to raise next time, one note per shared topic) that the routine keeps up to date and you can correct; "Mindmap dieser Person" (`/person/graph`) shows the person's topics and which of them probably belong together. A task can name the people you have to talk to: the task page shows the speaker names of its
 recording as tags: tap to add, tap again to take off, saved at once; a click on a name in the list filters by that person.
 
 Prompt for the routine (connector `Dennis_Voice-Vault`). It can run several times a day, for example every two

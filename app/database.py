@@ -126,6 +126,31 @@ class MindmapNode(Base):
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class PersonProfile(Base):
+    """The living profile of a person (D-057): role and unit, what they work on, what to raise next time."""
+    __tablename__ = "person_profiles"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(80), unique=True)
+    role: Mapped[str] = mapped_column(String(200), default="", server_default="")
+    current_work: Mapped[str] = mapped_column(Text, default="", server_default="")
+    next_points: Mapped[str] = mapped_column(Text, default="", server_default="")
+    updated_by: Mapped[str] = mapped_column(String(10), default="claude", server_default="claude")
+    updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class PersonTopicNote(Base):
+    """Where a topic stands with one person (D-057): one running note per person and topic."""
+    __tablename__ = "person_topic_notes"
+    __table_args__ = (UniqueConstraint("person", "topic_id", name="uq_person_topic_notes"),)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    person: Mapped[str] = mapped_column(String(80), index=True)  # lower case, the profile key
+    topic_id: Mapped[int] = mapped_column(ForeignKey("topics.id", ondelete="CASCADE"), index=True)
+    note: Mapped[str] = mapped_column(Text)
+    recording_id: Mapped[Optional[int]] = mapped_column(ForeignKey("recordings.id", ondelete="SET NULL"), nullable=True)
+    updated_by: Mapped[str] = mapped_column(String(10), default="claude", server_default="claude")
+    updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class ExcludedPerson(Base):
     """A name the owner excluded (D-044): never suggested, never set by Claude."""
     __tablename__ = "excluded_people"

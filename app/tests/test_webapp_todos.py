@@ -680,3 +680,50 @@ def test_d055_excluded_people_do_not_show_in_the_lists(client, make_todo, sessio
     assert "Dennis Winter" not in waiting and ">Jochen Rill<small>1</small>" in waiting and "Change ticket" in waiting
     mine = client.get("/todos").text
     assert "Own task" in mine and "Dennis Winter" not in mine
+
+
+def test_d057_briefing_shows_the_profile_and_saves_a_field(client, make_todo, session_factory):
+    import person_service
+    make_todo(title="Write offer", people=["Jochen Rill"], topic="Budget")
+    with session_factory() as s:
+        person_service.update_profile(s, now_utc(), "Jochen Rill", actor="claude", role="Head of <SOC>")
+        person_service.set_topic_note(s, now_utc(), "Jochen Rill", "Budget", "Offer approved", actor="claude")
+    html = client.get("/person?name=Jochen%20Rill").text
+    assert "Head of &lt;SOC&gt;" in html and "Offer approved" in html and 'href="/person/graph?name=Jochen%20Rill"' in html
+    response = client.post("/person/profile", data={"csrf": webapp.csrf_token(), "name": "Jochen Rill",
+                                                    "field": "current_work", "value": "SIEM rollout"},
+                           headers={"Accept": "application/json"})
+    assert response.json() == {"ok": True}
+    with session_factory() as s:
+        topic_id = person_service.clusters(s, "Jochen Rill")[0][0].id
+    assert post(client, "/person/profile", name="Jochen Rill", field=f"topic:{topic_id}", value="Signed").status_code == 200
+    with session_factory() as s:
+        found = person_service.profile(s, "Jochen Rill")
+        assert (found.current_work, found.updated_by) == ("SIEM rollout", "owner")
+        assert person_service.clusters(s, "Jochen Rill")[0][1].note == "Signed"
+
+
+@pytest.mark.parametrize("data, code", [
+    ({"field": "salary", "value": "x"}, 400),
+    ({"field": "topic:999", "value": "x"}, 404),
+    ({"field": "role", "value": "x", "csrf": "bad"}, 403),
+])
+def test_d057_bad_profile_saves_are_refused(client, data, code):
+    assert post(client, "/person/profile", name="Anna", **data).status_code == code
+
+
+def test_d057_excluded_person_has_no_profile_card_and_no_mindmap(client, make_todo, session_factory):
+    import people_admin
+    make_todo(title="Write offer", people=["Jochen Rill"])
+    with session_factory() as s:
+        people_admin.set_person_excluded(s, "Jochen Rill", True)
+    assert post(client, "/person/profile", name="Jochen Rill", field="role", value="x").status_code == 400
+    assert client.get("/person/graph?name=Jochen%20Rill").status_code == 404
+
+
+def test_d058_person_mindmap_page_is_read_only(client, make_todo):
+    make_todo(title="Write offer", people=["Jochen Rill"], topic="Budget")
+    html = client.get("/person/graph?name=jochen%20rill").text
+    assert "Mindmap: Jochen Rill" in html and '"person": "Jochen Rill"' in html
+    assert "data-arrange" not in html and "data-node-resize" not in html and "data-link-mode" not in html
+    assert client.get("/person/graph?name=Nobody").status_code == 404

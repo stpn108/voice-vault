@@ -1,7 +1,9 @@
 {% extends "base.html" %}
-{% block title %}{{ t("ui_graph") }}{% endblock %}
+{% block title %}{{ t("ui_graph_person", name=person) if person else t("ui_graph") }}{% endblock %}
 {% block crumbs %}
-<nav class="crumbs" aria-label="breadcrumb"><a href="/todos">{{ t("ui_nav_todos") }}</a><span class="sep">/</span><span aria-current="page">{{ t("ui_graph") }}</span></nav>
+<nav class="crumbs" aria-label="breadcrumb"><a href="/todos">{{ t("ui_nav_todos") }}</a><span class="sep">/</span>
+{%- if person %}<a href="/person?name={{ person | urlencode }}">{{ person }}</a><span class="sep">/</span><span aria-current="page">{{ t("ui_graph") }}</span>
+{%- else %}<span aria-current="page">{{ t("ui_graph") }}</span>{% endif %}</nav>
 {% endblock %}
 {% block content %}
 {% macro toggle(name, value, label) -%}
@@ -9,13 +11,13 @@
 {%- set _ = params.update({name: 1 - value}) -%}
 <a class="{{ 'on' if value else '' }}" href="/todos/graph?done={{ params.done }}&amp;topics={{ params.topics }}&amp;all={{ params.all }}&amp;waiting={{ params.waiting }}">{{ label }}</a>
 {%- endmacro %}
-<div class="head"><h1>{{ t("ui_graph") }}</h1></div>
-<div class="graph-controls">
+<div class="head"><h1>{{ t("ui_graph_person", name=person) if person else t("ui_graph") }}</h1></div>
+{% if not person %}<div class="graph-controls">
   {{ toggle("done", done, t("ui_graph_done")) }}
   {{ toggle("topics", topics, t("ui_graph_topics")) }}
   {{ toggle("all", everything, t("ui_graph_all")) }}
   {{ toggle("waiting", waiting, t("ui_graph_waiting")) }}
-</div>
+</div>{% endif %}
 {% if data.nodes %}
 <div class="card graph-wrap">
   <div id="graph" role="img" aria-label="{{ t('ui_graph') }}"></div>
@@ -24,22 +26,23 @@
     <button type="button" data-zoom="out" title="{{ t('ui_graph_zoom_out') }}" aria-label="{{ t('ui_graph_zoom_out') }}">−</button>
     <button type="button" data-zoom="fit" title="{{ t('ui_graph_fit') }}" aria-label="{{ t('ui_graph_fit') }}">⤢</button>
     <button type="button" data-fullscreen aria-pressed="false" title="{{ t('ui_graph_fullscreen') }}" aria-label="{{ t('ui_graph_fullscreen') }}">⛶</button>
-    <button type="button" data-arrange title="{{ t('ui_graph_arrange') }}" aria-label="{{ t('ui_graph_arrange') }}"
+    {% if not person %}<button type="button" data-arrange title="{{ t('ui_graph_arrange') }}" aria-label="{{ t('ui_graph_arrange') }}"
             data-confirm="{{ t('ui_graph_arrange_confirm') }}">✨</button>
-    <button type="button" data-link-mode aria-pressed="false" title="{{ t('ui_graph_link_mode') }}" aria-label="{{ t('ui_graph_link_mode') }}">🔗</button>
+    <button type="button" data-link-mode aria-pressed="false" title="{{ t('ui_graph_link_mode') }}" aria-label="{{ t('ui_graph_link_mode') }}">🔗</button>{% endif %}
   </div>
-  <div class="node-resize" data-node-resize hidden title="{{ t('ui_graph_resize') }}"></div>
+  {% if not person %}<div class="node-resize" data-node-resize hidden title="{{ t('ui_graph_resize') }}"></div>{% endif %}
   <div class="graph-status" data-graph-status hidden data-pick-first="{{ t('ui_graph_pick_first') }}"
        data-pick-second="{{ t('ui_graph_pick_second') }}" data-linked="{{ t('ui_linked') }}" data-already="{{ t('ui_linked_already') }}"
-       data-failed="{{ t('ui_graph_link_failed') }}"></div>
+       data-failed="{{ t('ui_graph_link_failed') }}" data-why="{{ t('ui_graph_why') }}"></div>
 </div>
 <div class="graph-legend">
   <span><i class="lg-open"></i>{{ t("todo_status_open") }}</span><span><i class="lg-progress"></i>{{ t("todo_status_in_progress") }}</span>
   <span><i class="lg-done"></i>{{ t("todo_status_done") }}</span>{% if waiting %}<span><i class="lg-waiting"></i>{{ t("ui_kind_waiting") }}</span>{% endif %}
   <span><i class="lg-urgent"></i>{{ t("todo_prio_1") }}</span><span><i class="lg-high"></i>{{ t("todo_prio_2") }}</span>
   {% if topics %}<span><i class="lg-topic"></i>{{ t("ui_topic") }}</span>{% endif %}
+  {% if person %}<span><i class="lg-inferred"></i>{{ t("ui_graph_inferred") }}</span>{% endif %}
 </div>
-<p class="muted" style="font-size:.85rem">{{ t("ui_graph_hint") }} {{ t("ui_graph_hint_link") }}{% if data.truncated %} {{ t("ui_graph_truncated") }}{% endif %}</p>
+<p class="muted" style="font-size:.85rem">{% if person %}{{ t("ui_graph_hint_person") }}{% else %}{{ t("ui_graph_hint") }} {{ t("ui_graph_hint_link") }}{% endif %}{% if data.truncated %} {{ t("ui_graph_truncated") }}{% endif %}</p>
 <script type="application/json" id="graph-data">{{ {"data": data, "csrf": csrf, "confirm": t("ui_graph_unlink_confirm")} | tojson }}</script>
 <script src="/static/vendor/cytoscape-3.30.2.min.js" defer></script>
 <script src="/static/vendor/layout-base-2.0.1.js" defer></script>

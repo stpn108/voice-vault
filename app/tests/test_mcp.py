@@ -202,7 +202,8 @@ def test_tools_list_has_no_delete_tool_and_marks_write_tools(client):
     tools = rpc(client, "tools/list").json()["result"]["tools"]
     names = [t["name"] for t in tools]
     assert names[:2] == ["list_recordings", "get_recording"]
-    writers = {"add_todo", "update_todo", "add_topic_note", "mark_recording_analyzed", "save_digest"}
+    writers = {"add_todo", "update_todo", "add_topic_note", "mark_recording_analyzed", "save_digest",
+               "update_person", "set_person_topic"}
     assert writers <= set(names)
     for tool in tools:
         assert not any(word in tool["name"] for word in ("delete", "remove", "discard", "trash"))
