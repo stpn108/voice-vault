@@ -83,3 +83,35 @@ def test_d058_person_graph_has_the_person_topics_tasks_and_links(db_session):
     assert {e["type"] for e in graph["edges"]} == {"person", "topic", "link"}
     assert f"/todos/{a}?person=Jochen%20Rill" in {n["url"] for n in graph["nodes"]}
     assert people.person_graph(db_session, NOW, "Nobody") is None
+
+
+def test_d059_a_hidden_topic_leaves_profile_map_and_relations_and_claude_cannot_put_it_back(db_session):
+    rec = add_recording(db_session, 1)
+    svc.add_topic_note(db_session, NOW, topic="Budget", recording_id=rec.id, note="a")
+    svc.add_topic_note(db_session, NOW, topic="SOC", recording_id=rec.id, note="b")
+    make(db_session, "Offer", topic="Budget", people=["Anna", "Ian"])
+    make(db_session, "Staffing", topic="SOC", people=["Anna", "Ian"])
+    people.set_topic_note(db_session, NOW, "Anna", "Budget", "Draft", actor="claude")
+    budget = db_session.scalar(select(Topic).where(Topic.name == "Budget"))
+    people_admin.hide_topic(db_session, "anna", budget.id)
+    assert people.clusters(db_session, "Anna") == [] and budget.id not in people.person_topics(db_session, "Anna")
+    assert {n["label"] for n in people.person_graph(db_session, NOW, "Anna")["nodes"]} >= {"Offer"}
+    assert "p%d" % budget.id not in {n["id"] for n in people.person_graph(db_session, NOW, "Anna")["nodes"]}
+    with pytest.raises(people.PersonError, match="took topic"):
+        people.set_topic_note(db_session, NOW, "Anna", "Budget", "again", actor="claude")
+    ids = [t.id for t in db_session.scalars(select(Topic))]
+    assert people.topic_relations(db_session, ids, ignore="Ian")[0][3]["people"] == 0  # Anna no longer counts
+    assert people_admin.hidden_pairs(db_session)[0][0] == "Anna"
+    assert people_admin.show_topic(db_session, "Anna", budget.id) is True
+    assert [n.note for _, n in people.clusters(db_session, "Anna")] == ["Draft"]
+
+
+@pytest.mark.parametrize("own, others, counts", [(1, 4, True), (1, 5, False)])
+def test_d059_a_conversation_ties_a_person_to_its_topics_only_with_a_20_percent_share(db_session, own, others, counts):
+    from database import Segment
+    rec = add_recording(db_session, 1, segments=0)
+    for i in range(own + others):
+        db_session.add(Segment(recording_id=rec.id, idx=i, speaker="Anna" if i < own else "Bob", text="x"))
+    db_session.commit()
+    svc.add_topic_note(db_session, NOW, topic="Budget", recording_id=rec.id, note="a")
+    assert bool(people.person_topics(db_session, "Anna")) is counts

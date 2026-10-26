@@ -151,9 +151,14 @@ def test_d057_the_profile_follows_a_renamed_name_and_goes_with_a_deleted_one(db_
     import task_links
     from database import PersonMapNode
     task_links.save_layout(db_session, NOW, [{"key": "person", "x": 1, "y": 2}], person="Jochen Rill")
+    from database import PersonTopicHidden, Topic
+    admin.hide_topic(db_session, "Jochen Rill", db_session.scalar(select(Topic.id).where(Topic.name == "SOC")))
     admin.rename_person(db_session, NOW, "Jochen Rill", "Jochen")
-    assert ps.profile(db_session, "Jochen").role == "CISO" and len(ps.clusters(db_session, "Jochen")) == 2
+    assert ps.profile(db_session, "Jochen").role == "CISO"
     assert [m.person for m in db_session.scalars(select(PersonMapNode))] == ["jochen"]
+    assert [h.person for h in db_session.scalars(select(PersonTopicHidden))] == ["jochen"]
+    assert len(ps.clusters(db_session, "Jochen")) == 1
     admin.delete_person(db_session, NOW, "Jochen")
     assert ps.profile(db_session, "Jochen") is None and ps.clusters(db_session, "Jochen") == []
     assert db_session.scalars(select(PersonMapNode)).all() == []
+    assert db_session.scalars(select(PersonTopicHidden)).all() == []

@@ -14,7 +14,7 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 import todo_service
-from database import ExcludedPerson, PersonMapNode, PersonProfile, PersonTopicNote, Recording, Segment, Todo
+from database import ExcludedPerson, PersonMapNode, PersonProfile, PersonTopicHidden, PersonTopicNote, Topic, Recording, Segment, Todo
 from import_service import UNNAMED_SPEAKER
 
 log = logging.getLogger(__name__)
@@ -152,6 +152,7 @@ def delete_person(session: Session, now: dt.datetime, name: str) -> dict:
     segments = _relabel(session, found.name, lambda recording_id: _next_unknown(session, recording_id))
     session.execute(delete(PersonTopicNote).where(PersonTopicNote.person == found.name.lower()))
     session.execute(delete(PersonMapNode).where(PersonMapNode.person == found.name.lower()))
+    session.execute(delete(PersonTopicHidden).where(PersonTopicHidden.person == found.name.lower()))
     session.execute(delete(PersonProfile).where(func.lower(PersonProfile.name) == found.name.lower()))
     session.commit()
     log.info("Person deleted tasks=%s segments=%s", len(tasks), segments)
@@ -197,6 +198,13 @@ def _move_profile(session: Session, old: str, new: str) -> None:
             session.execute(delete(PersonMapNode).where(PersonMapNode.person == old.lower()))
         else:
             session.execute(update(PersonMapNode).where(PersonMapNode.person == old.lower()).values(person=new.lower()))
+    if old.lower() != new.lower():
+        gone = set(session.scalars(select(PersonTopicHidden.topic_id).where(PersonTopicHidden.person == new.lower())))
+        for pair in session.scalars(select(PersonTopicHidden).where(PersonTopicHidden.person == old.lower())).all():
+            if pair.topic_id in gone:
+                session.delete(pair)
+            else:
+                pair.person = new.lower()
     taken = set(session.scalars(select(PersonTopicNote.topic_id).where(PersonTopicNote.person == new.lower())))
     for note in session.scalars(select(PersonTopicNote).where(PersonTopicNote.person == old.lower())).all():
         if old.lower() == new.lower():
@@ -205,6 +213,36 @@ def _move_profile(session: Session, old: str, new: str) -> None:
             session.delete(note)
         else:
             note.person = new.lower()
+
+
+def hide_topic(session: Session, name: str, topic_id: int) -> bool:
+    """Take a topic off a person (D-059). Returns False when it was already off."""
+    name = _clean(name)
+    if not name or session.get(Topic, topic_id) is None:
+        raise PeopleError("unknown person or topic")
+    if session.scalar(select(PersonTopicHidden.id).where(PersonTopicHidden.person == name.lower(),
+                                                         PersonTopicHidden.topic_id == topic_id)):
+        return False
+    session.add(PersonTopicHidden(person=name.lower(), topic_id=topic_id))
+    session.commit()
+    log.info("Topic taken off a person topic_id=%s", topic_id)
+    return True
+
+
+def show_topic(session: Session, name: str, topic_id: int) -> bool:
+    """Put a topic back on a person. Returns False when it was not off."""
+    result = session.execute(delete(PersonTopicHidden).where(PersonTopicHidden.person == _clean(name).lower(),
+                                                             PersonTopicHidden.topic_id == topic_id))
+    session.commit()
+    return result.rowcount > 0
+
+
+def hidden_pairs(session: Session) -> list:
+    """(person, topic) of every topic taken off a person, by person and topic name."""
+    shown = {p.name.lower(): p.name for p in people(session)}
+    shown.update({p.name.lower(): p.name for p in session.scalars(select(PersonProfile))})
+    rows = session.execute(select(PersonTopicHidden.person, Topic).join(Topic, Topic.id == PersonTopicHidden.topic_id)).all()
+    return sorted(((shown.get(key, key), topic) for key, topic in rows), key=lambda r: (r[0].lower(), r[1].name.lower()))
 
 
 def orphans(session: Session) -> list:

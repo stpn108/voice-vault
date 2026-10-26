@@ -141,6 +141,16 @@ class PersonMapNode(Base):
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class PersonTopicHidden(Base):
+    """The owner took this topic off this person (D-059); only the pair is stored, nothing else changes."""
+    __tablename__ = "person_topic_hidden"
+    __table_args__ = (UniqueConstraint("person", "topic_id"),)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    person: Mapped[str] = mapped_column(String(80))  # lower case
+    topic_id: Mapped[int] = mapped_column(ForeignKey("topics.id", ondelete="CASCADE"))
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class PersonProfile(Base):
     """The living profile of a person (D-057): role and unit, what they work on, what to raise next time."""
     __tablename__ = "person_profiles"

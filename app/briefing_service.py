@@ -48,9 +48,11 @@ def briefing(session: Session, now: dt.datetime, name: str) -> Optional[Briefing
         spelled = next((_clean(s) for s in session.scalars(select(Segment.speaker).where(
             Segment.recording_id == recordings[0].id, func.lower(func.trim(Segment.speaker)) == name.lower()))), name)
 
-    hidden = set(todos._excluded_ids(session))
+    import person_service  # the same rules as the profile (D-059): hidden topics, 20 % share of a talk
+    hidden = set(todos._excluded_ids(session)) | person_service.hidden_topics(session, name)
     topic_ids = [row.topic_id for row in mine + waiting if row.topic_id]
-    recent = [r.id for r in recordings[:RECORDINGS_FOR_TOPICS]]
+    counted = set(person_service.talked_in(session, name))
+    recent = [r.id for r in recordings if r.id in counted][:RECORDINGS_FOR_TOPICS]
     if recent:
         topic_ids += session.scalars(select(TopicNote.topic_id).where(TopicNote.recording_id.in_(recent))).all()
     topics = []

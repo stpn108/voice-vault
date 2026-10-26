@@ -252,6 +252,12 @@
   .node-resize { position: absolute; z-index: 6; width: 14px; height: 14px; cursor: nwse-resize; touch-action: none;
     background: linear-gradient(135deg, transparent 50%, var(--accent) 50%); border-radius: 0 0 .35rem 0; opacity: .85; }
   .node-resize:hover { opacity: 1; }
+  .node-hide { position: absolute; z-index: 6; width: 20px; height: 20px; padding: 0; border-radius: 50%; font-size: 11px; line-height: 1;
+    background: var(--surface); color: var(--danger); border: 1px solid var(--line); cursor: pointer; }
+  .node-hide:hover { background: var(--danger); color: var(--surface); }
+  .cluster-head form.inline { display: inline; margin-left: .3rem; }
+  .cluster-head .tag-x { border: 0; background: none; padding: 0 .15rem; color: var(--muted); cursor: pointer; font-size: .8rem; }
+  .cluster-head .tag-x:hover { color: var(--danger); }
   .graph-wrap { background: radial-gradient(circle at 1px 1px, var(--line) 1px, transparent 0) 0 0 / 22px 22px, var(--surface); }
   .graph-wrap:fullscreen, .graph-wrap.max { border-radius: 0; border: 0; }
   .graph-wrap:fullscreen #graph, .graph-wrap.max #graph { height: 100vh; }

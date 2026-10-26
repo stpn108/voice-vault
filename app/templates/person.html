@@ -9,7 +9,7 @@
   <span class="muted">{% if b.last_talk %}{{ t("ui_brief_last_talk_today") if days_since == 0 else t("ui_brief_last_talk_yesterday") if days_since == 1 else t("ui_brief_last_talk", days=days_since) }} · {{ t("ui_brief_conversation_one") if b.conversations == 1 else t("ui_brief_conversations", count=b.conversations) }}{% else %}{{ t("ui_brief_no_talk") }}{% endif %}</span>
 </div>
 {% if not excluded %}
-<section class="card profile-card" data-profile data-name="{{ b.name }}" data-csrf="{{ csrf }}"
+<section class="card profile-card" data-profile data-name="{{ b.name }}" data-csrf="{{ csrf }}" data-hide-confirm="{{ t('ui_topic_hide_confirm', name=b.name) }}"
          data-saved="{{ t('ui_saved') }}" data-failed="{{ t('ui_save_failed') }}">
   <div class="profile-head"><h2>{{ t("ui_profile") }}</h2>
     <span class="save-state" data-save-state></span>
@@ -23,7 +23,11 @@
   <div class="field"><span>{{ t("ui_profile_clusters") }}</span>
     {% if clusters %}<div class="clusters">{% for topic, note in clusters %}
       <div class="cluster"><div class="cluster-head"><a href="/topics/{{ topic.id }}">{{ topic.name }}</a>
-        <span class="muted">{{ note.updated_at | localtime }}{% if note.updated_by == "claude" %} · Claude{% endif %}</span></div>
+        <span class="muted">{{ note.updated_at | localtime }}{% if note.updated_by == "claude" %} · Claude{% endif %}
+        <form class="inline" method="post" action="/person/topic/hide" data-hide-topic>
+          <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="name" value="{{ b.name }}">
+          <input type="hidden" name="topic_id" value="{{ topic.id }}">
+          <button type="submit" class="tag-x" title="{{ t('ui_topic_hide') }}" aria-label="{{ t('ui_topic_hide') }}: {{ topic.name }}">✕</button></form></span></div>
         <textarea data-field="topic:{{ topic.id }}" rows="2" maxlength="800">{{ note.note }}</textarea></div>
     {% endfor %}</div>{% else %}<p class="muted" style="margin:.2rem 0 0">{{ t("ui_profile_no_clusters") }}</p>{% endif %}
   </div>

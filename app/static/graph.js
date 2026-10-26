@@ -242,6 +242,35 @@
     });
   });
 
+  // ✕ on a topic box of a person's Mindmap takes the topic off the person (D-059).
+  var hideButton = document.querySelector("[data-node-hide]");
+  var hideNode = null;
+  var hideTimer = null;
+  if (hideButton) {
+    cy.on("mouseover", "node[kind = 'topic']", function (event) {
+      clearTimeout(hideTimer);
+      hideNode = event.target;
+      var box = hideNode.renderedBoundingBox({ includeLabels: false });
+      hideButton.style.left = (box.x2 - 9) + "px";
+      hideButton.style.top = (box.y1 - 9) + "px";
+      hideButton.hidden = false;
+    });
+    cy.on("mouseout", "node[kind = 'topic']", function () {
+      hideTimer = setTimeout(function () { hideButton.hidden = true; hideNode = null; }, 600);
+    });
+    cy.on("pan zoom drag", function () { hideButton.hidden = true; });
+    hideButton.addEventListener("pointerenter", function () { clearTimeout(hideTimer); });
+    hideButton.addEventListener("click", function () {
+      if (!hideNode || !window.confirm(hideButton.getAttribute("data-confirm") + "\n" + hideNode.data("full"))) { return; }
+      var data = new FormData();
+      data.set("csrf", payload.csrf);
+      data.set("name", payload.data.person);
+      data.set("topic_id", hideNode.id().slice(1));
+      fetch("/person/topic/hide", { method: "POST", body: data, credentials: "same-origin", headers: { "Accept": "application/json" } })
+        .then(function (response) { if (response.ok) { window.location.reload(); } });
+    });
+  }
+
   // --- resizing a box (D-054): a corner handle appears on hover; dragging it sets the box's size ---
   var handle = document.querySelector("[data-node-resize]");
   var handleNode = null;

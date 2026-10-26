@@ -12,6 +12,8 @@
     <button type="button" data-link-mode aria-pressed="false" title="{{ t('ui_graph_link_mode') }}" aria-label="{{ t('ui_graph_link_mode') }}">🔗</button>
   </div>
   <div class="node-resize" data-node-resize hidden title="{{ t('ui_graph_resize') }}"></div>
+  {% if person %}<button type="button" class="node-hide" data-node-hide hidden title="{{ t('ui_topic_hide') }}" aria-label="{{ t('ui_topic_hide') }}"
+          data-confirm="{{ t('ui_topic_hide_confirm', name=person) }}">✕</button>{% endif %}
   <div class="graph-status" data-graph-status hidden data-pick-first="{{ t('ui_graph_pick_first') }}"
        data-pick-second="{{ t('ui_graph_pick_second') }}" data-linked="{{ t('ui_linked') }}" data-already="{{ t('ui_linked_already') }}"
        data-failed="{{ t('ui_graph_link_failed') }}" data-why="{{ t('ui_graph_why') }}"></div>

@@ -77,6 +77,8 @@ Once a day Claude reads the recordings that are new since its last run, adds the
     Given a person's briefing, then a profile card shows role and unit, what the person works on, what to raise next time and one note per shared topic; Claude keeps them up to date through `update_person` and `set_person_topic`, the owner corrects any field on the page (saved when leaving it), and each replaced text is kept. Given an excluded person, then no profile is shown or written.
 28. **A person's own mind map (D-058).**
     Given the person page, then below the briefing cards a Mindmap shows the person in the middle, their topics around them and their tasks and promises at the topics; topics that probably belong together are joined by a dashed line whose width follows the evidence (shared conversations, linked tasks, shared people other than this person), and pointing at the line says why. Boxes can be moved, resized, arranged with "Perfekt verteilen" and linked like on the big Mindmap; the arrangement is kept per person.
+29. **Taking a topic off a person (D-059).**
+    Given a topic on a person's profile or Mindmap, when the owner presses its ✕ and confirms, then the topic leaves the person's profile, Mindmap, shared-topics card and probable connections, tasks, recordings and notes stay unchanged, and Claude's `set_person_topic` refuses that pair; "Verwaltung → Personen" lists the pair and "Zurückholen" restores it with its old note. Given a conversation, then it connects a person to its topics only when the person spoke at least 20 % of its passages.
 
 ## Out of scope
 

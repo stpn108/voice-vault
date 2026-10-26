@@ -40,6 +40,22 @@
   <button type="submit">{{ t("ui_people_exclude") }}</button>
   <span class="muted" style="flex-basis:100%;font-size:.85rem">{{ t("ui_people_exclude_hint") }}</span>
 </form>
+{% if hidden %}
+<h2>{{ t("ui_people_hidden") }}</h2>
+<p class="muted" style="font-size:.85rem;margin-top:-.3rem">{{ t("ui_people_hidden_hint") }}</p>
+<ul class="list">
+  {% for person, topic in hidden %}
+  <li><div class="item" style="cursor:default">
+    <div class="item-main"><div class="item-title">{{ person }} · {{ topic.name }}</div></div>
+    <form class="inline" method="post" action="/admin/people/topic-restore">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="name" value="{{ person }}">
+      <input type="hidden" name="topic_id" value="{{ topic.id }}">
+      <button class="small" type="submit">{{ t("ui_people_restore") }}</button>
+    </form>
+  </div></li>
+  {% endfor %}
+</ul>
+{% endif %}
 <h2>{{ t("ui_people_orphans") }}</h2>
 <p class="muted" style="font-size:.85rem;margin-top:-.3rem">{{ t("ui_people_orphans_hint") }}</p>
 {% if orphans %}

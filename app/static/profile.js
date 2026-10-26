@@ -4,6 +4,12 @@
   var box = document.querySelector("[data-profile]");
   if (!box) { return; }
   var state = box.querySelector("[data-save-state]");
+  // ✕ on a topic note takes the topic off the person (D-059); the page reloads so the map follows.
+  box.querySelectorAll("[data-hide-topic]").forEach(function (form) {
+    form.addEventListener("submit", function (event) {
+      if (!window.confirm(box.getAttribute("data-hide-confirm"))) { event.preventDefault(); }
+    });
+  });
   box.addEventListener("change", function (event) {
     var field = event.target.getAttribute("data-field");
     if (!field) { return; }

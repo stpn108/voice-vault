@@ -682,3 +682,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner request: "how topics most probably connect"; after the first version: "not linked, directly on the person page, with resizable boxes, saved positions and the arrange button". Counting is explainable and stable; the owner can check every line. The person themself is on all their topics and would connect everything, so they do not count. |
 | **Rejected alternatives** | (A) letting Claude guess connections: not explainable, changes between runs; (B) text similarity of notes: needs a model or library and gives lines nobody can explain; (C) a separate page linked from the briefing: owner wants it on the page; (D) sharing positions with the big Mindmap: the person map has other nodes (the person, probable connections), one task would sit well in one map and badly in the other. |
 | **Status** | **FINAL** |
+
+### D-059: The owner can take a topic off a person; a conversation counts only with a 20 % share (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-26 |
+| **Decision** | Amends D-057 and D-058. (1) An ✕ on a topic note of the profile and on a topic box of the person's Mindmap takes the topic off the person after a confirmation. It stores only the pair (`person_topic_hidden`: person, topic); tasks, recordings and notes stay untouched, the person's topic note stays stored. A hidden pair is left out of the profile, the person's Mindmap and the counting of shared people for probable connections, whatever source connected it. `set_person_topic` refuses a hidden pair, so the routine does not put it back. "Verwaltung → Personen" lists the hidden pairs; "Zurückholen" restores one, and its old note shows again. Renaming a name moves its pairs, deleting a name deletes them. Hiding and restoring live in `people_admin` (UI only, Claude cannot reach it). (2) A conversation connects a person to its topics only when the person spoke at least 20 % of its passages (`TALK_SHARE_MIN`). |
+| **In plain words** | You can take a topic off a person, and get it back in the admin page. Someone who only says a sentence in a meeting no longer gets all its topics. |
+| **Reasoning** | Owner question "how do I remove a person from a topic?": the connection is computed from three sources, so there was nothing to remove. Owner agreed to the proposal and chose 20 %. |
+| **Rejected alternatives** | (A) removing the underlying source (task tag, note): touches data the owner did not mean to change, and a conversation cannot be changed; (B) deleting the person's topic note on hiding: restoring would lose it; (C) 10 %: owner chose 20 %. |
+| **Status** | **FINAL** |

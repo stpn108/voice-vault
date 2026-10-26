@@ -175,7 +175,7 @@ after a confirmation: its notes go, its tasks stay. The task list sorts by prior
 or title. "Statistik" (`/stats`) charts task flow, open tasks by priority, open tasks per person and conversation hours
 (Chart.js 4.4.7, vendored in `app/static/vendor`). The header link "Verwaltung" (`/admin`) collects the admin tools: "Personen" (delete, rename or merge
 names, name the unnamed speakers of stored transcripts) and "Aufräumen". "Wartet auf" in the task list holds what other people promised you; a click on a name opens a briefing on that
-person (`/person`) with a living profile (role and unit, current work, what to raise next time, one note per shared topic) that the routine keeps up to date and you can correct; below it a Mindmap of the person's topics shows which of them probably belong together; it is arranged like the big Mindmap and kept per person. A task can name the people you have to talk to: the task page shows the speaker names of its
+person (`/person`) with a living profile (role and unit, current work, what to raise next time, one note per shared topic) that the routine keeps up to date and you can correct; below it a Mindmap of the person's topics shows which of them probably belong together; it is arranged like the big Mindmap and kept per person. An ✕ on a topic takes it off the person (restore under "Verwaltung → Personen"); a conversation counts for a person's topics only when they spoke at least 20 % of it. A task can name the people you have to talk to: the task page shows the speaker names of its
 recording as tags: tap to add, tap again to take off, saved at once; a click on a name in the list filters by that person.
 
 Prompt for the routine (connector `Dennis_Voice-Vault`). It can run several times a day, for example every two

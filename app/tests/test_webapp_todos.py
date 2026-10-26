@@ -738,3 +738,21 @@ def test_d058_person_mindmap_is_on_the_person_page_and_remembers_its_own_layout(
         assert (nodes["person"]["x"], nodes[f"t{todo}"]["w"]) == (10, 200)
         assert "x" not in next(n for n in task_links.graph(s, everything=True)["nodes"] if n["id"] == f"t{todo}")
     assert post(client, "/todos/graph/layout", layout='[{"key": "person", "x": 1, "y": 2}]').status_code == 400
+
+
+def test_d059_owner_takes_a_topic_off_a_person_and_restores_it(client, make_todo, session_factory):
+    import person_service
+    make_todo(title="Write offer", people=["Jochen Rill"], topic="Budget")
+    with session_factory() as s:
+        person_service.set_topic_note(s, now_utc(), "Jochen Rill", "Budget", "Offer approved", actor="claude")
+        topic_id = person_service.clusters(s, "Jochen Rill")[0][0].id
+    html = client.get("/person?name=Jochen%20Rill").text
+    assert 'action="/person/topic/hide"' in html and "data-node-hide" in html
+    response = post(client, "/person/topic/hide", name="Jochen Rill", topic_id=topic_id)
+    assert response.status_code == 303 and response.headers["location"] == "/person?name=Jochen%20Rill"
+    html = client.get("/person?name=Jochen%20Rill").text
+    assert "Offer approved" not in html and f'"id": "p{topic_id}"' not in html and f'href="/topics/{topic_id}"' not in html
+    assert "Jochen Rill · Budget" in client.get("/admin/people").text
+    assert post(client, "/admin/people/topic-restore", name="jochen rill", topic_id=topic_id).status_code == 303
+    assert "Offer approved" in client.get("/person?name=Jochen%20Rill").text
+    assert post(client, "/person/topic/hide", name="Jochen Rill", topic_id=999).status_code == 404

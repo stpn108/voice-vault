@@ -17,6 +17,7 @@ from collections import Counter
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, Iterator
+from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Query, Request
 from fastapi import Path as PathParam
@@ -548,6 +549,21 @@ def person_profile_save(request: Request, name: str = Form(..., max_length=todos
     return JSONResponse({"ok": True})
 
 
+@app.post("/person/topic/hide")
+def person_topic_hide(request: Request, name: str = Form(..., max_length=todos.PERSON_MAX),
+                      topic_id: int = Form(..., ge=1, le=MAX_ID), csrf: str = Form(""),
+                      session: Session = Depends(get_session)):
+    """Take a topic off a person (D-059): from the profile and the person's Mindmap."""
+    require_csrf(request, csrf)
+    try:
+        people_admin.hide_topic(session, name, topic_id)
+    except people_admin.PeopleError as exc:
+        raise _people_error(exc)
+    if "application/json" in request.headers.get("accept", ""):
+        return JSONResponse({"ok": True})
+    return RedirectResponse("/person?name=" + quote(name.strip()), status_code=303)
+
+
 @app.post("/person/graph/layout")
 def person_graph_layout(request: Request, name: str = Form(..., max_length=todos.PERSON_MAX),
                         layout: str = Form(..., max_length=200_000), csrf: str = Form(""),
@@ -576,7 +592,7 @@ ADMIN_TOOLS = [
     {"path": "/admin/people", "title": "ui_admin_people", "text": "ui_admin_people_text"},
     {"path": "/cleanup", "title": "ui_cleanup", "text": "ui_admin_cleanup_text"},
 ]
-PEOPLE_MESSAGES = ("renamed", "deleted", "assigned", "excluded", "allowed")
+PEOPLE_MESSAGES = ("renamed", "deleted", "assigned", "excluded", "allowed", "restored")
 
 
 def _people_error(exc: people_admin.PeopleError) -> HTTPException:
@@ -593,6 +609,7 @@ def admin_index(request: Request, cfg: Config = Depends(get_config)):
 def admin_people(request: Request, done: str = Query("", max_length=10), session: Session = Depends(get_session),
                  cfg: Config = Depends(get_config)):
     return render(request, cfg, "people.html", people=people_admin.people(session), orphans=people_admin.orphans(session),
+                  hidden=people_admin.hidden_pairs(session),
                   known=todos.known_people(session), done=done if done in PEOPLE_MESSAGES else "")
 
 
@@ -640,6 +657,16 @@ def admin_people_delete(request: Request, name: str = Form(..., max_length=todos
         raise HTTPException(status_code=409, detail=get_text("ui_changed_since", cfg_lang()))
     people_admin.delete_person(session, now_utc(), found.name)
     return RedirectResponse("/admin/people?done=deleted", status_code=303)
+
+
+@app.post("/admin/people/topic-restore")
+def admin_people_topic_restore(request: Request, name: str = Form(..., max_length=todos.PERSON_MAX),
+                               topic_id: int = Form(..., ge=1, le=MAX_ID), csrf: str = Form(""),
+                               session: Session = Depends(get_session)):
+    """Put a topic back on a person (D-059)."""
+    require_csrf(request, csrf)
+    people_admin.show_topic(session, name, topic_id)
+    return RedirectResponse("/admin/people?done=restored", status_code=303)
 
 
 @app.post("/admin/people/assign")

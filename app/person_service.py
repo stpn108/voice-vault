@@ -15,11 +15,12 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 import todo_service as todos
-from database import PersonMapNode, PersonProfile, PersonTopicNote, Segment, Todo, TodoLink, Topic, TopicNote
+from database import PersonMapNode, PersonProfile, PersonTopicHidden, PersonTopicNote, Segment, Todo, TodoLink, Topic, TopicNote
 
 log = logging.getLogger(__name__)
 
 ROLE_MAX, WORK_MAX, POINTS_MAX, CLUSTER_MAX = 200, 800, 1000, 800
+TALK_SHARE_MIN = 0.2  # share of a conversation's passages before it ties the person to its topics (D-059)
 RELATION_MIN_SCORE = 2
 
 
@@ -78,6 +79,8 @@ def set_topic_note(session: Session, now: dt.datetime, name: str, topic: str, no
     note = todos._text(note, "note", CLUSTER_MAX, required=True)
     recording_id = todos._visible_recording(session, recording_id)
     topic_row = todos._writable_topic(session, topic)
+    if topic_row.id in hidden_topics(session, name):
+        raise PersonError(f"the owner took topic '{topic_row.name}' off {name}; do not record it again")
     found = session.scalar(select(PersonTopicNote).where(PersonTopicNote.person == name.lower(),
                                                          PersonTopicNote.topic_id == topic_row.id))
     if found is None:
@@ -96,25 +99,40 @@ def set_topic_note(session: Session, now: dt.datetime, name: str, topic: str, no
     return found
 
 
+def hidden_topics(session: Session, name: str) -> set:
+    """Topics the owner took off this person (D-059)."""
+    return set(session.scalars(select(PersonTopicHidden.topic_id).where(PersonTopicHidden.person == _key(name))))
+
+
 def clusters(session: Session, name: str) -> list:
-    """(topic, note) of this person's topics, newest first; excluded topics left out."""
-    hidden = set(todos._excluded_ids(session))
+    """(topic, note) of this person's topics, newest first; excluded and hidden topics left out."""
+    hidden = set(todos._excluded_ids(session)) | hidden_topics(session, name)
     rows = session.execute(select(Topic, PersonTopicNote).join(PersonTopicNote, PersonTopicNote.topic_id == Topic.id)
                            .where(PersonTopicNote.person == _key(name))
                            .order_by(PersonTopicNote.updated_at.desc())).all()
     return [(topic, note) for topic, note in rows if topic.id not in hidden]
 
 
+def talked_in(session: Session, name: str) -> list:
+    """Recordings in which the person spoke at least TALK_SHARE_MIN of the passages (D-059)."""
+    own = dict(session.execute(select(Segment.recording_id, func.count()).where(
+        func.lower(func.trim(Segment.speaker)) == _key(name)).group_by(Segment.recording_id)).all())
+    if not own:
+        return []
+    total = dict(session.execute(select(Segment.recording_id, func.count()).where(Segment.recording_id.in_(list(own)))
+                                 .group_by(Segment.recording_id)).all())
+    return [rid for rid, count in own.items() if count >= TALK_SHARE_MIN * total[rid]]
+
+
 def person_topics(session: Session, name: str) -> list:
     """Every topic connected to the person: clusters, topics of tasks with them, topics of their talks."""
-    hidden = set(todos._excluded_ids(session))
+    hidden = set(todos._excluded_ids(session)) | hidden_topics(session, name)
     key = _key(name)
     ids = [t.id for t, _ in clusters(session, name)]
     for todo in session.scalars(select(Todo).where(Todo.topic_id.is_not(None), Todo.status.in_(todos.ACTIVE))):
         if key in {p.lower() for p in (todo.people or "").split("\n") if p}:
             ids.append(todo.topic_id)
-    spoke = select(Segment.recording_id).where(func.lower(func.trim(Segment.speaker)) == key).distinct()
-    ids += session.scalars(select(TopicNote.topic_id).where(TopicNote.recording_id.in_(spoke))).all()
+    ids += session.scalars(select(TopicNote.topic_id).where(TopicNote.recording_id.in_(talked_in(session, name)))).all()
     return [i for i in dict.fromkeys(ids) if i not in hidden]
 
 
@@ -145,6 +163,8 @@ def topic_relations(session: Session, topic_ids: list, ignore: str = "") -> list
                 topics_of_person.setdefault(name.lower(), set()).add(todo.topic_id)
     for note in session.scalars(select(PersonTopicNote).where(PersonTopicNote.topic_id.in_(wanted))):
         topics_of_person.setdefault(note.person, set()).add(note.topic_id)
+    for pair in session.scalars(select(PersonTopicHidden)):
+        topics_of_person.get(pair.person, set()).discard(pair.topic_id)
     topics_of_person.pop(ignore.lower(), None)
     for group in topics_of_person.values():
         for pair in combinations(sorted(group), 2):
