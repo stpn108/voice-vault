@@ -297,16 +297,19 @@ def todo_list(request: Request, status: str = Query("open", max_length=12), topi
     # What others owe the owner is not started or put back, so that list has no "in progress" tab (D-038).
     statuses = [s for s in todos.STATUSES if kind == "mine" or s != "in_progress"]
     # "Wartet auf": who owes how much, as a bar of people to filter by (D-039).
+    # Excluded people (D-044) are not shown in the list, neither in the bar nor as tags (D-055).
+    hidden = todos.excluded_people(session)
     owed = Counter()
     if kind == "waiting":
         for row in todos.list_todos(session, now_utc(), kind="waiting", limit=todos.LIST_LIMIT_MAX)[0]:
-            owed.update(row.people)
+            owed.update(n for n in row.people if n.lower() not in hidden)
+    shown_people = {row.id: [n for n in row.people if n.lower() not in hidden] for row in rows}
     return render(request, cfg, "todos.html", rows=rows, truncated=truncated, status=status, topic=topic, person=person,
                   kind=kind, kinds=todos.KINDS, kind_counts={k: todos.counts(session, k)["open"] for k in todos.KINDS},
                   sort=sort, sorts=todos.SORTS, today=now_utc().astimezone(LOCAL_TZ).date(),
                   counts=todos.counts(session, kind), statuses=statuses, priorities=todos.PRIORITIES,
                   known_people=todos.known_people(session) if kind == "waiting" else [],
-                  links=task_links.link_map(session, [r.id for r in rows]),
+                  links=task_links.link_map(session, [r.id for r in rows]), shown_people=shown_people,
                   owed=sorted(owed.items(), key=lambda pair: (-pair[1], pair[0].lower())))
 
 

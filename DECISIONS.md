@@ -637,3 +637,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner request. Stored on the server so the arrangement is the same on every device. Several runs with a simple score give a visibly tidier result than one run. |
 | **Rejected alternatives** | (A) browser storage: lost on another device or after clearing the browser; (B) one arrangement per view (with/without topics): the same task would jump between views; (C) a resize plug-in: not available for Cytoscape nodes; a small overlay handle does the job. |
 | **Status** | **FINAL** |
+
+### D-055: Excluded people do not show in the task lists (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-26 |
+| **Decision** | Amends D-044. In the task list, both "Meine Aufgaben" and "Wartet auf", excluded names are left out of the people tags of each row and out of the "Wartet auf" bar of people with their counts. The entries themselves stay; the names stay stored and are still shown on the task page, where the owner can take them off. |
+| **In plain words** | Names you excluded no longer appear in the lists, including the person bar of "Wartet auf". |
+| **Reasoning** | Owner request after deploying D-044. |
+| **Rejected alternatives** | (A) hiding the entries whose people are all excluded: an entry can still matter without the name; (B) removing the names from the tasks: not reversible by allowing the name again. |
+| **Status** | **FINAL** |

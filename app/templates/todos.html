@@ -55,7 +55,7 @@
       </div>
       {% set linked = links.get(row.id, []) %}
       <div class="task-links" {% if not linked %}hidden{% endif %}>{% for other_id, other_title, other_status in linked[:3] %}<a href="/todos/{{ other_id }}" data-link-id="{{ other_id }}" class="{{ 'finished' if other_status not in ('open', 'in_progress') else '' }}">{{ other_title }}</a>{% endfor %}{% if linked | length > 3 %}<a class="more" href="/todos/{{ row.id }}#links">{{ t("ui_links_more", count=linked | length - 3) }}</a>{% endif %}</div>
-      {% if row.people %}<div class="task-people">{% for name in row.people %}<a class="person" href="/person?name={{ name | urlencode }}">{{ name }}</a>{% endfor %}</div>{% endif %}
+      {% if shown_people[row.id] %}<div class="task-people">{% for name in shown_people[row.id] %}<a class="person" href="/person?name={{ name | urlencode }}">{{ name }}</a>{% endfor %}</div>{% endif %}
     </div>
     <button class="link-handle" type="button" title="{{ t('ui_link_handle') }}" aria-label="{{ t('ui_link_handle') }}"></button>
     {% if row.status in ("open", "in_progress") %}

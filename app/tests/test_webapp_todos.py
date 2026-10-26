@@ -667,3 +667,16 @@ def test_d054_the_mindmap_layout_is_saved_through_the_web_ui(client, make_todo):
     assert client.post("/todos/graph/layout", data={"csrf": "bad", "layout": layout}).status_code == 403
     html = client.get("/todos/graph").text
     assert "data-arrange" in html and "data-node-resize" in html
+
+
+
+def test_d055_excluded_people_do_not_show_in_the_lists(client, make_todo, session_factory):
+    import people_admin
+    make_todo(title="Change ticket", kind="waiting", people=["Jochen Rill", "Dennis Winter"])
+    make_todo(title="Own task", people=["Dennis Winter"])
+    with session_factory() as s:
+        people_admin.set_person_excluded(s, "Dennis Winter", True)
+    waiting = client.get("/todos?kind=waiting").text
+    assert "Dennis Winter" not in waiting and ">Jochen Rill<small>1</small>" in waiting and "Change ticket" in waiting
+    mine = client.get("/todos").text
+    assert "Own task" in mine and "Dennis Winter" not in mine
