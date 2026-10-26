@@ -763,11 +763,11 @@ def test_d060_from_waiting_the_breadcrumb_leads_back_to_waiting(client, make_tod
     assert 'class="person" href="/person?name=Jochen%20Rill&amp;from=waiting"' in client.get("/todos?kind=waiting").text
     html = client.get("/person?name=Jochen%20Rill&from=waiting").text
     crumbs = html[html.index('class="crumbs"'):html.index("</nav>", html.index('class="crumbs"'))]
-    assert 'href="/todos?kind=waiting">Wartet auf</a>' in crumbs and "Jochen Rill" in crumbs
+    assert 'href="/todos?kind=waiting">Zusagen an mich</a>' in crumbs and "Jochen Rill" in crumbs
     assert f'href="/todos/{todo}?person=Jochen%20Rill&amp;from=waiting"' in html
     task = client.get(f"/todos/{todo}?person=Jochen%20Rill&from=waiting").text
     crumbs = task[task.index('class="crumbs"'):task.index("</nav>", task.index('class="crumbs"'))]
-    assert 'href="/todos?kind=waiting">Wartet auf</a>' in crumbs
+    assert 'href="/todos?kind=waiting">Zusagen an mich</a>' in crumbs
     assert 'href="/person?name=Jochen%20Rill&amp;from=waiting">Jochen Rill</a>' in crumbs
     plain = client.get("/person?name=Jochen%20Rill").text
-    assert "Wartet auf</a>" not in plain[plain.index('class="crumbs"'):plain.index("</nav>")]
+    assert "Zusagen an mich</a>" not in plain[plain.index('class="crumbs"'):plain.index("</nav>")]

@@ -704,3 +704,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner request. A parameter is the only way to know where the owner came from without relying on the browser's referrer. |
 | **Rejected alternatives** | (A) the HTTP referrer: not sent in every setup and lost on reload; (B) always showing "Wartet auf" in the path: wrong when the person was opened from the own tasks. |
 | **Status** | **FINAL** |
+
+### D-061: "Wartet auf" is called "Zusagen an mich" (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-26 |
+| **Decision** | The UI label of the waiting view is "Zusagen an mich" (English "Promised to me"); the badge on a single entry reads "Zusage", the Mindmap switch "Zusagen an mich anzeigen". Only the user-facing strings change: the kind stays `waiting` in the database, the URLs and the MCP tools, so the routine and old links keep working. The person page keeps "X schuldet Dir". |
+| **In plain words** | "Wartet auf" is now "Zusagen an mich". Nothing else changes. |
+| **Reasoning** | Owner request; the owner picked the name. It says what the list holds: what others promised. |
+| **Rejected alternatives** | (A) "Offene Zusagen": leaves open who promised whom; (B) "Bringschuld": sounds like a reproach; (C) "Delegiert": wrong for promises the owner did not delegate; (D) renaming the kind `waiting` too: breaks the routine and saved links for no gain. |
+| **Status** | **FINAL** |
