@@ -51,7 +51,9 @@
       { selector: "edge[type = 'topic']", style: { "width": 1.5, "line-color": v("--faint"), "line-style": "dotted",
         "curve-style": "straight", "opacity": 0.9 } },
       { selector: "edge[type = 'link']:active, edge[type = 'link']:selected", style: { "line-color": v("--danger"), "opacity": 1 } },
-      { selector: ".faded", style: { "opacity": 0.15 } },
+      { selector: ".faded", style: { "opacity": 0.12 } },
+      { selector: ".deg2", style: { "opacity": 0.75 } },
+      { selector: ".deg3", style: { "opacity": 0.5 } },
       { selector: "node.focus", style: { "border-width": 3, "border-color": v("--accent") } },
       { selector: "node.ghost", style: { "width": 1, "height": 1, "opacity": 0, "label": "", "events": "no" } },
       { selector: "edge[type = 'ghost']", style: { "width": 2, "line-color": v("--accent"), "line-style": "dashed",
@@ -76,13 +78,58 @@
   }
   view();
 
-  // Pointing at a task fades everything not connected to it.
+  // Pointing at a task highlights everything reachable through links, at any distance (D-052): direct
+  // neighbours fully, the 2nd degree a little lighter, the 3rd and further lighter still; the rest fades.
+  // Topics are not bridges (through a topic everything would be connected), but the task's topics stay.
+  var DEGREES = ["deg2", "deg3"];
+
+  function clearFocus() { cy.elements().removeClass("faded deg2 deg3"); }
+
+  function focus(start) {
+    if (start.data("kind") === "topic") {
+      cy.elements().not(start.closedNeighborhood()).addClass("faded");
+      return;
+    }
+    var distance = {};
+    distance[start.id()] = 0;
+    var queue = [start];
+    while (queue.length) {
+      var node = queue.shift();
+      node.connectedEdges("[type = 'link']").connectedNodes().forEach(function (next) {
+        if (distance[next.id()] === undefined) {
+          distance[next.id()] = distance[node.id()] + 1;
+          queue.push(next);
+        }
+      });
+    }
+    cy.batch(function () {
+      cy.nodes().forEach(function (n) {
+        var d = distance[n.id()];
+        if (d === undefined) {
+          var ownTopic = n.data("kind") === "topic" && n.edgesWith(start).length > 0;
+          if (!ownTopic) { n.addClass("faded"); }
+        } else if (d >= 2) {
+          n.addClass(DEGREES[Math.min(d, 3) - 2]);
+        }
+      });
+      cy.edges().forEach(function (e) {
+        var a = distance[e.source().id()], b = distance[e.target().id()];
+        if (e.data("type") === "link" && a !== undefined && b !== undefined) {
+          var d = Math.max(a, b);
+          if (d >= 2) { e.addClass(DEGREES[Math.min(d, 3) - 2]); }
+        } else if (!(e.data("type") === "topic" && (e.source().same(start) || e.target().same(start)))) {
+          e.addClass("faded");
+        }
+      });
+    });
+  }
+
   cy.on("mouseover", "node", function (event) {
     if (event.target.id() === "ghost") { return; }
-    var keep = event.target.closedNeighborhood();
-    cy.elements().not(keep).addClass("faded");
+    clearFocus();
+    focus(event.target);
   });
-  cy.on("mouseout", "node", function () { cy.elements().removeClass("faded"); });
+  cy.on("mouseout", "node", clearFocus);
 
   // Full screen (D-050): the browser's own when it has one, else the box fills the window.
   var wrapBox = document.querySelector(".graph-wrap");

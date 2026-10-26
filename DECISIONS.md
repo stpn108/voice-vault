@@ -604,3 +604,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner request. |
 | **Rejected alternatives** | (A) never showing them: some links are about who delivers what; (B) on by default: the owner asked to leave them out. |
 | **Status** | **FINAL** |
+
+### D-052: Hovering a task on the Mindmap highlights all tasks it reaches through links (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-26 |
+| **Decision** | Amends D-050. On hover, a breadth-first search over link edges (not topic edges) gives every reachable task its distance: the task and its direct neighbours stay fully visible, the 2nd degree at 75 %, the 3rd and further at 50 %; everything not reachable fades to 12 %. The hovered task's own topic node and its topic edge stay visible. Hovering a topic node still highlights only that topic and its tasks. |
+| **In plain words** | Pointing at a task now lights up the whole chain it is linked into, the further away the paler. |
+| **Reasoning** | Owner request. Topics are not used as bridges: through a topic every task of it would count as connected. |
+| **Rejected alternatives** | (A) a fixed depth limit: the owner asked for every degree; (B) the same strength for every degree: the direct links would no longer stand out. |
+| **Status** | **FINAL** |

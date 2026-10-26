@@ -640,6 +640,7 @@ def test_d049_mindmap_has_zoom_buttons_and_a_link_mode(client, make_todo):
         assert marker in html, marker
     script = client.get("/static/graph.js").text
     assert "/todos/links" in script and '"events": "no"' in script
+    assert "connectedEdges(\"[type = 'link']\")" in script and '".deg3"' in script  # D-052: all degrees
 
 
 
