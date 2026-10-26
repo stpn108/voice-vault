@@ -3,55 +3,112 @@
   "use strict";
   var source = document.getElementById("graph-data");
   if (!source || !window.cytoscape) { return; }
+  var fcose = Boolean(window.cytoscapeFcose);
+  var withTopics = JSON.parse(source.textContent).data.nodes.some(function (n) { return n.kind === "topic"; });
+  if (fcose) { cytoscape.use(window.cytoscapeFcose); }
   var payload = JSON.parse(source.textContent);
   var css = getComputedStyle(document.documentElement);
   function v(name) { return css.getPropertyValue(name).trim(); }
 
-  var fill = { open: v("--surface"), in_progress: v("--progress"), done: v("--ok"), dropped: v("--hover"), topic: v("--accent-soft") };
-  var border = { open: v("--faint"), in_progress: v("--progress"), done: v("--ok"), dropped: v("--line"), topic: v("--accent") };
+  var font = getComputedStyle(document.body).fontFamily;
+  // Status fills the node; an urgent or high priority shows as a coloured rim (D-050).
+  var fill = { open: v("--surface"), in_progress: v("--progress"), done: v("--ok"), dropped: v("--hover"), topic: v("--accent") };
+  var rim = { 1: v("--danger"), 2: v("--warn") };
   var elements = payload.data.nodes.map(function (n) {
-    return { data: { id: n.id, label: n.label.length > 60 ? n.label.slice(0, 57) + "…" : n.label, full: n.label,
-                     status: n.status, kind: n.kind, url: n.url } };
+    return { data: { id: n.id, label: n.label.length > 70 ? n.label.slice(0, 67) + "…" : n.label, full: n.label,
+                     status: n.status, kind: n.kind, url: n.url, priority: n.priority || 3 } };
   }).concat(payload.data.edges.map(function (e, i) {
     return { data: { id: "e" + i, source: e.source, target: e.target, type: e.type } };
   }));
 
+  function textWidth(n) { return Math.min(210, Math.max(70, (n.data("label") || "").length * 7.2)); }
+  function textLines(n) { return Math.max(1, Math.ceil((n.data("label") || "").length * 7.2 / 210)); }
+
   var cy = cytoscape({
     container: document.getElementById("graph"),
     elements: elements,
-    minZoom: 0.3,
-    maxZoom: 2.5,
+    minZoom: 0.25,
+    maxZoom: 3,
     style: [
       { selector: "node", style: {
-        "label": "data(label)", "text-wrap": "wrap", "text-max-width": "160px", "font-size": "11px",
-        "font-family": getComputedStyle(document.body).fontFamily, "color": v("--text"),
+        "label": "data(label)", "text-wrap": "wrap", "text-max-width": "210px", "font-size": "13px",
+        "font-family": font, "font-weight": 500, "color": v("--text"), "line-height": 1.3,
         "text-valign": "center", "text-halign": "center", "shape": "round-rectangle",
-        "width": function (n) { return Math.min(170, Math.max(56, (n.data("label") || "").length * 6.4)); },
-        "height": function (n) { return 16 * Math.ceil((n.data("label") || "").length * 6.4 / 170) + 4; }, "padding": "9px",
+        "width": textWidth, "height": function (n) { return 17 * textLines(n); }, "padding": "12px",
         "background-color": function (n) { return fill[n.data("status")] || fill.open; },
-        "border-width": 1.5, "border-color": function (n) { return border[n.data("status")] || border.open; } } },
-      { selector: "node[kind = 'waiting']", style: { "border-style": "dashed" } },
-      { selector: "node[status = 'done'], node[status = 'dropped']", style: { "opacity": 0.75 } },
-      { selector: "node[status = 'in_progress']", style: { "color": "#1a1300" } },
-      { selector: "node[status = 'topic']", style: { "font-size": "13px", "font-weight": 600, "shape": "ellipse",
-        "padding": "14px", "color": v("--accent") } },
-      { selector: "edge", style: { "width": 2, "line-color": v("--accent"), "curve-style": "bezier" } },
-      { selector: "edge[type = 'topic']", style: { "width": 1.2, "line-color": v("--faint"), "line-style": "dashed" } },
-      { selector: "edge[type = 'link']:active, edge[type = 'link']:selected", style: { "line-color": v("--danger") } },
+        "border-width": function (n) { return rim[n.data("priority")] && n.data("status") !== "done" ? 2.5 : 1.2; },
+        "border-color": function (n) { return rim[n.data("priority")] || v("--line"); },
+        "transition-property": "opacity", "transition-duration": "120ms" } },
+      { selector: "node[kind = 'waiting']", style: { "border-style": "dashed", "border-width": 1.8, "border-color": v("--muted") } },
+      { selector: "node[status = 'done'], node[status = 'dropped']", style: { "opacity": 0.6, "color": v("--muted") } },
+      { selector: "node[status = 'in_progress']", style: { "color": "#1a1300", "font-weight": 600 } },
+      { selector: "node[status = 'topic']", style: { "font-size": "15px", "font-weight": 700, "color": v("--surface"),
+        "shape": "round-rectangle", "padding": "16px", "border-width": 0,
+        "width": function (n) { return Math.max(80, (n.data("label") || "").length * 8.6); }, "height": 20 } },
+      { selector: "edge", style: { "width": 2.5, "line-color": v("--accent"), "curve-style": "unbundled-bezier",
+        "control-point-distances": 18, "control-point-weights": 0.5, "opacity": 0.8,
+        "transition-property": "opacity", "transition-duration": "120ms" } },
+      { selector: "edge[type = 'topic']", style: { "width": 1.5, "line-color": v("--faint"), "line-style": "dotted",
+        "curve-style": "straight", "opacity": 0.9 } },
+      { selector: "edge[type = 'link']:active, edge[type = 'link']:selected", style: { "line-color": v("--danger"), "opacity": 1 } },
+      { selector: ".faded", style: { "opacity": 0.15 } },
+      { selector: "node.focus", style: { "border-width": 3, "border-color": v("--accent") } },
       { selector: "node.ghost", style: { "width": 1, "height": 1, "opacity": 0, "label": "", "events": "no" } },
       { selector: "edge[type = 'ghost']", style: { "width": 2, "line-color": v("--accent"), "line-style": "dashed",
         "curve-style": "straight", "events": "no" } }
     ],
-    layout: { name: "cose", animate: false, nodeDimensionsIncludeLabels: true, nodeRepulsion: function () { return 60000; },
-              idealEdgeLength: function () { return 130; }, nodeOverlap: 40, componentSpacing: 120, padding: 30,
-              randomize: true, numIter: 2500 }
+    // fCoSE (D-050): compact, without overlaps; separate groups are packed side by side.
+    layout: fcose ? { name: "fcose", quality: "proof", animate: false, randomize: true, nodeDimensionsIncludeLabels: true,
+                      packComponents: true, tile: true, tilingPaddingVertical: 24, tilingPaddingHorizontal: 24,
+                      nodeSeparation: withTopics ? 70 : 45, nodeRepulsion: function () { return withTopics ? 8000 : 5200; },
+                      idealEdgeLength: function (e) { return e.data("type") === "topic" ? 45 : 75; },
+                      edgeElasticity: function (e) { return e.data("type") === "topic" ? 0.6 : 0.35; },
+                      gravity: 0.3, gravityRange: 2.5, numIter: 4000, padding: 30 }
+                  : { name: "cose", animate: false, nodeDimensionsIncludeLabels: true, padding: 40 }
+  });
+
+  // Readable from the start: fit, but never so small that the text cannot be read (D-050).
+  function view() {
+    cy.fit(undefined, 30);
+    // Never start so small that the text cannot be read; ⤢ and full screen show everything.
+    if (cy.zoom() < 0.75) { cy.zoom(0.75); cy.center(); }
+    if (cy.zoom() > 1.5) { cy.zoom(1.5); cy.center(); }
+  }
+  view();
+
+  // Pointing at a task fades everything not connected to it.
+  cy.on("mouseover", "node", function (event) {
+    if (event.target.id() === "ghost") { return; }
+    var keep = event.target.closedNeighborhood();
+    cy.elements().not(keep).addClass("faded");
+  });
+  cy.on("mouseout", "node", function () { cy.elements().removeClass("faded"); });
+
+  // Full screen (D-050): the browser's own when it has one, else the box fills the window.
+  var wrapBox = document.querySelector(".graph-wrap");
+  var fullButton = document.querySelector("[data-fullscreen]");
+  function toggleFull() {
+    if (wrapBox.requestFullscreen && !document.fullscreenElement) {
+      wrapBox.requestFullscreen().catch(function () { wrapBox.classList.toggle("max"); afterResize(); });
+    } else if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      wrapBox.classList.toggle("max");
+      afterResize();
+    }
+  }
+  function afterResize() { setTimeout(function () { cy.resize(); view(); }, 60); }
+  fullButton.addEventListener("click", toggleFull);
+  document.addEventListener("fullscreenchange", function () {
+    fullButton.setAttribute("aria-pressed", document.fullscreenElement ? "true" : "false");
+    afterResize();
   });
 
   // Zoom buttons at the edge (D-049).
   document.querySelectorAll("[data-zoom]").forEach(function (button) {
     button.addEventListener("click", function () {
       var how = button.getAttribute("data-zoom");
-      if (how === "fit") { cy.animate({ fit: { padding: 30 } }, { duration: 200 }); return; }
+      if (how === "fit") { cy.animate({ fit: { padding: 40 } }, { duration: 200 }); return; }
       var level = cy.zoom() * (how === "in" ? 1.3 : 1 / 1.3);
       var box = cy.container().getBoundingClientRect();
       cy.animate({ zoom: { level: level, renderedPosition: { x: box.width / 2, y: box.height / 2 } } }, { duration: 150 });
@@ -72,7 +129,7 @@
 
   function dropGhost() {
     cy.remove("#ghost");
-    if (first) { first.style("border-width", 1.5); }
+    if (first) { first.removeClass("focus"); }
     first = null;
   }
 
@@ -117,7 +174,7 @@
     if (node.id() === "ghost" || node.data("kind") === "topic") { return; }
     if (!first) {
       first = node;
-      node.style("border-width", 4);
+      node.addClass("focus");
       // A copy: node.position() is the node's own live object, the ghost must not drag the task along.
       cy.add([{ data: { id: "ghost" }, position: { x: node.position("x"), y: node.position("y") }, classes: "ghost" },
               { data: { id: "ghost-edge", source: node.id(), target: "ghost", type: "ghost" } }]);
@@ -128,8 +185,6 @@
     dropGhost();
     if (a.id() !== node.id()) { link(a, node); } else { say("pick-first"); }
   });
-  cy.on("mouseover", "node", function (event) { event.target.style("border-width", 3); });
-  cy.on("mouseout", "node", function (event) { event.target.style("border-width", 1.5); });
   cy.on("tap", "edge[type = 'link']", function (event) {
     if (linking) { return; }
     var edge = event.target;

@@ -249,6 +249,19 @@
   .graph-status { position: absolute; left: .6rem; top: .6rem; z-index: 5; padding: .35rem .7rem; border-radius: .5rem;
     background: var(--accent-soft); color: var(--accent); font-size: .85rem; font-weight: 500; }
   .graph-wrap.linking #graph { cursor: crosshair; }
+  .graph-wrap { background: radial-gradient(circle at 1px 1px, var(--line) 1px, transparent 0) 0 0 / 22px 22px, var(--surface); }
+  .graph-wrap:fullscreen, .graph-wrap.max { border-radius: 0; border: 0; }
+  .graph-wrap:fullscreen #graph, .graph-wrap.max #graph { height: 100vh; }
+  .graph-wrap.max { position: fixed; inset: 0; z-index: 60; }
+  .graph-legend { display: flex; flex-wrap: wrap; gap: .3rem 1.1rem; margin: .7rem 0 .2rem; font-size: .82rem; color: var(--muted); }
+  .graph-legend span { display: inline-flex; align-items: center; gap: .4rem; }
+  .graph-legend i { width: .95rem; height: .7rem; border-radius: .25rem; border: 1.2px solid var(--line); background: var(--surface); }
+  .graph-legend .lg-progress { background: var(--progress); border-color: var(--progress); }
+  .graph-legend .lg-done { background: var(--ok); border-color: var(--ok); opacity: .6; }
+  .graph-legend .lg-waiting { border: 1.8px dashed var(--muted); }
+  .graph-legend .lg-urgent { border: 2.5px solid var(--danger); }
+  .graph-legend .lg-high { border: 2.5px solid var(--warn); }
+  .graph-legend .lg-topic { background: var(--accent); border-color: var(--accent); }
   .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: .8rem; }
   a.tile { display: block; padding: 1rem 1.1rem; text-decoration: none; color: var(--text); }
   a.tile:hover { border-color: var(--accent); } a.tile strong { display: block; margin-bottom: .3rem; } a.tile span { color: var(--muted); font-size: .9rem; }

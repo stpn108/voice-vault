@@ -582,3 +582,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner request. A mode with two taps works with mouse and finger and needs no further plug-in. |
 | **Rejected alternatives** | (A) the edgehandles plug-in: one more vendored file for the same result; (B) Shift+drag: not possible on a touch screen. |
 | **Status** | **FINAL** |
+
+### D-050: A nicer Mindmap: fCoSE layout, readable sizes, focus on hover, legend, full screen (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-26 |
+| **Decision** | Amends D-047/D-049. Layout with fCoSE 2.2.0 (cytoscape-fcose, with layout-base 2.0.1 and cose-base 2.2.0, all MIT, vendored, no eval): compact, without overlaps, separate groups packed side by side; topic edges shorter so tasks gather around their topic; built-in cose stays as fallback. Nodes: 13 px text (topics 15 px bold, filled accent), wrapped at 210 px; fill by status, an urgent or high priority as a red or orange rim, waiting entries dashed, finished ones faded. Links as soft curves, topic edges dotted. Pointing at a task fades everything not connected to it. The view starts fitted but never below zoom 0.75, so the text is readable; ⤢ shows everything. New ⛶ button: the browser's full screen (falls back to filling the window). A legend below explains colours and rims. Dotted background. |
+| **In plain words** | The Mindmap is laid out tidily, the text is readable, colours and rims show status and priority, and ⛶ makes it full screen. |
+| **Reasoning** | Owner feedback: layout, font sizes and the look were not good; full screen asked for. The built-in cose stretched graphs and let nodes overlap. |
+| **Rejected alternatives** | (A) tuning the built-in cose only: overlaps remained; (B) a hierarchical layout (dagre): links between tasks have no direction; (C) fitting everything at start: text below 7 px on wider graphs. |
+| **Status** | **FINAL** |

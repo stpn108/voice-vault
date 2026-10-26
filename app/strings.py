@@ -178,6 +178,7 @@ TEXTS = {
     "ui_graph_zoom_in": {"de": "Vergrößern", "en": "Zoom in"},
     "ui_graph_zoom_out": {"de": "Verkleinern", "en": "Zoom out"},
     "ui_graph_fit": {"de": "Alles einpassen", "en": "Fit all"},
+    "ui_graph_fullscreen": {"de": "Vollbild", "en": "Full screen"},
     "ui_graph_link_mode": {"de": "Verknüpfen: erst eine Aufgabe antippen, dann die zweite", "en": "Link: tap one task, then the other"},
     "ui_graph_pick_first": {"de": "Verknüpfen: erste Aufgabe antippen (Esc beendet)", "en": "Link: tap the first task (Esc ends)"},
     "ui_graph_pick_second": {"de": "Jetzt die zweite Aufgabe antippen", "en": "Now tap the second task"},

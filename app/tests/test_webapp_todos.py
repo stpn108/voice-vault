@@ -640,3 +640,14 @@ def test_d049_mindmap_has_zoom_buttons_and_a_link_mode(client, make_todo):
         assert marker in html, marker
     script = client.get("/static/graph.js").text
     assert "/todos/links" in script and '"events": "no"' in script
+
+
+
+@pytest.mark.parametrize("path", ["/static/vendor/layout-base-2.0.1.js", "/static/vendor/cose-base-2.2.0.js",
+                                  "/static/vendor/cytoscape-fcose-2.2.0.js"])
+def test_d050_mindmap_layout_scripts_are_served_from_this_server(client, make_todo, path):
+    a, b = make_todo(title="Alpha"), make_todo(title="Beta")
+    post(client, "/todos/links", a=a, b=str(b))
+    html = client.get("/todos/graph").text
+    assert f'<script src="{path}" defer></script>' in html and "data-fullscreen" in html and 'class="graph-legend"' in html
+    assert client.get(path).status_code == 200
