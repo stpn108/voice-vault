@@ -16,7 +16,7 @@
 {% if kind == "waiting" and owed %}<div class="owed" aria-label="{{ t('ui_waiting_who') }}">
   <a class="owed-chip {% if not person %}current{% endif %}" href="/todos?kind=waiting&amp;status={{ status }}&amp;sort={{ sort }}{{ '&topic=' ~ topic | urlencode if topic else '' }}">{{ t("ui_all") }}</a>
   {% for name, count in owed %}<a class="owed-chip {% if person and name.lower() == person.lower() %}current{% endif %}" href="/todos?kind=waiting&amp;status={{ status }}&amp;sort={{ sort }}&amp;person={{ name | urlencode }}{{ '&topic=' ~ topic | urlencode if topic else '' }}">{{ name }}<small>{{ count }}</small></a>{% endfor %}
-  {% if person %}<a class="owed-brief" href="/person?name={{ person | urlencode }}">{{ t("ui_waiting_briefing") }} →</a>{% endif %}
+  {% if person %}<a class="owed-brief" href="/person?name={{ person | urlencode }}&amp;from=waiting">{{ t("ui_waiting_briefing") }} →</a>{% endif %}
 </div>{% endif %}
 {% if topic or (person and kind != "waiting") %}<p class="sub" style="margin:-.5rem 0 1rem">{% if topic %}{{ t("ui_topic") }}: <strong>{{ topic }}</strong> · {% endif %}{% if person and kind != "waiting" %}{{ t("ui_person") }}: <strong>{{ person }}</strong> · {% endif %}<a href="/todos?status={{ status }}&amp;sort={{ sort }}{{ '&kind=waiting' if kind == 'waiting' else '' }}">{{ t("ui_filter_clear") }}</a></p>{% endif %}
 <form class="card quick" method="post" action="/todos">
@@ -55,7 +55,7 @@
       </div>
       {% set linked = links.get(row.id, []) %}
       <div class="task-links" {% if not linked %}hidden{% endif %}>{% for other_id, other_title, other_status in linked[:3] %}<a href="/todos/{{ other_id }}" data-link-id="{{ other_id }}" class="{{ 'finished' if other_status not in ('open', 'in_progress') else '' }}">{{ other_title }}</a>{% endfor %}{% if linked | length > 3 %}<a class="more" href="/todos/{{ row.id }}#links">{{ t("ui_links_more", count=linked | length - 3) }}</a>{% endif %}</div>
-      {% if shown_people[row.id] %}<div class="task-people">{% for name in shown_people[row.id] %}<a class="person" href="/person?name={{ name | urlencode }}">{{ name }}</a>{% endfor %}</div>{% endif %}
+      {% if shown_people[row.id] %}<div class="task-people">{% for name in shown_people[row.id] %}<a class="person" href="/person?name={{ name | urlencode }}{{ '&from=waiting' if kind == 'waiting' else '' }}">{{ name }}</a>{% endfor %}</div>{% endif %}
     </div>
     <button class="link-handle" type="button" title="{{ t('ui_link_handle') }}" aria-label="{{ t('ui_link_handle') }}"></button>
     {% if row.status in ("open", "in_progress") %}

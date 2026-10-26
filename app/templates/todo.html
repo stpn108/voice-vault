@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% block title %}{{ row.title }}{% endblock %}
 {% block crumbs %}
-{% if via_person %}<nav class="crumbs" aria-label="breadcrumb"><a href="/todos">{{ t("ui_nav_todos") }}</a><span class="sep">/</span><a href="/person?name={{ via_person | urlencode }}">{{ via_person }}</a><span class="sep">/</span><span aria-current="page">{{ row.title }}</span></nav>
+{% if via_person %}<nav class="crumbs" aria-label="breadcrumb"><a href="/todos">{{ t("ui_nav_todos") }}</a><span class="sep">/</span>
+{%- if via_waiting %}<a href="/todos?kind=waiting">{{ t("ui_kind_waiting") }}</a><span class="sep">/</span>{% endif -%}
+<a href="/person?name={{ via_person | urlencode }}{{ '&from=waiting' if via_waiting else '' }}">{{ via_person }}</a><span class="sep">/</span><span aria-current="page">{{ row.title }}</span></nav>
 {% else %}<nav class="crumbs" aria-label="breadcrumb"><a href="/todos{{ '?kind=waiting' if row.kind == 'waiting' else '' }}">{{ t("ui_kind_" ~ row.kind) }}</a><span class="sep">/</span><span aria-current="page">{{ row.title }}</span></nav>{% endif %}
 {% endblock %}
 {% block content %}

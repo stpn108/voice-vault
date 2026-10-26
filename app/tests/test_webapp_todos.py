@@ -545,7 +545,7 @@ def test_d039_waiting_view_offers_people_to_filter_by_and_prefills_who(client, m
     filtered = client.get("/todos?kind=waiting&person=Ian%20Wright").text
     assert "Timeline" in filtered and "Change ticket" not in filtered
     assert 'name="person" placeholder="Von wem" maxlength="80" list="list-people" required value="Ian Wright"' in filtered
-    assert 'href="/person?name=Ian%20Wright"' in filtered
+    assert 'href="/person?name=Ian%20Wright&amp;from=waiting"' in filtered
 
 
 
@@ -756,3 +756,18 @@ def test_d059_owner_takes_a_topic_off_a_person_and_restores_it(client, make_todo
     assert post(client, "/admin/people/topic-restore", name="jochen rill", topic_id=topic_id).status_code == 303
     assert "Offer approved" in client.get("/person?name=Jochen%20Rill").text
     assert post(client, "/person/topic/hide", name="Jochen Rill", topic_id=999).status_code == 404
+
+
+def test_d060_from_waiting_the_breadcrumb_leads_back_to_waiting(client, make_todo):
+    todo = make_todo(title="Change ticket", kind="waiting", people=["Jochen Rill"])
+    assert 'class="person" href="/person?name=Jochen%20Rill&amp;from=waiting"' in client.get("/todos?kind=waiting").text
+    html = client.get("/person?name=Jochen%20Rill&from=waiting").text
+    crumbs = html[html.index('class="crumbs"'):html.index("</nav>", html.index('class="crumbs"'))]
+    assert 'href="/todos?kind=waiting">Wartet auf</a>' in crumbs and "Jochen Rill" in crumbs
+    assert f'href="/todos/{todo}?person=Jochen%20Rill&amp;from=waiting"' in html
+    task = client.get(f"/todos/{todo}?person=Jochen%20Rill&from=waiting").text
+    crumbs = task[task.index('class="crumbs"'):task.index("</nav>", task.index('class="crumbs"'))]
+    assert 'href="/todos?kind=waiting">Wartet auf</a>' in crumbs
+    assert 'href="/person?name=Jochen%20Rill&amp;from=waiting">Jochen Rill</a>' in crumbs
+    plain = client.get("/person?name=Jochen%20Rill").text
+    assert "Wartet auf</a>" not in plain[plain.index('class="crumbs"'):plain.index("</nav>")]

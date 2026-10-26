@@ -394,7 +394,8 @@ def todo_graph(request: Request, done: int = Query(0, ge=0, le=1), topics: int =
 
 @app.get("/todos/{todo_id}", response_class=HTMLResponse)
 def todo_detail(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX_ID)], session: Session = Depends(get_session),
-                person: str = Query("", max_length=todos.PERSON_MAX), cfg: Config = Depends(get_config)):
+                person: str = Query("", max_length=todos.PERSON_MAX), came_from: str = Query("", alias="from", max_length=10),
+                cfg: Config = Depends(get_config)):
     found = todos.get_todo(session, now_utc(), todo_id)
     if found is None:
         raise HTTPException(status_code=404, detail="task not found")
@@ -412,7 +413,7 @@ def todo_detail(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX
     targets = [r for r in todos.list_todos(session, now_utc(), status="open", kind="all", limit=todos.LIST_LIMIT_MAX)[0]
                if r.id != row.id and r.id not in {item[0] for item in linked}]
     return render(request, cfg, "todo.html", row=row, events=events, undoable=undoable, candidates=candidates, via_person=via_person,
-                  linked=linked, link_targets=targets,
+                  via_waiting=came_from == "waiting", linked=linked, link_targets=targets,
                   topic_candidates=topic_candidates[:TOPIC_TAGS], known_topics=allowed,
                   speakers=speakers, known=todos.known_people(session), statuses=todos.STATUSES, priorities=todos.PRIORITIES)
 
@@ -514,17 +515,23 @@ def todo_undo(request: Request, event_id: Annotated[int, PathParam(ge=1, le=MAX_
 
 @app.get("/person", response_class=HTMLResponse)
 def person_page(request: Request, name: str = Query(..., max_length=todos.PERSON_MAX), session: Session = Depends(get_session),
-                cfg: Config = Depends(get_config)):
-    """Briefing before talking to someone (D-038)."""
+                came_from: str = Query("", alias="from", max_length=10), cfg: Config = Depends(get_config)):
+    """Briefing before talking to someone (D-038). Opened from "Wartet auf", the breadcrumb leads back there (D-060)."""
     found = briefing_service.briefing(session, now_utc(), name)
     if found is None:
         raise HTTPException(status_code=404, detail="unknown person")
     excluded = found.name.lower() in todos.excluded_people(session)
-    return render(request, cfg, "person.html", b=found, today=now_utc().astimezone(LOCAL_TZ).date(),
+    via_waiting = came_from == "waiting"
+    graph = None if excluded else person_service.person_graph(session, now_utc(), found.name)
+    if graph and via_waiting:
+        for node in graph["nodes"]:
+            if node["id"].startswith("t"):
+                node["url"] += "&from=waiting"
+    return render(request, cfg, "person.html", via_waiting=via_waiting, b=found, today=now_utc().astimezone(LOCAL_TZ).date(),
                   days_since=(now_utc() - found.last_talk).days if found.last_talk else None, excluded=excluded,
                   profile=None if excluded else person_service.profile(session, found.name),
                   clusters=[] if excluded else person_service.clusters(session, found.name),
-                  graph=None if excluded else person_service.person_graph(session, now_utc(), found.name))
+                  graph=graph)
 
 
 @app.post("/person/profile")

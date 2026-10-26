@@ -693,3 +693,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner question "how do I remove a person from a topic?": the connection is computed from three sources, so there was nothing to remove. Owner agreed to the proposal and chose 20 %. |
 | **Rejected alternatives** | (A) removing the underlying source (task tag, note): touches data the owner did not mean to change, and a conversation cannot be changed; (B) deleting the person's topic note on hiding: restoring would lose it; (C) 10 %: owner chose 20 %. |
 | **Status** | **FINAL** |
+
+### D-060: From "Wartet auf", the breadcrumb of a person leads back there (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-26 |
+| **Decision** | Amends D-040. Links to a person from the "Wartet auf" view (person tags of the rows, "Briefing" next to the person bar) carry `from=waiting`. The person page then shows "Aufgaben / Wartet auf / <Name>" and passes `from=waiting` on to its tasks (lists and Mindmap), whose breadcrumb reads "Aufgaben / Wartet auf / <Name> / <Aufgabe>". Without the parameter nothing changes. |
+| **In plain words** | If you open a person from "Wartet auf", the path at the top takes you back to "Wartet auf". |
+| **Reasoning** | Owner request. A parameter is the only way to know where the owner came from without relying on the browser's referrer. |
+| **Rejected alternatives** | (A) the HTTP referrer: not sent in every setup and lost on reload; (B) always showing "Wartet auf" in the path: wrong when the person was opened from the own tasks. |
+| **Status** | **FINAL** |
