@@ -689,7 +689,7 @@ def test_d057_briefing_shows_the_profile_and_saves_a_field(client, make_todo, se
         person_service.update_profile(s, now_utc(), "Jochen Rill", actor="claude", role="Head of <SOC>")
         person_service.set_topic_note(s, now_utc(), "Jochen Rill", "Budget", "Offer approved", actor="claude")
     html = client.get("/person?name=Jochen%20Rill").text
-    assert "Head of &lt;SOC&gt;" in html and "Offer approved" in html and 'href="/person/graph?name=Jochen%20Rill"' in html
+    assert "Head of &lt;SOC&gt;" in html and "Offer approved" in html and 'id="graph-data"' in html
     response = client.post("/person/profile", data={"csrf": webapp.csrf_token(), "name": "Jochen Rill",
                                                     "field": "current_work", "value": "SIEM rollout"},
                            headers={"Accept": "application/json"})
@@ -718,12 +718,23 @@ def test_d057_excluded_person_has_no_profile_card_and_no_mindmap(client, make_to
     with session_factory() as s:
         people_admin.set_person_excluded(s, "Jochen Rill", True)
     assert post(client, "/person/profile", name="Jochen Rill", field="role", value="x").status_code == 400
-    assert client.get("/person/graph?name=Jochen%20Rill").status_code == 404
+    html = client.get("/person?name=Jochen%20Rill").text
+    assert "data-profile" not in html and 'id="graph-data"' not in html
+    layout = '[{"key": "person", "x": 1, "y": 2}]'
+    assert post(client, "/person/graph/layout", name="Jochen Rill", layout=layout).status_code == 404
 
 
-def test_d058_person_mindmap_page_is_read_only(client, make_todo):
-    make_todo(title="Write offer", people=["Jochen Rill"], topic="Budget")
-    html = client.get("/person/graph?name=jochen%20rill").text
-    assert "Mindmap: Jochen Rill" in html and '"person": "Jochen Rill"' in html
-    assert "data-arrange" not in html and "data-node-resize" not in html and "data-link-mode" not in html
-    assert client.get("/person/graph?name=Nobody").status_code == 404
+def test_d058_person_mindmap_is_on_the_person_page_and_remembers_its_own_layout(client, make_todo, session_factory):
+    import person_service
+    import task_links
+    todo = make_todo(title="Write offer", people=["Jochen Rill"], topic="Budget")
+    html = client.get("/person?name=jochen%20rill").text
+    for part in ('"person": "Jochen Rill"', '"layout_url": "/person/graph/layout"', "data-arrange", "data-node-resize"):
+        assert part in html, part
+    layout = f'[{{"key": "person", "x": 10, "y": 20}}, {{"key": "t{todo}", "x": 5, "y": 6, "w": 200, "h": 80}}]'
+    assert post(client, "/person/graph/layout", name="Jochen Rill", layout=layout).json()["stored"] == 2
+    with session_factory() as s:
+        nodes = {n["id"]: n for n in person_service.person_graph(s, now_utc(), "Jochen Rill")["nodes"]}
+        assert (nodes["person"]["x"], nodes[f"t{todo}"]["w"]) == (10, 200)
+        assert "x" not in next(n for n in task_links.graph(s, everything=True)["nodes"] if n["id"] == f"t{todo}")
+    assert post(client, "/todos/graph/layout", layout='[{"key": "person", "x": 1, "y": 2}]').status_code == 400

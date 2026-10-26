@@ -126,6 +126,21 @@ class MindmapNode(Base):
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class PersonMapNode(Base):
+    """Where the owner put a box on a person's Mindmap and how big he made it (D-058). Same keys as
+    MindmapNode plus "person" for the person in the middle; one arrangement per person."""
+    __tablename__ = "person_map_nodes"
+    __table_args__ = (UniqueConstraint("person", "node_key"),)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    person: Mapped[str] = mapped_column(String(80))  # lower case
+    node_key: Mapped[str] = mapped_column(String(20))
+    x: Mapped[float] = mapped_column(Float)
+    y: Mapped[float] = mapped_column(Float)
+    width: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    height: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class PersonProfile(Base):
     """The living profile of a person (D-057): role and unit, what they work on, what to raise next time."""
     __tablename__ = "person_profiles"

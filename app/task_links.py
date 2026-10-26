@@ -12,12 +12,12 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 import todo_service as todos
-from database import MindmapNode, Todo, TodoEvent, TodoLink, Topic
+from database import MindmapNode, PersonMapNode, Todo, TodoEvent, TodoLink, Topic
 
 log = logging.getLogger(__name__)
 
 GRAPH_NODES_MAX = 400  # beyond this a picture of the tasks stops being readable
-NODE_KEY = re.compile(r"^[tp][0-9]{1,9}$")
+NODE_KEY = re.compile(r"^([tp][0-9]{1,9}|person)$")
 COORD_MAX = 1_000_000
 SIZE_MIN, SIZE_MAX = 30, 1200
 
@@ -144,8 +144,9 @@ def _number(value, low: float, high: float, name: str):
     return float(value)
 
 
-def save_layout(session: Session, now: dt.datetime, entries: list) -> int:
-    """Store positions (and sizes, where given) of Mindmap boxes. Returns how many were stored."""
+def save_layout(session: Session, now: dt.datetime, entries: list, person: str = "") -> int:
+    """Store positions (and sizes, where given) of Mindmap boxes, of a person's Mindmap when `person` is
+    given (D-058). Returns how many were stored."""
     if not isinstance(entries, list) or len(entries) > GRAPH_NODES_MAX * 2:
         raise LinkError("layout must be a list of at most %d boxes" % (GRAPH_NODES_MAX * 2))
     clean = {}
@@ -157,10 +158,17 @@ def save_layout(session: Session, now: dt.datetime, entries: list) -> int:
             _number(entry.get("w"), SIZE_MIN, SIZE_MAX, "width"), _number(entry.get("h"), SIZE_MIN, SIZE_MAX, "height"))
         if clean[entry["key"]][0] is None or clean[entry["key"]][1] is None:
             raise LinkError("x and y are required")
-    found = {m.node_key: m for m in session.scalars(select(MindmapNode).where(MindmapNode.node_key.in_(list(clean))))} \
-        if clean else {}
+    if person:
+        query = select(PersonMapNode).where(PersonMapNode.person == person.lower(), PersonMapNode.node_key.in_(list(clean)))
+        make = lambda key, x, y: PersonMapNode(person=person.lower(), node_key=key, x=x, y=y)  # noqa: E731
+    else:
+        if "person" in clean:
+            raise LinkError("unknown box")
+        query = select(MindmapNode).where(MindmapNode.node_key.in_(list(clean)))
+        make = lambda key, x, y: MindmapNode(node_key=key, x=x, y=y)  # noqa: E731
+    found = {m.node_key: m for m in session.scalars(query)} if clean else {}
     for key, (x, y, w, h) in clean.items():
-        row = found.get(key) or MindmapNode(node_key=key, x=x, y=y)
+        row = found.get(key) or make(key, x, y)
         row.x, row.y, row.updated_at = x, y, now
         if "w" in next(e for e in entries if e["key"] == key):
             row.width, row.height = w, h

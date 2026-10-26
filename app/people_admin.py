@@ -14,7 +14,7 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 import todo_service
-from database import ExcludedPerson, PersonProfile, PersonTopicNote, Recording, Segment, Todo
+from database import ExcludedPerson, PersonMapNode, PersonProfile, PersonTopicNote, Recording, Segment, Todo
 from import_service import UNNAMED_SPEAKER
 
 log = logging.getLogger(__name__)
@@ -151,6 +151,7 @@ def delete_person(session: Session, now: dt.datetime, name: str) -> dict:
                                  people=[n for n in current if n.lower() != found.name.lower()])
     segments = _relabel(session, found.name, lambda recording_id: _next_unknown(session, recording_id))
     session.execute(delete(PersonTopicNote).where(PersonTopicNote.person == found.name.lower()))
+    session.execute(delete(PersonMapNode).where(PersonMapNode.person == found.name.lower()))
     session.execute(delete(PersonProfile).where(func.lower(PersonProfile.name) == found.name.lower()))
     session.commit()
     log.info("Person deleted tasks=%s segments=%s", len(tasks), segments)
@@ -190,6 +191,12 @@ def _move_profile(session: Session, old: str, new: str) -> None:
             if not getattr(target, field):
                 setattr(target, field, getattr(source, field))
         session.delete(source)
+    if old.lower() != new.lower():  # the arrangement of the target's map wins; else the old one moves over
+        has_map = session.scalar(select(PersonMapNode.id).where(PersonMapNode.person == new.lower()).limit(1))
+        if has_map:
+            session.execute(delete(PersonMapNode).where(PersonMapNode.person == old.lower()))
+        else:
+            session.execute(update(PersonMapNode).where(PersonMapNode.person == old.lower()).values(person=new.lower()))
     taken = set(session.scalars(select(PersonTopicNote.topic_id).where(PersonTopicNote.person == new.lower())))
     for note in session.scalars(select(PersonTopicNote).where(PersonTopicNote.person == old.lower())).all():
         if old.lower() == new.lower():

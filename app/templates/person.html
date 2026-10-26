@@ -13,7 +13,7 @@
          data-saved="{{ t('ui_saved') }}" data-failed="{{ t('ui_save_failed') }}">
   <div class="profile-head"><h2>{{ t("ui_profile") }}</h2>
     <span class="save-state" data-save-state></span>
-    <a class="btn small" href="/person/graph?name={{ b.name | urlencode }}">{{ t("ui_profile_mindmap") }} →</a></div>
+</div>
   <label class="field"><span>{{ t("ui_profile_role") }}</span>
     <input type="text" data-field="role" maxlength="200" value="{{ profile.role if profile else '' }}" placeholder="{{ t('ui_profile_role_hint') }}"></label>
   <label class="field"><span>{{ t("ui_profile_work") }}</span>
@@ -58,5 +58,11 @@
     {% else %}<p class="muted">{{ t("ui_brief_none") }}</p>{% endif %}
   </section>
 </div>
+{% if graph %}
+<section class="person-map">
+  <h2>{{ t("ui_graph") }}</h2>
+  {% with data=graph, person=b.name, topics=1, waiting=1 %}{% include "_mindmap.html" %}{% endwith %}
+</section>
+{% endif %}
 <p style="margin-top:1rem"><a href="/todos?status=open&amp;person={{ b.name | urlencode }}">{{ t("ui_brief_all_tasks") }}</a></p>
 {% endblock %}

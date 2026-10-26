@@ -15,7 +15,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 import todo_service as todos
-from database import PersonProfile, PersonTopicNote, Segment, Todo, TodoLink, Topic, TopicNote
+from database import PersonMapNode, PersonProfile, PersonTopicNote, Segment, Todo, TodoLink, Topic, TopicNote
 
 log = logging.getLogger(__name__)
 
@@ -185,4 +185,9 @@ def person_graph(session: Session, now: dt.datetime, name: str) -> Optional[dict
         edges.append({"source": f"t{link.low_id}", "target": f"t{link.high_id}", "type": "link"})
     for a, b, score, why in topic_relations(session, topic_ids, ignore=found.name):
         edges.append({"source": f"p{a}", "target": f"p{b}", "type": "inferred", "score": score, "why": why})
+    saved = {m.node_key: m for m in session.scalars(select(PersonMapNode).where(PersonMapNode.person == found.name.lower()))}
+    for node in nodes:
+        place = saved.get(node["id"])
+        if place is not None:
+            node.update(x=place.x, y=place.y, w=place.width, h=place.height)
     return {"nodes": nodes, "edges": edges, "truncated": False, "person": found.name}

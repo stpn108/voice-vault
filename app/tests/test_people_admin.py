@@ -148,7 +148,12 @@ def test_d057_the_profile_follows_a_renamed_name_and_goes_with_a_deleted_one(db_
     assert (merged.role, merged.current_work) == ("CISO", "Budget") and ps.profile(db_session, "Anna") is None
     assert sorted((t.name, n.note) for t, n in ps.clusters(db_session, "Jochen Rill")) == [
         ("Budget", "from Jochen"), ("SOC", "SOC from Anna")]
+    import task_links
+    from database import PersonMapNode
+    task_links.save_layout(db_session, NOW, [{"key": "person", "x": 1, "y": 2}], person="Jochen Rill")
     admin.rename_person(db_session, NOW, "Jochen Rill", "Jochen")
     assert ps.profile(db_session, "Jochen").role == "CISO" and len(ps.clusters(db_session, "Jochen")) == 2
+    assert [m.person for m in db_session.scalars(select(PersonMapNode))] == ["jochen"]
     admin.delete_person(db_session, NOW, "Jochen")
     assert ps.profile(db_session, "Jochen") is None and ps.clusters(db_session, "Jochen") == []
+    assert db_session.scalars(select(PersonMapNode)).all() == []

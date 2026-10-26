@@ -1,0 +1,35 @@
+{# The Mindmap box with its tools (D-047, D-054); on the person page also the person's own map (D-058). #}
+{% if data.nodes %}
+<div class="card graph-wrap">
+  <div id="graph" role="img" aria-label="{{ t('ui_graph') }}"></div>
+  <div class="graph-tools">
+    <button type="button" data-zoom="in" title="{{ t('ui_graph_zoom_in') }}" aria-label="{{ t('ui_graph_zoom_in') }}">+</button>
+    <button type="button" data-zoom="out" title="{{ t('ui_graph_zoom_out') }}" aria-label="{{ t('ui_graph_zoom_out') }}">−</button>
+    <button type="button" data-zoom="fit" title="{{ t('ui_graph_fit') }}" aria-label="{{ t('ui_graph_fit') }}">⤢</button>
+    <button type="button" data-fullscreen aria-pressed="false" title="{{ t('ui_graph_fullscreen') }}" aria-label="{{ t('ui_graph_fullscreen') }}">⛶</button>
+    <button type="button" data-arrange title="{{ t('ui_graph_arrange') }}" aria-label="{{ t('ui_graph_arrange') }}"
+            data-confirm="{{ t('ui_graph_arrange_confirm') }}">✨</button>
+    <button type="button" data-link-mode aria-pressed="false" title="{{ t('ui_graph_link_mode') }}" aria-label="{{ t('ui_graph_link_mode') }}">🔗</button>
+  </div>
+  <div class="node-resize" data-node-resize hidden title="{{ t('ui_graph_resize') }}"></div>
+  <div class="graph-status" data-graph-status hidden data-pick-first="{{ t('ui_graph_pick_first') }}"
+       data-pick-second="{{ t('ui_graph_pick_second') }}" data-linked="{{ t('ui_linked') }}" data-already="{{ t('ui_linked_already') }}"
+       data-failed="{{ t('ui_graph_link_failed') }}" data-why="{{ t('ui_graph_why') }}"></div>
+</div>
+<div class="graph-legend">
+  <span><i class="lg-open"></i>{{ t("todo_status_open") }}</span><span><i class="lg-progress"></i>{{ t("todo_status_in_progress") }}</span>
+  <span><i class="lg-done"></i>{{ t("todo_status_done") }}</span>{% if waiting %}<span><i class="lg-waiting"></i>{{ t("ui_kind_waiting") }}</span>{% endif %}
+  <span><i class="lg-urgent"></i>{{ t("todo_prio_1") }}</span><span><i class="lg-high"></i>{{ t("todo_prio_2") }}</span>
+  {% if topics %}<span><i class="lg-topic"></i>{{ t("ui_topic") }}</span>{% endif %}
+  {% if person %}<span><i class="lg-inferred"></i>{{ t("ui_graph_inferred") }}</span>{% endif %}
+</div>
+<p class="muted" style="font-size:.85rem">{{ t("ui_graph_hint") }} {{ t("ui_graph_hint_link") }}{% if person %} {{ t("ui_graph_hint_person") }}{% endif %}{% if data.truncated %} {{ t("ui_graph_truncated") }}{% endif %}</p>
+<script type="application/json" id="graph-data">{{ {"data": data, "csrf": csrf, "confirm": t("ui_graph_unlink_confirm"), "layout_url": "/person/graph/layout" if person else "/todos/graph/layout"} | tojson }}</script>
+<script src="/static/vendor/cytoscape-3.30.2.min.js" defer></script>
+<script src="/static/vendor/layout-base-2.0.1.js" defer></script>
+<script src="/static/vendor/cose-base-2.2.0.js" defer></script>
+<script src="/static/vendor/cytoscape-fcose-2.2.0.js" defer></script>
+<script src="/static/graph.js" defer></script>
+{% else %}
+<div class="card empty">{{ t("ui_graph_empty") }}</div>
+{% endif %}

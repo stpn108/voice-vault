@@ -522,7 +522,8 @@ def person_page(request: Request, name: str = Query(..., max_length=todos.PERSON
     return render(request, cfg, "person.html", b=found, today=now_utc().astimezone(LOCAL_TZ).date(),
                   days_since=(now_utc() - found.last_talk).days if found.last_talk else None, excluded=excluded,
                   profile=None if excluded else person_service.profile(session, found.name),
-                  clusters=[] if excluded else person_service.clusters(session, found.name))
+                  clusters=[] if excluded else person_service.clusters(session, found.name),
+                  graph=None if excluded else person_service.person_graph(session, now_utc(), found.name))
 
 
 @app.post("/person/profile")
@@ -547,14 +548,19 @@ def person_profile_save(request: Request, name: str = Form(..., max_length=todos
     return JSONResponse({"ok": True})
 
 
-@app.get("/person/graph", response_class=HTMLResponse)
-def person_graph_page(request: Request, name: str = Query(..., max_length=todos.PERSON_MAX),
-                      session: Session = Depends(get_session), cfg: Config = Depends(get_config)):
-    """The person's own Mindmap: their topics, tasks and promises, and topics that probably belong together (D-058)."""
-    data = person_service.person_graph(session, now_utc(), name)
-    if data is None or data["person"].lower() in todos.excluded_people(session):
+@app.post("/person/graph/layout")
+def person_graph_layout(request: Request, name: str = Form(..., max_length=todos.PERSON_MAX),
+                        layout: str = Form(..., max_length=200_000), csrf: str = Form(""),
+                        session: Session = Depends(get_session)):
+    """Remember where the owner put the boxes of a person's Mindmap and how big he made them (D-058)."""
+    require_csrf(request, csrf)
+    if not name.strip() or name.strip().lower() in todos.excluded_people(session):
         raise HTTPException(status_code=404, detail="unknown person")
-    return render(request, cfg, "graph.html", data=data, person=data["person"], done=0, topics=1, everything=0, waiting=1)
+    try:
+        stored = task_links.save_layout(session, now_utc(), json.loads(layout), person=name.strip())
+    except (ValueError, task_links.LinkError) as exc:
+        raise HTTPException(status_code=400, detail=f"invalid layout: {exc}")
+    return JSONResponse({"ok": True, "stored": stored})
 
 
 @app.get("/stats", response_class=HTMLResponse)

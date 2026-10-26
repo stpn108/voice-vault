@@ -7,7 +7,8 @@
   var withTopics = JSON.parse(source.textContent).data.nodes.some(function (n) { return n.kind === "topic"; });
   if (fcose) { cytoscape.use(window.cytoscapeFcose); }
   var payload = JSON.parse(source.textContent);
-  // A person's own Mindmap (D-058): read-only, the person fixed in the middle, nothing is saved.
+  // A person's own Mindmap on the person page (D-058): the person starts in the middle, the arrangement is
+  // remembered per person.
   var personal = Boolean(payload.data.person);
   var css = getComputedStyle(document.documentElement);
   function v(name) { return css.getPropertyValue(name).trim(); }
@@ -20,7 +21,7 @@
     // Spread out from the start (D-053): nodes stacked at one point make Cytoscape mark their lines as
     // undrawable, and it keeps that until a node moves.
     // A box the owner placed or resized keeps that (D-054).
-    if (personal && n.kind === "person") { n.x = 0; n.y = 0; }
+    if (personal && n.kind === "person" && n.x === undefined) { n.x = 0; n.y = 0; }
     var data = { id: n.id, short: n.label.length > 70 ? n.label.slice(0, 67) + "…" : n.label, full: n.label,
                  status: n.status, kind: n.kind, url: n.url, priority: n.priority || 3, saved: n.x !== undefined };
     if (n.w) { data.w = n.w; data.h = n.h; }
@@ -133,10 +134,11 @@
     var data = new FormData();
     data.set("csrf", payload.csrf);
     data.set("layout", JSON.stringify(entries));
-    fetch("/todos/graph/layout", { method: "POST", body: data, credentials: "same-origin", headers: { "Accept": "application/json" } });
+    if (personal) { data.set("name", payload.data.person); }
+    fetch(payload.layout_url, { method: "POST", body: data, credentials: "same-origin", headers: { "Accept": "application/json" } });
   }
-  if (fresh.length && !personal) { remember(fresh, false); }
-  if (!personal) { cy.on("dragfree", "node", function (event) { remember(event.target, false); }); }
+  if (fresh.length) { remember(fresh, false); }
+  cy.on("dragfree", "node", function (event) { remember(event.target, false); });
 
   // Readable from the start: fit, but never so small that the text cannot be read (D-050).
   function view() {
@@ -239,11 +241,6 @@
       cy.animate({ zoom: { level: level, renderedPosition: { x: box.width / 2, y: box.height / 2 } } }, { duration: 150 });
     });
   });
-
-  if (personal) {
-    cy.on("tap", "node", function (event) { window.location.href = event.target.data("url"); });
-    return;
-  }
 
   // --- resizing a box (D-054): a corner handle appears on hover; dragging it sets the box's size ---
   var handle = document.querySelector("[data-node-resize]");
@@ -397,8 +394,8 @@
 
   cy.on("tap", "node", function (event) {
     var node = event.target;
-    if (!linking) { window.location.href = node.data("url"); return; }
-    if (node.id() === "ghost" || node.data("kind") === "topic") { return; }
+    if (!linking) { if (node.data("kind") !== "person") { window.location.href = node.data("url"); } return; }
+    if (node.id() === "ghost" || node.data("kind") === "topic" || node.data("kind") === "person") { return; }
     if (!first) {
       first = node;
       node.addClass("focus");
