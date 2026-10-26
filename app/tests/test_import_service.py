@@ -281,3 +281,18 @@ def test_d046_secret_recordings_are_invisible_to_the_deletion(session_factory):
     client.add("r2", title="Team Sync")
     stats = run_import(session_factory, client, lambda: NOW)
     assert stats.seen == {"r2"}
+
+
+def test_d056_a_secret_recording_is_named_in_the_log_once_then_only_counted(session_factory, caplog, monkeypatch):
+    import logging
+    monkeypatch.setattr(import_service, "_secret_logged", set())
+    client = FakeClient()
+    client.add("r1", title="#secret Vorstand")
+    client.add("r2", title="#secret Bewerbung")
+    with caplog.at_level(logging.INFO, logger="import_service"):
+        first = run_import(session_factory, client, lambda: NOW)
+        second = run_import(session_factory, client, lambda: NOW)
+    named = [r.getMessage() for r in caplog.records if "New secret recording" in r.getMessage()]
+    assert len(named) == 2 and all("Vorstand" not in m and "Bewerbung" not in m for m in named)
+    assert first.secret == second.secret == 2
+    assert any("secret=2" in r.getMessage() for r in caplog.records if r.getMessage().startswith("Import done"))

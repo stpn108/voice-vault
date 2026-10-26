@@ -648,3 +648,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner request after deploying D-044. |
 | **Rejected alternatives** | (A) hiding the entries whose people are all excluded: an entry can still matter without the name; (B) removing the names from the tasks: not reversible by allowing the name again. |
 | **Status** | **FINAL** |
+
+### D-056: A secret recording is named in the log once, then only counted (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-26 |
+| **Decision** | Amends D-046. The first time the app process sees a secret recording, it logs `New secret recording, left at Plaud and never downloaded` with the Plaud id and the start time (not the title). In later cycles the recording is only counted: the cycle's `Import done` line carries `secret=N`. The set of recordings already named lives in memory, so after a restart each is named once more. |
+| **In plain words** | The log names a secret recording once when it first turns up; after that it only says how many there are. |
+| **Reasoning** | Owner request; a line per secret recording every ten minutes clutters the log. The title stays out of the log on purpose. |
+| **Rejected alternatives** | (A) storing which secret recordings were named: a table only for a log line; (B) logging the title once: the owner marked it secret. |
+| **Status** | **FINAL** |

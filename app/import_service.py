@@ -42,6 +42,21 @@ def is_secret(title: str) -> bool:
     return (title or "").lstrip().lower().startswith(SECRET_PREFIX)
 
 
+# Secret recordings already named in the log since the process started; later cycles only count them (D-056).
+_secret_logged: set = set()
+
+
+def _note_secret(stats: "ImportStats", item, start_ms: int) -> None:
+    stats.secret += 1
+    stats.skipped += 1
+    if item.plaud_id in _secret_logged:
+        return
+    _secret_logged.add(item.plaud_id)
+    started = from_epoch_ms(start_ms).isoformat() if start_ms else "unknown"
+    # The title is not logged: whoever marks a recording secret will not want the rest of it in a log.
+    log.info("New secret recording, left at Plaud and never downloaded plaud_id=%s started=%s", item.plaud_id, started)
+
+
 def clean_text(value) -> str:
     """Text the database and the hash can take: no NUL characters, no lone surrogates."""
     return str(value).replace("\x00", "").encode("utf-8", "replace").decode("utf-8")
@@ -147,9 +162,7 @@ def import_recording(session: Session, client: PlaudClient, item: PlaudRecording
                      naming_wait_days: int = 7) -> None:
     if is_secret(item.title):
         # Marked secret by the owner: not downloaded, not stored, and therefore never deleted at Plaud.
-        stats.secret += 1
-        stats.skipped += 1
-        log.info("Secret recording, not downloading plaud_id=%s", item.plaud_id)
+        _note_secret(stats, item, item.start_ms)
         return
     existing = session.scalar(select(Recording).where(Recording.plaud_id == item.plaud_id))
     if existing is not None and existing.trashed_at is not None and existing.deleted_at is None:
@@ -171,9 +184,7 @@ def import_recording(session: Session, client: PlaudClient, item: PlaudRecording
     if is_secret(detail.title):
         # The list may lag behind a rename; the detail is metadata only, no content was fetched yet.
         stats.seen.discard(item.plaud_id)
-        stats.secret += 1
-        stats.skipped += 1
-        log.info("Secret recording, not downloading plaud_id=%s", item.plaud_id)
+        _note_secret(stats, item, detail.start_ms or item.start_ms)
         return
     if not detail.is_processed:
         if existing is not None and existing.is_plaud_processed:
