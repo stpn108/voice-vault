@@ -560,3 +560,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner request; the owner asked for a line instead of dragging the task itself. A drawn line reads as "connect these two" and works on touch screens, unlike HTML drag and drop. |
 | **Rejected alternatives** | (A) HTML5 drag and drop of the whole row: no touch support, and it collides with text selection; (B) drawing links inside the graph: needs a further plug-in (edgehandles); the list is where the tasks are; (C) a hand-written force layout: a maintained library lays out and zooms better. |
 | **Status** | **FINAL** |
+
+### D-048: Links are visible in the task list; the graph is called "Mindmap" (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-26 |
+| **Decision** | Amends D-047. Each task row lists its linked tasks under the title ("🔗 title, title, …", at most three, then "+n weitere"; finished ones struck through), each a link to that task; a link drawn in the list adds the entry at once, undo takes it off. Hovering a row draws curved lines from its dot to the linked tasks shown on the page and highlights them; scrolling or leaving the row hides them. The "🔗 n" counter is gone (`link_counts` replaced by `link_map`). The graph page and its link are named "Mindmap". |
+| **In plain words** | In the list you see under each task what it is linked to, and pointing at a task draws the lines to its linked tasks. The graph is now called "Mindmap". |
+| **Reasoning** | Owner request; a count alone did not show what is linked. Lines only on hover keep the list readable. |
+| **Rejected alternatives** | (A) all lines drawn all the time: unreadable with more than a few links; (B) a separate column with the links: takes width from the titles. |
+| **Status** | **FINAL** |

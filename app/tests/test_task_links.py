@@ -20,7 +20,7 @@ def test_d047_link_is_stored_once_logged_on_both_and_can_be_removed(db_session):
     assert links.link(db_session, NOW, b, a) is True
     assert links.link(db_session, NOW, a, b) is False
     assert [row[1] for row in links.linked_to(db_session, a)] == ["Beta"]
-    assert links.link_counts(db_session, [a, b]) == {a: 1, b: 1}
+    assert links.link_map(db_session, [a, b]) == {a: [(b, "Beta", "open")], b: [(a, "Alpha", "open")]}
     kinds = sorted(e.kind for e in db_session.scalars(select(TodoEvent).where(TodoEvent.kind == "linked")))
     assert kinds == ["linked", "linked"]
     assert links.unlink(db_session, NOW, a, b) is True and links.linked_to(db_session, a) == []

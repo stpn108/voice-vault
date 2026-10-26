@@ -305,7 +305,7 @@ def todo_list(request: Request, status: str = Query("open", max_length=12), topi
                   sort=sort, sorts=todos.SORTS, today=now_utc().astimezone(LOCAL_TZ).date(),
                   counts=todos.counts(session, kind), statuses=statuses, priorities=todos.PRIORITIES,
                   known_people=todos.known_people(session) if kind == "waiting" else [],
-                  link_counts=task_links.link_counts(session, [r.id for r in rows]),
+                  links=task_links.link_map(session, [r.id for r in rows]),
                   owed=sorted(owed.items(), key=lambda pair: (-pair[1], pair[0].lower())))
 
 

@@ -600,7 +600,8 @@ def test_d047_line_drawn_in_the_list_links_two_tasks(client, make_todo):
     body = client.post("/todos/links", data={"csrf": webapp.csrf_token(), "a": a, "b": str(b)},
                        headers={"Accept": "application/json"}).json()
     assert body == {"ok": True, "created": True}
-    assert "🔗 1" in client.get("/todos").text
+    listed = client.get("/todos").text
+    assert f'data-links="{b}"' in listed and f'<a href="/todos/{b}" data-link-id="{b}" class="">Beta</a>' in listed
     detail = client.get(f"/todos/{a}").text
     assert 'id="links"' in detail and f'href="/todos/{b}"' in detail
 

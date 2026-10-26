@@ -75,13 +75,21 @@ def linked_to(session: Session, todo_id: int) -> list:
                   key=lambda row: (row[2] not in todos.ACTIVE, row[1].lower()))
 
 
-def link_counts(session: Session, ids: list) -> dict:
-    counts = {}
-    if ids:
-        for row in session.scalars(select(TodoLink).where(or_(TodoLink.low_id.in_(ids), TodoLink.high_id.in_(ids)))):
-            counts[row.low_id] = counts.get(row.low_id, 0) + 1
-            counts[row.high_id] = counts.get(row.high_id, 0) + 1
-    return counts
+def link_map(session: Session, ids: list) -> dict:
+    """For each of the given tasks: the linked tasks as (id, title, status), open ones first (D-048)."""
+    pairs = session.scalars(select(TodoLink).where(or_(TodoLink.low_id.in_(ids), TodoLink.high_id.in_(ids)))).all() \
+        if ids else []
+    other_ids = {p.low_id for p in pairs} | {p.high_id for p in pairs}
+    tasks = {t.id: t for t in session.scalars(select(Todo).where(Todo.id.in_(other_ids)))} if other_ids else {}
+    result = {}
+    for p in pairs:
+        for mine, other in ((p.low_id, p.high_id), (p.high_id, p.low_id)):
+            if mine in ids and other in tasks:
+                t = tasks[other]
+                result.setdefault(mine, []).append((t.id, t.title, t.status))
+    for rows in result.values():
+        rows.sort(key=lambda row: (row[2] not in todos.ACTIVE, row[1].lower()))
+    return result
 
 
 def graph(session: Session, *, done: bool = False, topics: bool = False, everything: bool = False) -> dict:

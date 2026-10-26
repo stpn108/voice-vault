@@ -37,7 +37,7 @@
 {% if grouped %}<h2 class="group-title"><span class="dot p{{ prio }}"></span>{{ t("todo_prio_" ~ prio) }}<span class="count">{{ items | length }}</span></h2>{% endif %}
 <ul class="list">
   {% for row in items %}
-  <li class="task {% if row.status not in ('open', 'in_progress') %}finished{% endif %}" data-status="{{ row.status }}" data-id="{{ row.id }}" data-kind="{{ row.kind }}">
+  <li class="task {% if row.status not in ('open', 'in_progress') %}finished{% endif %}" data-status="{{ row.status }}" data-id="{{ row.id }}" data-kind="{{ row.kind }}" data-links="{{ links.get(row.id, []) | map(attribute=0) | join(',') }}">
     <form class="check" data-quick method="post" action="/todos/{{ row.id }}/status">
       <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="list">
       {% if row.status in ("open", "in_progress") %}<button class="check" type="submit" name="status" value="done" title="{{ t('ui_todo_check') }}" aria-label="{{ t('ui_todo_check') }}">✓</button>
@@ -52,8 +52,9 @@
         <span>{{ row.age_days }} {{ t("ui_day") if row.age_days == 1 else t("ui_days") }}</span>
         {% set active = row.status in ('open', 'in_progress') %}{% if row.due_date %}<span class="due {% if active and row.due_date < today %}overdue{% endif %}">{{ t("ui_overdue") if active and row.due_date < today else t("ui_due") }} {{ row.due_date.strftime("%d.%m.") }}</span>{% endif %}
         {% if not grouped %}<span>{{ t("todo_prio_" ~ row.priority) }}</span>{% endif %}
-        {% if link_counts.get(row.id) %}<a class="link-count" href="/todos/{{ row.id }}#links" data-n="{{ link_counts[row.id] }}">🔗 {{ link_counts[row.id] }}</a>{% endif %}
       </div>
+      {% set linked = links.get(row.id, []) %}
+      <div class="task-links" {% if not linked %}hidden{% endif %}>{% for other_id, other_title, other_status in linked[:3] %}<a href="/todos/{{ other_id }}" data-link-id="{{ other_id }}" class="{{ 'finished' if other_status not in ('open', 'in_progress') else '' }}">{{ other_title }}</a>{% endfor %}{% if linked | length > 3 %}<a class="more" href="/todos/{{ row.id }}#links">{{ t("ui_links_more", count=linked | length - 3) }}</a>{% endif %}</div>
       {% if row.people %}<div class="task-people">{% for name in row.people %}<a class="person" href="/person?name={{ name | urlencode }}">{{ name }}</a>{% endfor %}</div>{% endif %}
     </div>
     <button class="link-handle" type="button" title="{{ t('ui_link_handle') }}" aria-label="{{ t('ui_link_handle') }}"></button>
