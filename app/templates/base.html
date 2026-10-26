@@ -239,7 +239,16 @@
   .graph-controls a { color: var(--text); text-decoration: none; display: inline-flex; gap: .35rem; align-items: center; }
   .graph-controls a::before { content: ""; width: .9rem; height: .9rem; border-radius: .25rem; border: 1.5px solid var(--faint); }
   .graph-controls a.on::before { background: var(--accent); border-color: var(--accent); }
-  #graph { height: min(72vh, 46rem); padding: 0; overflow: hidden; }
+  .graph-wrap { position: relative; padding: 0; overflow: hidden; }
+  #graph { height: min(72vh, 46rem); }
+  .graph-tools { position: absolute; top: .6rem; right: .6rem; display: flex; flex-direction: column; gap: .3rem; z-index: 5; }
+  .graph-tools button { width: 2.1rem; height: 2.1rem; padding: 0; justify-content: center; font-size: 1.05rem; line-height: 1;
+    background: var(--surface); border: 1px solid var(--line); border-radius: .5rem; color: var(--text); cursor: pointer; box-shadow: var(--shadow); }
+  .graph-tools button:hover { border-color: var(--accent); }
+  .graph-tools button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .graph-status { position: absolute; left: .6rem; top: .6rem; z-index: 5; padding: .35rem .7rem; border-radius: .5rem;
+    background: var(--accent-soft); color: var(--accent); font-size: .85rem; font-weight: 500; }
+  .graph-wrap.linking #graph { cursor: crosshair; }
   .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: .8rem; }
   a.tile { display: block; padding: 1rem 1.1rem; text-decoration: none; color: var(--text); }
   a.tile:hover { border-color: var(--accent); } a.tile strong { display: block; margin-bottom: .3rem; } a.tile span { color: var(--muted); font-size: .9rem; }

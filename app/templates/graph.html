@@ -16,8 +16,19 @@
   {{ toggle("all", everything, t("ui_graph_all")) }}
 </div>
 {% if data.nodes %}
-<div class="card" id="graph" role="img" aria-label="{{ t('ui_graph') }}"></div>
-<p class="muted" style="font-size:.85rem">{{ t("ui_graph_hint") }}{% if data.truncated %} {{ t("ui_graph_truncated") }}{% endif %}</p>
+<div class="card graph-wrap">
+  <div id="graph" role="img" aria-label="{{ t('ui_graph') }}"></div>
+  <div class="graph-tools">
+    <button type="button" data-zoom="in" title="{{ t('ui_graph_zoom_in') }}" aria-label="{{ t('ui_graph_zoom_in') }}">+</button>
+    <button type="button" data-zoom="out" title="{{ t('ui_graph_zoom_out') }}" aria-label="{{ t('ui_graph_zoom_out') }}">−</button>
+    <button type="button" data-zoom="fit" title="{{ t('ui_graph_fit') }}" aria-label="{{ t('ui_graph_fit') }}">⤢</button>
+    <button type="button" data-link-mode aria-pressed="false" title="{{ t('ui_graph_link_mode') }}" aria-label="{{ t('ui_graph_link_mode') }}">🔗</button>
+  </div>
+  <div class="graph-status" data-graph-status hidden data-pick-first="{{ t('ui_graph_pick_first') }}"
+       data-pick-second="{{ t('ui_graph_pick_second') }}" data-linked="{{ t('ui_linked') }}" data-already="{{ t('ui_linked_already') }}"
+       data-failed="{{ t('ui_graph_link_failed') }}"></div>
+</div>
+<p class="muted" style="font-size:.85rem">{{ t("ui_graph_hint") }} {{ t("ui_graph_hint_link") }}{% if data.truncated %} {{ t("ui_graph_truncated") }}{% endif %}</p>
 <script type="application/json" id="graph-data">{{ {"data": data, "csrf": csrf, "confirm": t("ui_graph_unlink_confirm")} | tojson }}</script>
 <script src="/static/vendor/cytoscape-3.30.2.min.js" defer></script>
 <script src="/static/graph.js" defer></script>

@@ -629,3 +629,14 @@ def test_d047_graph_page_renders_with_toggles_and_local_scripts(client, make_tod
     assert 'id="graph-data"' in html and "/static/vendor/cytoscape-3.30.2.min.js" in html
     assert 'href="/todos/graph?done=0&amp;topics=1&amp;all=0"' in html
     assert client.get("/static/graph.js").status_code == 200
+
+
+
+def test_d049_mindmap_has_zoom_buttons_and_a_link_mode(client, make_todo):
+    a, b = make_todo(title="Alpha"), make_todo(title="Beta")
+    post(client, "/todos/links", a=a, b=str(b))
+    html = client.get("/todos/graph").text
+    for marker in ('data-zoom="in"', 'data-zoom="out"', 'data-zoom="fit"', "data-link-mode", "data-graph-status"):
+        assert marker in html, marker
+    script = client.get("/static/graph.js").text
+    assert "/todos/links" in script and '"events": "no"' in script

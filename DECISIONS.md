@@ -571,3 +571,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner request; a count alone did not show what is linked. Lines only on hover keep the list readable. |
 | **Rejected alternatives** | (A) all lines drawn all the time: unreadable with more than a few links; (B) a separate column with the links: takes width from the titles. |
 | **Status** | **FINAL** |
+
+### D-049: Zoom buttons and linking on the Mindmap (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-26 |
+| **Decision** | Amends D-047. The Mindmap has buttons at its top right edge: zoom in, zoom out, fit all, and 🔗 for a link mode. In link mode a tap on a task marks it and a dashed line follows the pointer (an invisible helper node that takes no clicks); a tap on a second task links the two through the same `POST /todos/links` as the list and draws the line; a tap on the same task, the button again or Esc ends it; topic nodes cannot be linked. A status line says what to do next and whether the link was made. Outside link mode a tap still opens the task and a tap on a line still offers to remove it. |
+| **In plain words** | Zoom with + and − at the edge of the Mindmap; switch on 🔗, tap one task, then another, and they are linked. |
+| **Reasoning** | Owner request. A mode with two taps works with mouse and finger and needs no further plug-in. |
+| **Rejected alternatives** | (A) the edgehandles plug-in: one more vendored file for the same result; (B) Shift+drag: not possible on a touch screen. |
+| **Status** | **FINAL** |
