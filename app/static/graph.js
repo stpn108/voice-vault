@@ -17,15 +17,20 @@
   var elements = payload.data.nodes.map(function (n) {
     // Spread out from the start (D-053): nodes stacked at one point make Cytoscape mark their lines as
     // undrawable, and it keeps that until a node moves.
-    return { data: { id: n.id, label: n.label.length > 70 ? n.label.slice(0, 67) + "…" : n.label, full: n.label,
-                     status: n.status, kind: n.kind, url: n.url, priority: n.priority || 3 },
-             position: { x: Math.random() * 1500, y: Math.random() * 1000 } };
+    // A box the owner placed or resized keeps that (D-054).
+    var data = { id: n.id, short: n.label.length > 70 ? n.label.slice(0, 67) + "…" : n.label, full: n.label,
+                 status: n.status, kind: n.kind, url: n.url, priority: n.priority || 3, saved: n.x !== undefined };
+    if (n.w) { data.w = n.w; data.h = n.h; }
+    return { data: data, position: n.x !== undefined ? { x: n.x, y: n.y } : { x: Math.random() * 1500, y: Math.random() * 1000 } };
   }).concat(payload.data.edges.map(function (e, i) {
     return { data: { id: "e" + i, source: e.source, target: e.target, type: e.type } };
   }));
 
-  function textWidth(n) { return Math.min(210, Math.max(70, (n.data("label") || "").length * 7.2)); }
-  function textLines(n) { return Math.max(1, Math.ceil((n.data("label") || "").length * 7.2 / 210)); }
+  // Text and size: a box the owner made bigger shows the whole title and wraps at its own width.
+  function labelOf(n) { return n.data("w") ? n.data("full") : (n.data("short") || ""); }
+  function textWidth(n) { return n.data("w") || Math.min(210, Math.max(70, labelOf(n).length * 7.2)); }
+  function textLines(n) { return Math.max(1, Math.ceil(labelOf(n).length * 7.2 / Math.max(60, textWidth(n) - 6))); }
+  function textHeight(n) { return n.data("h") || 17 * textLines(n); }
 
   var cy = cytoscape({
     container: document.getElementById("graph"),
@@ -34,10 +39,10 @@
     maxZoom: 3,
     style: [
       { selector: "node", style: {
-        "label": "data(label)", "text-wrap": "wrap", "text-max-width": "210px", "font-size": "13px",
+        "label": labelOf, "text-wrap": "wrap", "text-max-width": function (n) { return textWidth(n) + "px"; }, "font-size": "13px",
         "font-family": font, "font-weight": 500, "color": v("--text"), "line-height": 1.3,
         "text-valign": "center", "text-halign": "center", "shape": "round-rectangle",
-        "width": textWidth, "height": function (n) { return 17 * textLines(n); }, "padding": "12px",
+        "width": textWidth, "height": textHeight, "padding": "12px",
         "background-color": function (n) { return fill[n.data("status")] || fill.open; },
         "border-width": function (n) { return rim[n.data("priority")] && n.data("status") !== "done" ? 2.5 : 1.2; },
         "border-color": function (n) { return rim[n.data("priority")] || v("--line"); },
@@ -47,7 +52,8 @@
       { selector: "node[status = 'in_progress']", style: { "color": "#1a1300", "font-weight": 600 } },
       { selector: "node[status = 'topic']", style: { "font-size": "15px", "font-weight": 700, "color": v("--surface"),
         "shape": "round-rectangle", "padding": "16px", "border-width": 0,
-        "width": function (n) { return Math.max(80, (n.data("label") || "").length * 8.6); }, "height": 20 } },
+        "width": function (n) { return n.data("w") || Math.max(80, labelOf(n).length * 8.6); },
+        "height": function (n) { return n.data("h") || 20; } } },
       // "bezier" draws a single edge straight and always finds its end points; "unbundled-bezier" failed at some
       // angles and left lines out (D-053).
       { selector: "edge", style: { "width": 2.5, "line-color": v("--accent"), "curve-style": "bezier", "opacity": 0.8,
@@ -67,16 +73,59 @@
   });
 
   // fCoSE (D-050): compact, without overlaps; separate groups are packed side by side.
-  var layoutOptions = fcose ? { name: "fcose", quality: "proof", animate: false, randomize: true, nodeDimensionsIncludeLabels: true,
-                      packComponents: true, tile: true, tilingPaddingVertical: 24, tilingPaddingHorizontal: 24,
-                      nodeSeparation: withTopics ? 70 : 45, nodeRepulsion: function () { return withTopics ? 8000 : 5200; },
-                      idealEdgeLength: function (e) { return e.data("type") === "topic" ? 45 : 75; },
-                      edgeElasticity: function (e) { return e.data("type") === "topic" ? 0.6 : 0.35; },
-                      gravity: 0.3, gravityRange: 2.5, numIter: 4000, padding: 30 }
-                  : { name: "cose", animate: false, nodeDimensionsIncludeLabels: true, padding: 40 };
-  cy.layout(layoutOptions).run();
-  // Every node "moves" once more, so Cytoscape works out every line again for the final positions (D-053).
-  cy.nodes().forEach(function (n) { n.position({ x: n.position("x"), y: n.position("y") + 0.01 }); });
+  function layoutOptions(fixed) {
+    if (!fcose) { return { name: "cose", animate: false, nodeDimensionsIncludeLabels: true, padding: 40 }; }
+    var options = { name: "fcose", quality: "proof", animate: false, randomize: true, nodeDimensionsIncludeLabels: true,
+                    packComponents: true, tile: true, tilingPaddingVertical: 30, tilingPaddingHorizontal: 30,
+                    nodeSeparation: withTopics ? 80 : 60, nodeRepulsion: function () { return withTopics ? 9000 : 6500; },
+                    idealEdgeLength: function (e) { return e.data("type") === "topic" ? 55 : 90; },
+                    edgeElasticity: function (e) { return e.data("type") === "topic" ? 0.6 : 0.35; },
+                    gravity: 0.3, gravityRange: 2.5, numIter: 5000, padding: 30 };
+    if (fixed && fixed.length) { options.fixedNodeConstraint = fixed; }
+    return options;
+  }
+
+  // Remembered boxes stay where they are (D-054); only boxes without a place are laid out around them.
+  function nudge() {
+    // Every node "moves" once more, so Cytoscape works out every line again for the final positions (D-053).
+    cy.nodes().forEach(function (n) { n.position({ x: n.position("x"), y: n.position("y") + 0.01 }); });
+  }
+  var placed = cy.nodes().filter(function (n) { return n.data("saved"); });
+  var fresh = cy.nodes().filter(function (n) { return !n.data("saved"); });
+  if (fresh.length) {
+    cy.layout(layoutOptions(placed.map(function (n) {
+      return { nodeId: n.id(), position: { x: n.position("x"), y: n.position("y") } };
+    }))).run();
+  }
+  nudge();
+
+  // --- saving positions and sizes (D-054) ---
+  var pending = {};
+  var saveTimer = null;
+  function remember(nodes, withSize) {
+    nodes.forEach(function (n) {
+      if (n.id() === "ghost") { return; }
+      var entry = { key: n.id(), x: Math.round(n.position("x") * 10) / 10, y: Math.round(n.position("y") * 10) / 10 };
+      if (withSize || (pending[n.id()] && "w" in pending[n.id()])) {
+        entry.w = n.data("w") || null; entry.h = n.data("h") || null;
+      }
+      pending[n.id()] = entry;
+      n.data("saved", true);
+    });
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(flush, 400);
+  }
+  function flush() {
+    var entries = Object.keys(pending).map(function (key) { return pending[key]; });
+    pending = {};
+    if (!entries.length) { return; }
+    var data = new FormData();
+    data.set("csrf", payload.csrf);
+    data.set("layout", JSON.stringify(entries));
+    fetch("/todos/graph/layout", { method: "POST", body: data, credentials: "same-origin", headers: { "Accept": "application/json" } });
+  }
+  if (fresh.length) { remember(fresh, false); }
+  cy.on("dragfree", "node", function (event) { remember(event.target, false); });
 
   // Readable from the start: fit, but never so small that the text cannot be read (D-050).
   function view() {
@@ -158,6 +207,103 @@
   document.addEventListener("fullscreenchange", function () {
     fullButton.setAttribute("aria-pressed", document.fullscreenElement ? "true" : "false");
     afterResize();
+  });
+
+  // --- resizing a box (D-054): a corner handle appears on hover; dragging it sets the box's size ---
+  var handle = document.querySelector("[data-node-resize]");
+  var handleNode = null;
+  var resizing = null;
+  var hideHandleTimer = null;
+
+  function placeHandle() {
+    if (!handleNode || handleNode.removed()) { handle.hidden = true; return; }
+    var box = handleNode.renderedBoundingBox({ includeLabels: false });
+    handle.style.left = (box.x2 - 13) + "px";
+    handle.style.top = (box.y2 - 13) + "px";
+    handle.hidden = false;
+  }
+  cy.on("mouseover", "node", function (event) {
+    if (linking || resizing || event.target.id() === "ghost") { return; }
+    clearTimeout(hideHandleTimer);
+    handleNode = event.target;
+    placeHandle();
+  });
+  cy.on("mouseout", "node", function () {
+    if (resizing) { return; }
+    hideHandleTimer = setTimeout(function () { handle.hidden = true; handleNode = null; }, 600);
+  });
+  cy.on("pan zoom position", function () { if (handleNode) { placeHandle(); } });
+  handle.addEventListener("pointerenter", function () { clearTimeout(hideHandleTimer); });
+  handle.addEventListener("pointerdown", function (event) {
+    if (!handleNode) { return; }
+    event.preventDefault();
+    handle.setPointerCapture(event.pointerId);
+    resizing = { node: handleNode, x: event.clientX, y: event.clientY, w: handleNode.width(), h: handleNode.height() };
+  });
+  handle.addEventListener("pointermove", function (event) {
+    if (!resizing) { return; }
+    var zoom = cy.zoom();
+    var w = Math.max(70, Math.min(1100, resizing.w + 2 * (event.clientX - resizing.x) / zoom));
+    var h = Math.max(20, Math.min(1100, resizing.h + 2 * (event.clientY - resizing.y) / zoom));
+    resizing.node.data({ w: Math.round(w), h: Math.round(h) });
+    placeHandle();
+  });
+  handle.addEventListener("pointerup", function () {
+    if (!resizing) { return; }
+    remember(resizing.node, true);
+    resizing = null;
+  });
+
+  // --- "Perfekt verteilen" (D-054): several layouts, the one with the fewest crossings and overlaps wins ---
+  function crosses(p1, p2, p3, p4) {
+    function side(a, b, c) { return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x); }
+    return side(p1, p2, p3) * side(p1, p2, p4) < 0 && side(p3, p4, p1) * side(p3, p4, p2) < 0;
+  }
+  function score() {
+    var lines = cy.edges().filter(function (e) { return e.data("type") !== "ghost"; }).map(function (e) {
+      return [e.source(), e.target(), e.source().position(), e.target().position()];
+    });
+    var bad = 0;
+    for (var i = 0; i < lines.length; i++) {
+      for (var j = i + 1; j < lines.length; j++) {
+        var a = lines[i], b = lines[j];
+        if (a[0] === b[0] || a[0] === b[1] || a[1] === b[0] || a[1] === b[1]) { continue; }
+        if (crosses(a[2], a[3], b[2], b[3])) { bad += 1; }
+      }
+    }
+    var boxes = cy.nodes().map(function (n) { return n.boundingBox({ includeLabels: false }); });
+    for (var k = 0; k < boxes.length; k++) {
+      for (var m = k + 1; m < boxes.length; m++) {
+        var p = boxes[k], q = boxes[m];
+        if (p.x1 < q.x2 && q.x1 < p.x2 && p.y1 < q.y2 && q.y1 < p.y2) { bad += 5; }
+      }
+    }
+    return bad;
+  }
+  document.querySelector("[data-arrange]").addEventListener("click", function (event) {
+    if (!window.confirm(event.currentTarget.getAttribute("data-confirm"))) { return; }
+    var start = {};
+    cy.nodes().forEach(function (n) { start[n.id()] = { x: n.position("x"), y: n.position("y") }; });
+    var best = null, bestScore = Infinity;
+    for (var run = 0; run < 6; run++) {
+      cy.layout(layoutOptions(null)).run();
+      var s = score();
+      if (s < bestScore) {
+        bestScore = s;
+        best = {};
+        cy.nodes().forEach(function (n) { best[n.id()] = { x: n.position("x"), y: n.position("y") }; });
+      }
+    }
+    // Glide from where the boxes were to the winning arrangement, then remember it.
+    cy.nodes().forEach(function (n) { n.position(start[n.id()]); });
+    var moves = cy.nodes().map(function (n) {
+      return n.animation({ position: best[n.id()], duration: 500, easing: "ease-in-out-cubic" }).play().promise();
+    });
+    Promise.all(moves).then(function () {
+      nudge();
+      cy.animate({ fit: { padding: 30 } }, { duration: 250 });
+      remember(cy.nodes(), false);
+    });
   });
 
   // Zoom buttons at the edge (D-049).

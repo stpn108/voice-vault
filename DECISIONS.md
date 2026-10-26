@@ -626,3 +626,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner report with a screenshot; moving the box made the line appear. |
 | **Rejected alternatives** | (A) "haystack" edges: always drawn, but they run through the boxes; (B) keeping the soft curves and redrawing on a timer: hides the cause. |
 | **Status** | **FINAL** |
+
+### D-054: The Mindmap remembers positions and sizes; boxes can be resized; "Perfekt verteilen" (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-26 |
+| **Decision** | New table `mindmap_nodes` (key `t<task id>` or `p<topic id>`, x, y, optional width and height), one arrangement for all devices and views. `POST /todos/graph/layout` (form field `layout` with JSON, CSRF as usual; keys, numbers and ranges checked: coordinates within ±1,000,000, sizes 30 to 1200, at most 800 entries) stores positions, and sizes when sent. The Mindmap places remembered boxes where they were and lays out only new boxes around them (fCoSE `fixedNodeConstraint`); boxes placed for the first time are stored at once, so the map stays stable. Dragging a box stores its position. Hovering a box shows a corner handle; dragging it resizes the box, which then wraps at its own width and shows the full title; the size is stored. ✨ "Perfekt verteilen" asks first, then runs six fCoSE layouts, scores each by edge crossings plus five per overlap of boxes, glides the boxes to the best one and stores it; sizes stay. Spacing for first layouts slightly larger. |
+| **In plain words** | Boxes stay where you put them and at the size you pulled them to; ✨ arranges everything anew after asking. |
+| **Reasoning** | Owner request. Stored on the server so the arrangement is the same on every device. Several runs with a simple score give a visibly tidier result than one run. |
+| **Rejected alternatives** | (A) browser storage: lost on another device or after clearing the browser; (B) one arrangement per view (with/without topics): the same task would jump between views; (C) a resize plug-in: not available for Cytoscape nodes; a small overlay handle does the job. |
+| **Status** | **FINAL** |

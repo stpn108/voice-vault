@@ -249,6 +249,9 @@
   .graph-status { position: absolute; left: .6rem; top: .6rem; z-index: 5; padding: .35rem .7rem; border-radius: .5rem;
     background: var(--accent-soft); color: var(--accent); font-size: .85rem; font-weight: 500; }
   .graph-wrap.linking #graph { cursor: crosshair; }
+  .node-resize { position: absolute; z-index: 6; width: 14px; height: 14px; cursor: nwse-resize; touch-action: none;
+    background: linear-gradient(135deg, transparent 50%, var(--accent) 50%); border-radius: 0 0 .35rem 0; opacity: .85; }
+  .node-resize:hover { opacity: 1; }
   .graph-wrap { background: radial-gradient(circle at 1px 1px, var(--line) 1px, transparent 0) 0 0 / 22px 22px, var(--surface); }
   .graph-wrap:fullscreen, .graph-wrap.max { border-radius: 0; border: 0; }
   .graph-wrap:fullscreen #graph, .graph-wrap.max #graph { height: 100vh; }

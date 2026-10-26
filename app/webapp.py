@@ -8,6 +8,7 @@ change, escaped output and a strict Content-Security-Policy.
 """
 import hashlib
 import hmac
+import json
 import logging
 import os
 import re
@@ -361,6 +362,18 @@ def todo_unlink(request: Request, a: int = Form(..., ge=1, le=MAX_ID), b: str = 
     if "application/json" in request.headers.get("accept", ""):
         return JSONResponse({"ok": True, "removed": removed})
     return RedirectResponse(f"/todos/{first}" if back == "detail" else "/todos/graph", status_code=303)
+
+
+@app.post("/todos/graph/layout")
+def todo_graph_layout(request: Request, layout: str = Form(..., max_length=200_000), csrf: str = Form(""),
+                      session: Session = Depends(get_session)):
+    """Remember where the owner put Mindmap boxes and how big he made them (D-054)."""
+    require_csrf(request, csrf)
+    try:
+        stored = task_links.save_layout(session, now_utc(), json.loads(layout))
+    except (ValueError, task_links.LinkError) as exc:
+        raise HTTPException(status_code=400, detail=f"invalid layout: {exc}")
+    return JSONResponse({"ok": True, "stored": stored})
 
 
 @app.get("/todos/graph", response_class=HTMLResponse)

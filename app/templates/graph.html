@@ -24,8 +24,11 @@
     <button type="button" data-zoom="out" title="{{ t('ui_graph_zoom_out') }}" aria-label="{{ t('ui_graph_zoom_out') }}">−</button>
     <button type="button" data-zoom="fit" title="{{ t('ui_graph_fit') }}" aria-label="{{ t('ui_graph_fit') }}">⤢</button>
     <button type="button" data-fullscreen aria-pressed="false" title="{{ t('ui_graph_fullscreen') }}" aria-label="{{ t('ui_graph_fullscreen') }}">⛶</button>
+    <button type="button" data-arrange title="{{ t('ui_graph_arrange') }}" aria-label="{{ t('ui_graph_arrange') }}"
+            data-confirm="{{ t('ui_graph_arrange_confirm') }}">✨</button>
     <button type="button" data-link-mode aria-pressed="false" title="{{ t('ui_graph_link_mode') }}" aria-label="{{ t('ui_graph_link_mode') }}">🔗</button>
   </div>
+  <div class="node-resize" data-node-resize hidden title="{{ t('ui_graph_resize') }}"></div>
   <div class="graph-status" data-graph-status hidden data-pick-first="{{ t('ui_graph_pick_first') }}"
        data-pick-second="{{ t('ui_graph_pick_second') }}" data-linked="{{ t('ui_linked') }}" data-already="{{ t('ui_linked_already') }}"
        data-failed="{{ t('ui_graph_link_failed') }}"></div>

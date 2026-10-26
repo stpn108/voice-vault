@@ -5,16 +5,21 @@ imports this module. Every change is written to both tasks' history.
 """
 import datetime as dt
 import logging
+import math
+import re
 
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 import todo_service as todos
-from database import Todo, TodoEvent, TodoLink, Topic
+from database import MindmapNode, Todo, TodoEvent, TodoLink, Topic
 
 log = logging.getLogger(__name__)
 
 GRAPH_NODES_MAX = 400  # beyond this a picture of the tasks stops being readable
+NODE_KEY = re.compile(r"^[tp][0-9]{1,9}$")
+COORD_MAX = 1_000_000
+SIZE_MIN, SIZE_MAX = 30, 1200
 
 
 class LinkError(ValueError):
@@ -120,4 +125,45 @@ def graph(session: Session, *, done: bool = False, topics: bool = False, everyth
                       "url": f"/topics/{topic_id}"})
     edges += [{"source": f"t{a}", "target": f"t{b}", "type": "link"} for a, b in links
               if f"t{a}" in kept and f"t{b}" in kept]
+    saved = {m.node_key: m for m in session.scalars(select(MindmapNode).where(
+        MindmapNode.node_key.in_([n["id"] for n in nodes])))} if nodes else {}
+    for node in nodes:
+        place = saved.get(node["id"])
+        if place is not None:
+            node.update(x=place.x, y=place.y, w=place.width, h=place.height)
     return {"nodes": nodes, "edges": edges, "truncated": len(shown) > GRAPH_NODES_MAX}
+
+
+# --- remembered positions and sizes (D-054) ---------------------------------------------------------
+def _number(value, low: float, high: float, name: str):
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) \
+            or not low <= value <= high:
+        raise LinkError(f"{name} out of range")
+    return float(value)
+
+
+def save_layout(session: Session, now: dt.datetime, entries: list) -> int:
+    """Store positions (and sizes, where given) of Mindmap boxes. Returns how many were stored."""
+    if not isinstance(entries, list) or len(entries) > GRAPH_NODES_MAX * 2:
+        raise LinkError("layout must be a list of at most %d boxes" % (GRAPH_NODES_MAX * 2))
+    clean = {}
+    for entry in entries:
+        if not isinstance(entry, dict) or not NODE_KEY.match(str(entry.get("key", ""))):
+            raise LinkError("unknown box")
+        clean[entry["key"]] = (
+            _number(entry.get("x"), -COORD_MAX, COORD_MAX, "x"), _number(entry.get("y"), -COORD_MAX, COORD_MAX, "y"),
+            _number(entry.get("w"), SIZE_MIN, SIZE_MAX, "width"), _number(entry.get("h"), SIZE_MIN, SIZE_MAX, "height"))
+        if clean[entry["key"]][0] is None or clean[entry["key"]][1] is None:
+            raise LinkError("x and y are required")
+    found = {m.node_key: m for m in session.scalars(select(MindmapNode).where(MindmapNode.node_key.in_(list(clean))))} \
+        if clean else {}
+    for key, (x, y, w, h) in clean.items():
+        row = found.get(key) or MindmapNode(node_key=key, x=x, y=y)
+        row.x, row.y, row.updated_at = x, y, now
+        if "w" in next(e for e in entries if e["key"] == key):
+            row.width, row.height = w, h
+        session.add(row)
+    session.commit()
+    return len(clean)

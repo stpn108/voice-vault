@@ -652,3 +652,18 @@ def test_d050_mindmap_layout_scripts_are_served_from_this_server(client, make_to
     html = client.get("/todos/graph").text
     assert f'<script src="{path}" defer></script>' in html and "data-fullscreen" in html and 'class="graph-legend"' in html
     assert client.get(path).status_code == 200
+
+
+def test_d054_the_mindmap_layout_is_saved_through_the_web_ui(client, make_todo):
+    import json
+    a, b = make_todo(title="Alpha"), make_todo(title="Beta")
+    post(client, "/todos/links", a=a, b=str(b))
+    layout = json.dumps([{"key": f"t{a}", "x": 1, "y": 2, "w": 400, "h": 120}])
+    response = client.post("/todos/graph/layout", data={"csrf": webapp.csrf_token(), "layout": layout},
+                           headers={"Accept": "application/json"})
+    assert response.json() == {"ok": True, "stored": 1}
+    assert '"w": 400' in client.get("/todos/graph").text
+    assert client.post("/todos/graph/layout", data={"csrf": webapp.csrf_token(), "layout": "not json"}).status_code == 400
+    assert client.post("/todos/graph/layout", data={"csrf": "bad", "layout": layout}).status_code == 403
+    html = client.get("/todos/graph").text
+    assert "data-arrange" in html and "data-node-resize" in html

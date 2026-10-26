@@ -62,3 +62,28 @@ def test_d051_waiting_entries_are_left_out_of_the_graph_unless_asked(db_session)
     links.link(db_session, NOW, a, b)
     assert links.graph(db_session)["nodes"] == []
     assert {n["label"] for n in links.graph(db_session, waiting=True)["nodes"]} == {"Alpha", "Concept from Jochen"}
+
+
+# --- remembered positions and sizes (D-054) -----------------------------------------------------------
+def test_d054_positions_and_sizes_are_stored_and_come_back_with_the_graph(db_session):
+    a, b = make(db_session, "Alpha"), make(db_session, "Beta")
+    links.link(db_session, NOW, a, b)
+    assert links.save_layout(db_session, NOW, [{"key": f"t{a}", "x": 10.5, "y": -20, "w": 300, "h": 90},
+                                              {"key": f"t{b}", "x": 200, "y": 40}]) == 2
+    nodes = {n["id"]: n for n in links.graph(db_session)["nodes"]}
+    assert (nodes[f"t{a}"]["x"], nodes[f"t{a}"]["y"], nodes[f"t{a}"]["w"], nodes[f"t{a}"]["h"]) == (10.5, -20, 300, 90)
+    assert nodes[f"t{b}"]["w"] is None
+    # moving keeps the size unless a size is sent
+    links.save_layout(db_session, NOW, [{"key": f"t{a}", "x": 0, "y": 0}])
+    assert {n["id"]: n for n in links.graph(db_session)["nodes"]}[f"t{a}"]["w"] == 300
+    links.save_layout(db_session, NOW, [{"key": f"t{a}", "x": 0, "y": 0, "w": None, "h": None}])
+    assert {n["id"]: n for n in links.graph(db_session)["nodes"]}[f"t{a}"]["w"] is None
+
+
+@pytest.mark.parametrize("entry", [
+    {"key": "x1", "x": 0, "y": 0}, {"key": "t1", "x": float("nan"), "y": 0}, {"key": "t1", "x": 2e6, "y": 0},
+    {"key": "t1", "x": 0, "y": 0, "w": 5}, {"key": "t1", "y": 0}, {"key": "t1", "x": True, "y": 0}, "junk",
+])
+def test_d054_bad_layout_entries_are_refused(db_session, entry):
+    with pytest.raises(links.LinkError):
+        links.save_layout(db_session, NOW, [entry])

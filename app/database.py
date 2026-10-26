@@ -114,6 +114,18 @@ class TodoLink(Base):
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class MindmapNode(Base):
+    """Where the owner put a box on the Mindmap and how big he made it (D-054). Key "t<task id>" or "p<topic id>"."""
+    __tablename__ = "mindmap_nodes"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    node_key: Mapped[str] = mapped_column(String(20), unique=True)
+    x: Mapped[float] = mapped_column(Float)
+    y: Mapped[float] = mapped_column(Float)
+    width: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    height: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class ExcludedPerson(Base):
     """A name the owner excluded (D-044): never suggested, never set by Claude."""
     __tablename__ = "excluded_people"
