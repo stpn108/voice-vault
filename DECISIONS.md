@@ -593,3 +593,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner feedback: layout, font sizes and the look were not good; full screen asked for. The built-in cose stretched graphs and let nodes overlap. |
 | **Rejected alternatives** | (A) tuning the built-in cose only: overlaps remained; (B) a hierarchical layout (dagre): links between tasks have no direction; (C) fitting everything at start: text below 7 px on wider graphs. |
 | **Status** | **FINAL** |
+
+### D-051: "Wartet auf" entries are optional on the Mindmap, off by default (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-26 |
+| **Decision** | Amends D-047. The Mindmap shows only the owner's own tasks by default. A fourth toggle "Wartet auf anzeigen" (`waiting=1`) adds the waiting entries (dashed); the legend lists them only then. Links to a waiting entry are hidden while it is off. |
+| **In plain words** | The Mindmap shows your own tasks; switch on "Wartet auf anzeigen" to see what others owe you as well. |
+| **Reasoning** | Owner request. |
+| **Rejected alternatives** | (A) never showing them: some links are about who delivers what; (B) on by default: the owner asked to leave them out. |
+| **Status** | **FINAL** |

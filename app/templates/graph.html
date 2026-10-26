@@ -5,15 +5,16 @@
 {% endblock %}
 {% block content %}
 {% macro toggle(name, value, label) -%}
-{%- set params = {"done": done, "topics": topics, "all": everything} -%}
+{%- set params = {"done": done, "topics": topics, "all": everything, "waiting": waiting} -%}
 {%- set _ = params.update({name: 1 - value}) -%}
-<a class="{{ 'on' if value else '' }}" href="/todos/graph?done={{ params.done }}&amp;topics={{ params.topics }}&amp;all={{ params.all }}">{{ label }}</a>
+<a class="{{ 'on' if value else '' }}" href="/todos/graph?done={{ params.done }}&amp;topics={{ params.topics }}&amp;all={{ params.all }}&amp;waiting={{ params.waiting }}">{{ label }}</a>
 {%- endmacro %}
 <div class="head"><h1>{{ t("ui_graph") }}</h1></div>
 <div class="graph-controls">
   {{ toggle("done", done, t("ui_graph_done")) }}
   {{ toggle("topics", topics, t("ui_graph_topics")) }}
   {{ toggle("all", everything, t("ui_graph_all")) }}
+  {{ toggle("waiting", waiting, t("ui_graph_waiting")) }}
 </div>
 {% if data.nodes %}
 <div class="card graph-wrap">
@@ -31,7 +32,7 @@
 </div>
 <div class="graph-legend">
   <span><i class="lg-open"></i>{{ t("todo_status_open") }}</span><span><i class="lg-progress"></i>{{ t("todo_status_in_progress") }}</span>
-  <span><i class="lg-done"></i>{{ t("todo_status_done") }}</span><span><i class="lg-waiting"></i>{{ t("ui_kind_waiting") }}</span>
+  <span><i class="lg-done"></i>{{ t("todo_status_done") }}</span>{% if waiting %}<span><i class="lg-waiting"></i>{{ t("ui_kind_waiting") }}</span>{% endif %}
   <span><i class="lg-urgent"></i>{{ t("todo_prio_1") }}</span><span><i class="lg-high"></i>{{ t("todo_prio_2") }}</span>
   {% if topics %}<span><i class="lg-topic"></i>{{ t("ui_topic") }}</span>{% endif %}
 </div>

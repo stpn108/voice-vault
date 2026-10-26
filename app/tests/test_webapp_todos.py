@@ -627,7 +627,7 @@ def test_d047_graph_page_renders_with_toggles_and_local_scripts(client, make_tod
     post(client, "/todos/links", a=a, b=str(b))
     html = client.get("/todos/graph?done=1&topics=1&all=0").text
     assert 'id="graph-data"' in html and "/static/vendor/cytoscape-3.30.2.min.js" in html
-    assert 'href="/todos/graph?done=0&amp;topics=1&amp;all=0"' in html
+    assert 'href="/todos/graph?done=0&amp;topics=1&amp;all=0&amp;waiting=0"' in html
     assert client.get("/static/graph.js").status_code == 200
 
 

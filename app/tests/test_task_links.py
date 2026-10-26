@@ -53,3 +53,12 @@ def test_d047_graph_leaves_out_tasks_of_excluded_topics(db_session):
     links.link(db_session, NOW, a, b)
     svc.set_topic_excluded(db_session, "Secret", True)
     assert links.graph(db_session)["nodes"] == []
+
+
+
+def test_d051_waiting_entries_are_left_out_of_the_graph_unless_asked(db_session):
+    a = make(db_session, "Alpha")
+    b = make(db_session, "Concept from Jochen", kind="waiting", people=["Jochen"])
+    links.link(db_session, NOW, a, b)
+    assert links.graph(db_session)["nodes"] == []
+    assert {n["label"] for n in links.graph(db_session, waiting=True)["nodes"]} == {"Alpha", "Concept from Jochen"}

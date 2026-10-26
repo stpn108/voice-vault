@@ -92,11 +92,14 @@ def link_map(session: Session, ids: list) -> dict:
     return result
 
 
-def graph(session: Session, *, done: bool = False, topics: bool = False, everything: bool = False) -> dict:
-    """Nodes and edges for the graph page. Tasks of excluded topics are left out, like in the list."""
+def graph(session: Session, *, done: bool = False, topics: bool = False, everything: bool = False,
+          waiting: bool = False) -> dict:
+    """Nodes and edges for the graph page. Tasks of excluded topics are left out, like in the list;
+    what others owe the owner only on request (D-051)."""
     hidden = set(todos._excluded_ids(session))
     statuses = todos.STATUSES if done else todos.ACTIVE
-    tasks = {t.id: t for t in session.scalars(select(Todo).where(Todo.status.in_(statuses)))
+    kinds = todos.KINDS if waiting else ("mine",)
+    tasks = {t.id: t for t in session.scalars(select(Todo).where(Todo.status.in_(statuses), Todo.kind.in_(kinds)))
              if t.topic_id not in hidden}
     links = [(r.low_id, r.high_id) for r in session.scalars(select(TodoLink))
              if r.low_id in tasks and r.high_id in tasks]

@@ -185,6 +185,7 @@ TEXTS = {
     "ui_graph_link_failed": {"de": "Verknüpfen ging nicht", "en": "Linking failed"},
     "ui_graph_done": {"de": "Erledigte anzeigen", "en": "Show finished"},
     "ui_graph_topics": {"de": "Themen als Knoten", "en": "Topics as nodes"},
+    "ui_graph_waiting": {"de": "Wartet auf anzeigen", "en": "Show waiting for"},
     "ui_graph_all": {"de": "Auch unverknüpfte Aufgaben", "en": "Also tasks without links"},
     "ui_graph_empty": {"de": "Noch keine Verknüpfungen. In der Aufgabenliste eine Linie vom Punkt rechts zu einer anderen Aufgabe ziehen.", "en": "No links yet. In the task list, draw a line from the dot on the right to another task."},
     "ui_graph_hint": {"de": "Knoten anklicken öffnet die Aufgabe, Knoten lassen sich verschieben, eine Linie anklicken entfernt die Verknüpfung.", "en": "Click a node to open the task, drag nodes around, click a line to remove the link."},
