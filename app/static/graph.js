@@ -15,8 +15,11 @@
   var fill = { open: v("--surface"), in_progress: v("--progress"), done: v("--ok"), dropped: v("--hover"), topic: v("--accent") };
   var rim = { 1: v("--danger"), 2: v("--warn") };
   var elements = payload.data.nodes.map(function (n) {
+    // Spread out from the start (D-053): nodes stacked at one point make Cytoscape mark their lines as
+    // undrawable, and it keeps that until a node moves.
     return { data: { id: n.id, label: n.label.length > 70 ? n.label.slice(0, 67) + "…" : n.label, full: n.label,
-                     status: n.status, kind: n.kind, url: n.url, priority: n.priority || 3 } };
+                     status: n.status, kind: n.kind, url: n.url, priority: n.priority || 3 },
+             position: { x: Math.random() * 1500, y: Math.random() * 1000 } };
   }).concat(payload.data.edges.map(function (e, i) {
     return { data: { id: "e" + i, source: e.source, target: e.target, type: e.type } };
   }));
@@ -45,8 +48,9 @@
       { selector: "node[status = 'topic']", style: { "font-size": "15px", "font-weight": 700, "color": v("--surface"),
         "shape": "round-rectangle", "padding": "16px", "border-width": 0,
         "width": function (n) { return Math.max(80, (n.data("label") || "").length * 8.6); }, "height": 20 } },
-      { selector: "edge", style: { "width": 2.5, "line-color": v("--accent"), "curve-style": "unbundled-bezier",
-        "control-point-distances": 18, "control-point-weights": 0.5, "opacity": 0.8,
+      // "bezier" draws a single edge straight and always finds its end points; "unbundled-bezier" failed at some
+      // angles and left lines out (D-053).
+      { selector: "edge", style: { "width": 2.5, "line-color": v("--accent"), "curve-style": "bezier", "opacity": 0.8,
         "transition-property": "opacity", "transition-duration": "120ms" } },
       { selector: "edge[type = 'topic']", style: { "width": 1.5, "line-color": v("--faint"), "line-style": "dotted",
         "curve-style": "straight", "opacity": 0.9 } },
@@ -59,15 +63,20 @@
       { selector: "edge[type = 'ghost']", style: { "width": 2, "line-color": v("--accent"), "line-style": "dashed",
         "curve-style": "straight", "events": "no" } }
     ],
-    // fCoSE (D-050): compact, without overlaps; separate groups are packed side by side.
-    layout: fcose ? { name: "fcose", quality: "proof", animate: false, randomize: true, nodeDimensionsIncludeLabels: true,
+    layout: { name: "preset" }
+  });
+
+  // fCoSE (D-050): compact, without overlaps; separate groups are packed side by side.
+  var layoutOptions = fcose ? { name: "fcose", quality: "proof", animate: false, randomize: true, nodeDimensionsIncludeLabels: true,
                       packComponents: true, tile: true, tilingPaddingVertical: 24, tilingPaddingHorizontal: 24,
                       nodeSeparation: withTopics ? 70 : 45, nodeRepulsion: function () { return withTopics ? 8000 : 5200; },
                       idealEdgeLength: function (e) { return e.data("type") === "topic" ? 45 : 75; },
                       edgeElasticity: function (e) { return e.data("type") === "topic" ? 0.6 : 0.35; },
                       gravity: 0.3, gravityRange: 2.5, numIter: 4000, padding: 30 }
-                  : { name: "cose", animate: false, nodeDimensionsIncludeLabels: true, padding: 40 }
-  });
+                  : { name: "cose", animate: false, nodeDimensionsIncludeLabels: true, padding: 40 };
+  cy.layout(layoutOptions).run();
+  // Every node "moves" once more, so Cytoscape works out every line again for the final positions (D-053).
+  cy.nodes().forEach(function (n) { n.position({ x: n.position("x"), y: n.position("y") + 0.01 }); });
 
   // Readable from the start: fit, but never so small that the text cannot be read (D-050).
   function view() {

@@ -615,3 +615,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner request. Topics are not used as bridges: through a topic every task of it would count as connected. |
 | **Rejected alternatives** | (A) a fixed depth limit: the owner asked for every degree; (B) the same strength for every degree: the direct links would no longer stand out. |
 | **Status** | **FINAL** |
+
+### D-053: Every link line is drawn on the Mindmap (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-26 |
+| **Decision** | Fixes D-050. Some link lines were missing until a node was moved, while the hover highlight (D-052) showed the tasks as linked. Two causes: Cytoscape drew once with all nodes stacked at one point before the layout ran and kept those lines marked as undrawable; and the `unbundled-bezier` edge style could not find end points at some angles. Now the nodes start at random spread-out positions, the layout runs after creation (`preset`, then fCoSE), every node is nudged once afterwards so all lines are worked out for the final positions, and edges use the robust `bezier` style (a single edge is drawn straight). Checked over 24 page loads in all three views: no line missing, no warning. |
+| **In plain words** | Lines that only appeared after moving a box are now always drawn. |
+| **Reasoning** | Owner report with a screenshot; moving the box made the line appear. |
+| **Rejected alternatives** | (A) "haystack" edges: always drawn, but they run through the boxes; (B) keeping the soft curves and redrawing on a timer: hides the cause. |
+| **Status** | **FINAL** |
