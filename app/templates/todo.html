@@ -40,6 +40,22 @@
     </div>
   </div>
 </form>
+<h2 id="links">{{ t("ui_links") }}</h2>
+<div class="card links-card">
+  {% if linked %}<ul class="brief-list">{% for other_id, title, other_status, other_kind in linked %}<li style="display:flex;gap:.6rem;align-items:center">
+    <span class="pill status-chip-static s-{{ other_status }}">{{ t("todo_status_" ~ other_status) }}</span>
+    <a href="/todos/{{ other_id }}" style="flex:1">{{ title }}</a>
+    <form class="inline" method="post" action="/todos/links/remove"><input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="a" value="{{ row.id }}"><input type="hidden" name="b" value="{{ other_id }}"><input type="hidden" name="back" value="detail">
+      <button class="ghost" type="submit" title="{{ t('ui_unlink') }}" aria-label="{{ t('ui_unlink') }}">×</button></form>
+  </li>{% endfor %}</ul>{% else %}<p class="muted" style="margin:0 0 .6rem">{{ t("ui_links_none") }}</p>{% endif %}
+  <form class="quick" method="post" action="/todos/links" style="margin-top:.6rem">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="a" value="{{ row.id }}"><input type="hidden" name="back" value="detail">
+    <input type="text" name="b" list="link-targets" required autocomplete="off" placeholder="{{ t('ui_link_with') }}" style="flex:1 1 16rem">
+    <datalist id="link-targets">{% for r in link_targets %}<option value="#{{ r.id }} {{ r.title }}">{% endfor %}</datalist>
+    <button type="submit">{{ t("ui_link") }}</button>
+  </form>
+</div>
 <h2>{{ t("ui_history") }}</h2>
 <ul class="timeline">
   {% for e in events %}

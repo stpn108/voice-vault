@@ -549,3 +549,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner request: some conversations must not leave Plaud. A title prefix is something the owner can set in the Plaud app in seconds. |
 | **Rejected alternatives** | (A) a Plaud tag or folder: not read by this project, the title is; (B) importing and hiding it: the content would still be on the server. |
 | **Status** | **FINAL** |
+
+### D-047: Linking tasks by drawing a line, and a graph page (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-26 |
+| **Decision** | New table `todo_links` (pair stored once, lower id first, unique) and module `task_links` (web UI only, like `topic_admin`: taking a link off deletes a row). Every task row in the list has a dot on the right; pressing it and drawing a line (pointer events: mouse, pen, finger) to another task and letting go links the two (`POST /todos/links`, JSON, CSRF as usual); a notice offers undo; Esc or letting go elsewhere cancels. The row shows "🔗 n". The task page lists the linked tasks with × to remove and a field with all open tasks ("#id title") to add one. Each link and unlink is written to both tasks' history (`linked`/`unlinked`, not undoable through the history; the × and the notice do that). `/todos/graph` draws the tasks and links with Cytoscape.js 3.30.2 (MIT, vendored in `static/vendor`, no eval, CSP unchanged): by default open tasks that have a link; toggles for finished tasks, topics as hub nodes (mind-map view) and tasks without links; nodes coloured by status, waiting entries dashed; clicking a node opens it, nodes can be dragged, clicking a line removes the link after a confirmation. Tasks of excluded topics are left out. At most 400 nodes. Claude has no tool for links. |
+| **In plain words** | Draw a line from the dot of one task to another to link them; "Graph" shows them as a mind map, with finished tasks on request. |
+| **Reasoning** | Owner request; the owner asked for a line instead of dragging the task itself. A drawn line reads as "connect these two" and works on touch screens, unlike HTML drag and drop. |
+| **Rejected alternatives** | (A) HTML5 drag and drop of the whole row: no touch support, and it collides with text selection; (B) drawing links inside the graph: needs a further plug-in (edgehandles); the list is where the tasks are; (C) a hand-written force layout: a maintained library lays out and zooms better. |
+| **Status** | **FINAL** |

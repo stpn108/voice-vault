@@ -104,6 +104,16 @@ class Todo(Base):
     kind: Mapped[str] = mapped_column(String(10), default="mine", server_default="mine", index=True)
 
 
+class TodoLink(Base):
+    """Two tasks the owner linked (D-047); stored once, the lower id first."""
+    __tablename__ = "todo_links"
+    __table_args__ = (UniqueConstraint("low_id", "high_id", name="uq_todo_links_pair"),)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    low_id: Mapped[int] = mapped_column(ForeignKey("todos.id", ondelete="CASCADE"), index=True)
+    high_id: Mapped[int] = mapped_column(ForeignKey("todos.id", ondelete="CASCADE"), index=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class ExcludedPerson(Base):
     """A name the owner excluded (D-044): never suggested, never set by Claude."""
     __tablename__ = "excluded_people"

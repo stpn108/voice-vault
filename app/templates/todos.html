@@ -2,7 +2,7 @@
 {% block title %}{{ t("ui_nav_todos") }}{% endblock %}
 {% block content %}
 {% set keep = ("&topic=" ~ topic | urlencode if topic else "") ~ ("&person=" ~ person | urlencode if person else "") ~ ("&kind=waiting" if kind == "waiting" else "") %}
-<div class="kinds">{% for k in kinds %}<a href="/todos?kind={{ k }}" class="kind-link {% if k == kind %}current{% endif %}">{{ t("ui_kind_" ~ k) }}<small>{{ kind_counts[k] }}</small></a>{% endfor %}</div>
+<div class="kinds">{% for k in kinds %}<a href="/todos?kind={{ k }}" class="kind-link {% if k == kind %}current{% endif %}">{{ t("ui_kind_" ~ k) }}<small>{{ kind_counts[k] }}</small></a>{% endfor %}<a class="kind-link graph-link" href="/todos/graph" style="margin-left:auto">{{ t("ui_graph") }} →</a></div>
 <div class="head" style="margin-top:.6rem">
   <h1>{{ t("ui_kind_" ~ kind) }}</h1>
   <div class="seg">
@@ -52,9 +52,11 @@
         <span>{{ row.age_days }} {{ t("ui_day") if row.age_days == 1 else t("ui_days") }}</span>
         {% set active = row.status in ('open', 'in_progress') %}{% if row.due_date %}<span class="due {% if active and row.due_date < today %}overdue{% endif %}">{{ t("ui_overdue") if active and row.due_date < today else t("ui_due") }} {{ row.due_date.strftime("%d.%m.") }}</span>{% endif %}
         {% if not grouped %}<span>{{ t("todo_prio_" ~ row.priority) }}</span>{% endif %}
+        {% if link_counts.get(row.id) %}<a class="link-count" href="/todos/{{ row.id }}#links" data-n="{{ link_counts[row.id] }}">🔗 {{ link_counts[row.id] }}</a>{% endif %}
       </div>
       {% if row.people %}<div class="task-people">{% for name in row.people %}<a class="person" href="/person?name={{ name | urlencode }}">{{ name }}</a>{% endfor %}</div>{% endif %}
     </div>
+    <button class="link-handle" type="button" title="{{ t('ui_link_handle') }}" aria-label="{{ t('ui_link_handle') }}"></button>
     {% if row.status in ("open", "in_progress") %}
     <form class="task-actions" data-quick method="post" action="/todos/{{ row.id }}/status">
       <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="list">
@@ -75,5 +77,8 @@
      data-done="{{ t('todo_toast_done') }}" data-dropped="{{ t('todo_toast_dropped') }}" data-open="{{ t('todo_toast_open') }}">
   <span data-toast-text></span><button type="button">{{ t("ui_undo") }}</button>
 </div>
+<div id="link-toast" class="toast" role="status" aria-live="polite" hidden data-linked="{{ t('ui_linked') }}"
+     data-already="{{ t('ui_linked_already') }}" data-csrf="{{ csrf }}"><span data-toast-text></span><button type="button">{{ t("ui_undo") }}</button></div>
 <script src="/static/todos.js" defer></script>
+<script src="/static/links.js" defer></script>
 {% endblock %}

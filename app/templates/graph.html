@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}{{ t("ui_graph") }}{% endblock %}
+{% block crumbs %}
+<nav class="crumbs" aria-label="breadcrumb"><a href="/todos">{{ t("ui_nav_todos") }}</a><span class="sep">/</span><span aria-current="page">{{ t("ui_graph") }}</span></nav>
+{% endblock %}
+{% block content %}
+{% macro toggle(name, value, label) -%}
+{%- set params = {"done": done, "topics": topics, "all": everything} -%}
+{%- set _ = params.update({name: 1 - value}) -%}
+<a class="{{ 'on' if value else '' }}" href="/todos/graph?done={{ params.done }}&amp;topics={{ params.topics }}&amp;all={{ params.all }}">{{ label }}</a>
+{%- endmacro %}
+<div class="head"><h1>{{ t("ui_graph") }}</h1></div>
+<div class="graph-controls">
+  {{ toggle("done", done, t("ui_graph_done")) }}
+  {{ toggle("topics", topics, t("ui_graph_topics")) }}
+  {{ toggle("all", everything, t("ui_graph_all")) }}
+</div>
+{% if data.nodes %}
+<div class="card" id="graph" role="img" aria-label="{{ t('ui_graph') }}"></div>
+<p class="muted" style="font-size:.85rem">{{ t("ui_graph_hint") }}{% if data.truncated %} {{ t("ui_graph_truncated") }}{% endif %}</p>
+<script type="application/json" id="graph-data">{{ {"data": data, "csrf": csrf, "confirm": t("ui_graph_unlink_confirm")} | tojson }}</script>
+<script src="/static/vendor/cytoscape-3.30.2.min.js" defer></script>
+<script src="/static/graph.js" defer></script>
+{% else %}
+<div class="card empty">{{ t("ui_graph_empty") }}</div>
+{% endif %}
+{% endblock %}

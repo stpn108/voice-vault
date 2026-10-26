@@ -218,6 +218,21 @@
   a.owed-chip.current { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 600; }
   a.owed-chip.current small { color: var(--accent); }
   a.owed-brief { margin-left: auto; font-size: .85rem; color: var(--accent); }
+  .link-handle { flex: none; align-self: center; width: 1.6rem; height: 1.6rem; border: 0; background: transparent; cursor: crosshair;
+    touch-action: none; position: relative; padding: 0; }
+  .link-handle::after { content: ""; position: absolute; inset: .45rem; border-radius: 50%; border: 2px solid var(--faint); background: var(--surface); }
+  .link-handle:hover::after, li.task:hover .link-handle::after { border-color: var(--accent); }
+  .link-layer { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 50; }
+  .link-layer line { stroke: var(--accent); stroke-width: 2.5; stroke-dasharray: 6 4; stroke-linecap: round; }
+  html.linking, html.linking * { cursor: crosshair !important; user-select: none; }
+  li.task.link-target { outline: 2px solid var(--accent); outline-offset: -2px; background: var(--accent-soft); }
+  a.link-count { color: var(--muted); text-decoration: none; } a.link-count:hover { color: var(--accent); }
+  .status-chip-static { padding: .05rem .5rem; font-size: .75rem; flex: none; }
+  .graph-controls { display: flex; flex-wrap: wrap; gap: .4rem 1rem; align-items: center; margin: 0 0 .8rem; font-size: .9rem; }
+  .graph-controls a { color: var(--text); text-decoration: none; display: inline-flex; gap: .35rem; align-items: center; }
+  .graph-controls a::before { content: ""; width: .9rem; height: .9rem; border-radius: .25rem; border: 1.5px solid var(--faint); }
+  .graph-controls a.on::before { background: var(--accent); border-color: var(--accent); }
+  #graph { height: min(72vh, 46rem); padding: 0; overflow: hidden; }
   .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: .8rem; }
   a.tile { display: block; padding: 1rem 1.1rem; text-decoration: none; color: var(--text); }
   a.tile:hover { border-color: var(--accent); } a.tile strong { display: block; margin-bottom: .3rem; } a.tile span { color: var(--muted); font-size: .9rem; }

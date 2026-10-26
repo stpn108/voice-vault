@@ -10,6 +10,7 @@ import hashlib
 import hmac
 import logging
 import os
+import re
 import secrets
 from collections import Counter
 from contextlib import asynccontextmanager
@@ -31,6 +32,7 @@ import todo_service as todos
 import briefing_service
 import people_admin
 import stats_service
+import task_links
 import topic_admin
 from config import Config, load_config
 from database import engine, migrate_schema
@@ -303,6 +305,7 @@ def todo_list(request: Request, status: str = Query("open", max_length=12), topi
                   sort=sort, sorts=todos.SORTS, today=now_utc().astimezone(LOCAL_TZ).date(),
                   counts=todos.counts(session, kind), statuses=statuses, priorities=todos.PRIORITIES,
                   known_people=todos.known_people(session) if kind == "waiting" else [],
+                  link_counts=task_links.link_counts(session, [r.id for r in rows]),
                   owed=sorted(owed.items(), key=lambda pair: (-pair[1], pair[0].lower())))
 
 
@@ -321,6 +324,54 @@ def todo_add(request: Request, title: str = Form("", max_length=todos.TITLE_MAX)
     return RedirectResponse(f"/todos/{todo.id}", status_code=303)
 
 
+LINK_TARGET = re.compile(r"^\s*#?(\d{1,9})\b")  # "#12 Title" from the suggestion list, or a bare id
+
+
+def _link_ids(a: int, target: str) -> tuple:
+    found = LINK_TARGET.match(target or "")
+    if not found:
+        raise HTTPException(status_code=400, detail="pick a task from the list")
+    return a, int(found.group(1))
+
+
+@app.post("/todos/links")
+def todo_link(request: Request, a: int = Form(..., ge=1, le=MAX_ID), b: str = Form(..., max_length=320),
+              back: str = Form("", max_length=20), csrf: str = Form(""), session: Session = Depends(get_session)):
+    """Link two tasks: a line drawn in the list (JSON) or a pick on the task page (D-047)."""
+    require_csrf(request, csrf)
+    first, second = _link_ids(a, b)
+    try:
+        created = task_links.link(session, now_utc(), first, second)
+    except task_links.LinkError as exc:
+        raise HTTPException(status_code=404 if "no task" in str(exc) else 400, detail=str(exc))
+    if "application/json" in request.headers.get("accept", ""):
+        return JSONResponse({"ok": True, "created": created})
+    return RedirectResponse(f"/todos/{first}" if back == "detail" else "/todos/graph", status_code=303)
+
+
+@app.post("/todos/links/remove")
+def todo_unlink(request: Request, a: int = Form(..., ge=1, le=MAX_ID), b: str = Form(..., max_length=320),
+                back: str = Form("", max_length=20), csrf: str = Form(""), session: Session = Depends(get_session)):
+    require_csrf(request, csrf)
+    first, second = _link_ids(a, b)
+    try:
+        removed = task_links.unlink(session, now_utc(), first, second)
+    except task_links.LinkError as exc:
+        raise HTTPException(status_code=404 if "no task" in str(exc) else 400, detail=str(exc))
+    if "application/json" in request.headers.get("accept", ""):
+        return JSONResponse({"ok": True, "removed": removed})
+    return RedirectResponse(f"/todos/{first}" if back == "detail" else "/todos/graph", status_code=303)
+
+
+@app.get("/todos/graph", response_class=HTMLResponse)
+def todo_graph(request: Request, done: int = Query(0, ge=0, le=1), topics: int = Query(0, ge=0, le=1),
+               everything: int = Query(0, ge=0, le=1, alias="all"), session: Session = Depends(get_session),
+               cfg: Config = Depends(get_config)):
+    """The tasks and their links as a graph (D-047)."""
+    data = task_links.graph(session, done=bool(done), topics=bool(topics), everything=bool(everything))
+    return render(request, cfg, "graph.html", data=data, done=done, topics=topics, everything=everything)
+
+
 @app.get("/todos/{todo_id}", response_class=HTMLResponse)
 def todo_detail(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX_ID)], session: Session = Depends(get_session),
                 person: str = Query("", max_length=todos.PERSON_MAX), cfg: Config = Depends(get_config)):
@@ -337,7 +388,11 @@ def todo_detail(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX
     topic_candidates = ([row.topic] if row.topic else []) + [n for n in allowed if n.lower() != (row.topic or "").lower()]
     # Opened from a person's briefing or a person filter: the breadcrumb leads back there (D-040).
     via_person = next((p for p in row.people if p.lower() == " ".join(person.split()).lower()), None)
+    linked = task_links.linked_to(session, row.id)
+    targets = [r for r in todos.list_todos(session, now_utc(), status="open", kind="all", limit=todos.LIST_LIMIT_MAX)[0]
+               if r.id != row.id and r.id not in {item[0] for item in linked}]
     return render(request, cfg, "todo.html", row=row, events=events, undoable=undoable, candidates=candidates, via_person=via_person,
+                  linked=linked, link_targets=targets,
                   topic_candidates=topic_candidates[:TOPIC_TAGS], known_topics=allowed,
                   speakers=speakers, known=todos.known_people(session), statuses=todos.STATUSES, priorities=todos.PRIORITIES)
 

@@ -71,6 +71,8 @@ Once a day Claude reads the recordings that are new since its last run, adds the
     Given a commitment another person made to the owner in a recording, then Claude records it with `add_todo` kind `waiting` and that person in `people`; it appears only under "Wartet auf" in the task list, never in the owner's list, counts, reminder or statistics, and can be marked done (received) or dropped like a task. Given a name anywhere in the UI, then a click opens `/person?name=…` with the owner's open tasks with that person, what the person owes him, shared topics with their latest note, and the latest three conversations the person spoke in (with the summary).
 25. **Topic sorting and suggestions (D-041).**
     Given the topic page, then the owner sorts by last activity, name or open tasks, and the field for excluding a topic suggests the existing topic names while typing.
+26. **Linked tasks and graph (D-047).**
+    Given two tasks in the list, when the owner draws a line from one task's dot to the other, then they are linked (undo offered) and both show it; the task page lists and removes links and adds one by picking a task. Given the graph page, then linked open tasks are shown as a graph; finished tasks, topics as nodes and unlinked tasks can be switched on; clicking a line removes the link.
 
 ## Out of scope
 

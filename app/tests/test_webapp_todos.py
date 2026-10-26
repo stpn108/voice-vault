@@ -590,3 +590,41 @@ def test_d044_people_page_excludes_and_allows_a_name(client, make_todo):
     todo = make_todo(title="Other")
     assert 'value="Anna"' not in client.get(f"/todos/{todo}").text.split('id="known-people"')[1].split("</datalist>")[0]
     assert post(client, "/admin/people/exclude", name="Anna", excluded="0").headers["location"] == "/admin/people?done=allowed"
+
+
+# --- links and graph (D-047) ---------------------------------------------------------------------
+def test_d047_line_drawn_in_the_list_links_two_tasks(client, make_todo):
+    a, b = make_todo(title="Alpha"), make_todo(title="Beta")
+    html = client.get("/todos").text
+    assert 'class="link-handle"' in html and '<script src="/static/links.js" defer></script>' in html
+    body = client.post("/todos/links", data={"csrf": webapp.csrf_token(), "a": a, "b": str(b)},
+                       headers={"Accept": "application/json"}).json()
+    assert body == {"ok": True, "created": True}
+    assert "🔗 1" in client.get("/todos").text
+    detail = client.get(f"/todos/{a}").text
+    assert 'id="links"' in detail and f'href="/todos/{b}"' in detail
+
+
+def test_d047_task_page_links_by_pick_and_unlinks(client, make_todo):
+    a, b = make_todo(title="Alpha"), make_todo(title="Beta")
+    assert f'<option value="#{b} Beta">' in client.get(f"/todos/{a}").text
+    assert post(client, "/todos/links", a=a, b=f"#{b} Beta", back="detail").headers["location"] == f"/todos/{a}"
+    assert post(client, "/todos/links/remove", a=a, b=str(b), back="detail").status_code == 303
+    assert "Noch keine Verknüpfung" in client.get(f"/todos/{a}").text
+
+
+@pytest.mark.parametrize("data, status", [({"b": "nonsense"}, 400), ({"b": "999"}, 404), ({"csrf": "bad", "b": "2"}, 403)])
+def test_d047_bad_link_requests(client, make_todo, data, status):
+    a = make_todo(title="Alpha")
+    make_todo(title="Beta")
+    assert post(client, "/todos/links", a=a, **data).status_code == status
+
+
+def test_d047_graph_page_renders_with_toggles_and_local_scripts(client, make_todo):
+    a, b = make_todo(title="Alpha"), make_todo(title="Beta")
+    assert "Noch keine Verknüpfungen" in client.get("/todos/graph").text
+    post(client, "/todos/links", a=a, b=str(b))
+    html = client.get("/todos/graph?done=1&topics=1&all=0").text
+    assert 'id="graph-data"' in html and "/static/vendor/cytoscape-3.30.2.min.js" in html
+    assert 'href="/todos/graph?done=0&amp;topics=1&amp;all=0"' in html
+    assert client.get("/static/graph.js").status_code == 200
