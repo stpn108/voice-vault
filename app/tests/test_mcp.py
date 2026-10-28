@@ -203,7 +203,7 @@ def test_tools_list_has_no_delete_tool_and_marks_write_tools(client):
     names = [t["name"] for t in tools]
     assert names[:2] == ["list_recordings", "get_recording"]
     writers = {"add_todo", "update_todo", "add_topic_note", "mark_recording_analyzed", "save_digest",
-               "update_person", "set_person_topic"}
+               "update_person", "set_person_topic", "suggest_spelling"}
     assert writers <= set(names)
     for tool in tools:
         assert not any(word in tool["name"] for word in ("delete", "remove", "discard", "trash"))

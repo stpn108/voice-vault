@@ -177,4 +177,9 @@ def call_tool(session: Session, name: str, arguments: object, now: dt.datetime, 
     unknown = set(arguments) - set(next(tool for tool in TOOLS if tool["name"] == name)["inputSchema"]["properties"])
     if unknown:
         raise ToolArgumentError(f"unknown argument(s): {', '.join(sorted(unknown))}")
-    return handler(session, arguments, now, stability_minutes)
+    arguments, fixer = mcp_todo_tools.apply_glossary(session, name, arguments)
+    result = handler(session, arguments, now, stability_minutes)
+    note = fixer.report() if fixer else ""
+    if note and not result.get("isError"):
+        result["content"][0]["text"] += "\n" + note
+    return result

@@ -13,6 +13,7 @@ from typing import Optional
 from sqlalchemy import and_, exists, or_, select
 from sqlalchemy.orm import Session
 
+import glossary_service as glossary
 from database import Recording, Segment, SyncRequest
 from utils import as_utc
 
@@ -130,15 +131,12 @@ def list_recordings(session: Session, now: dt.datetime, stability_minutes: int,
         stmt = stmt.where(Recording.started_at < as_utc(until))
     query = query.strip()
     if query:
-        pattern = _like_pattern(query)
-        in_segments = exists().where(
-            Segment.recording_id == Recording.id, Segment.text.ilike(pattern, escape="\\")
-        )
-        stmt = stmt.where(or_(
-            Recording.title.ilike(pattern, escape="\\"),
-            Recording.summary.ilike(pattern, escape="\\"),
-            in_segments,
-        ))
+        conditions = []
+        for spelling in glossary.variants(session, query):  # every spelling of a known term (D-062)
+            pattern = _like_pattern(spelling)
+            conditions += [Recording.title.ilike(pattern, escape="\\"), Recording.summary.ilike(pattern, escape="\\"),
+                           exists().where(Segment.recording_id == Recording.id, Segment.text.ilike(pattern, escape="\\"))]
+        stmt = stmt.where(or_(*conditions))
     if cursor:
         started_at, rec_id = decode_cursor(cursor)
         stmt = stmt.where(or_(

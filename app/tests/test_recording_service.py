@@ -253,3 +253,12 @@ def test_d045_a_request_nobody_picked_up_is_given_up_after_ten_minutes(db_sessio
     later = now + dt.timedelta(minutes=11)
     assert rs.sync_state(db_session, later)["state"] == "idle"
     assert rs.request_sync(db_session, later) is True
+
+
+def test_d062_search_finds_every_spelling_of_a_glossary_term(db_session):
+    import glossary_admin
+    add_recording(db_session, 1, summary="Termin mit Glynkania zum SOC")
+    add_recording(db_session, 2, summary="Nichts davon")
+    glossary_admin.add_term(db_session, "Glycania", "", "Glynkania")
+    page = svc.list_recordings(db_session, NOW, STABILITY, query="glycania")
+    assert [r.title for r in page.rows] == ["Title 1"]

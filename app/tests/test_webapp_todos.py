@@ -771,3 +771,41 @@ def test_d060_from_waiting_the_breadcrumb_leads_back_to_waiting(client, make_tod
     assert 'href="/person?name=Jochen%20Rill&amp;from=waiting">Jochen Rill</a>' in crumbs
     plain = client.get("/person?name=Jochen%20Rill").text
     assert "Zusagen an mich</a>" not in plain[plain.index('class="crumbs"'):plain.index("</nav>")]
+
+
+def test_d062_owner_edit_learns_marks_ambiguous_and_clarifies(client, make_todo, session_factory):
+    import glossary_admin
+    from database import GlossarySuggestion
+    with session_factory() as s:
+        glossary_admin.add_term(s, "Stefan Zimmermann", "", "Stefan")
+        glossary_admin.add_term(s, "Stephan Simmang", "", "Stefan")
+    todo = make_todo(title="Mit Stefan über Glucania reden", people=["Stefan"])
+    assert '>Stefan?</span>' in client.get("/todos").text
+    page = client.get(f"/todos/{todo}").text
+    assert 'action="/todos/%d/clarify"' % todo in page and 'value="Stephan Simmang"' in page
+    response = post(client, f"/todos/{todo}/clarify", word="Stefan", choice="Stephan Simmang")
+    assert response.status_code == 303
+    with session_factory() as s:
+        row = svc.get_todo(s, now_utc(), todo)[0]
+        assert row.title == "Mit Stephan Simmang über Glucania reden" and row.people == ["Stephan Simmang"]
+    assert post(client, f"/todos/{todo}/clarify", word="Stefan", choice="Nobody").status_code == 400
+    post(client, f"/todos/{todo}", title="Mit Stephan Simmang über Glycania reden", detail="", priority="3", status="open",
+         people="Stephan Simmang")
+    with session_factory() as s:
+        assert [(g.wrong, g.right) for g in s.scalars(select(GlossarySuggestion))] == [("Glucania", "Glycania")]
+    html = client.get("/admin/glossary").text
+    assert "Glucania" in html and "Glycania" in html and "aus Deiner Korrektur" in html
+
+
+def test_d062_admin_glossary_accepts_and_adds_terms(client, session_factory):
+    import glossary_service
+    from database import GlossarySuggestion
+    with session_factory() as s:
+        glossary_service.suggest(s, "Glucania", "Glycania", source="claude")
+        sid = s.scalars(select(GlossarySuggestion)).one().id
+    assert post(client, "/admin/glossary/suggestion", suggestion_id=sid, decision="accept").headers["location"] == \
+        "/admin/glossary?done=accepted"
+    assert post(client, "/admin/glossary/term", canonical="Wiz", aliases="Wiss, Whiz").status_code == 303
+    with session_factory() as s:
+        assert glossary_service.mapping(s)["whiz"] == ["Wiz"] and glossary_service.mapping(s)["glucania"] == ["Glycania"]
+    assert post(client, "/admin/glossary/term", canonical="x").status_code == 400

@@ -141,6 +141,36 @@ class PersonMapNode(Base):
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class GlossaryTerm(Base):
+    """The right spelling of a name or term (D-062), with an optional hint for telling it apart."""
+    __tablename__ = "glossary_terms"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    canonical: Mapped[str] = mapped_column(String(120), unique=True)
+    hint: Mapped[str] = mapped_column(String(300), default="")
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class GlossaryAlias(Base):
+    """A known misspelling of a term; the same misspelling may belong to several terms (then it is ambiguous)."""
+    __tablename__ = "glossary_aliases"
+    __table_args__ = (UniqueConstraint("term_id", "alias"),)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    term_id: Mapped[int] = mapped_column(ForeignKey("glossary_terms.id", ondelete="CASCADE"))
+    alias: Mapped[str] = mapped_column(String(120))
+
+
+class GlossarySuggestion(Base):
+    """A spelling correction waiting for the owner (status "open") or turned down ("rejected")."""
+    __tablename__ = "glossary_suggestions"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    wrong: Mapped[str] = mapped_column(String(120))
+    right: Mapped[str] = mapped_column(String(120))
+    source: Mapped[str] = mapped_column(String(40), default="")
+    hint: Mapped[str] = mapped_column(String(300), default="")
+    status: Mapped[str] = mapped_column(String(10), default="open")
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class PersonTopicHidden(Base):
     """The owner took this topic off this person (D-059); only the pair is stored, nothing else changes."""
     __tablename__ = "person_topic_hidden"

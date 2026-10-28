@@ -257,3 +257,19 @@ def test_d057_claude_cannot_profile_an_excluded_person(client, session_factory):
         people_admin.set_person_excluded(s, "Secret Person", True)
     assert is_error(call(client, "update_person", {"name": "Secret Person", "role": "x"}))
     assert is_error(call(client, "get_person", {"name": "Secret Person"}))
+
+
+def test_d062_claude_writes_get_the_glossary_and_hear_about_ambiguous_names(client, session_factory):
+    import glossary_admin
+    with session_factory() as s:
+        glossary_admin.add_term(s, "Glycania", "", "Glynkania")
+        glossary_admin.add_term(s, "Stefan Zimmermann", "", "Stefan")
+        glossary_admin.add_term(s, "Stephan Simmang", "", "Stefan")
+    response = call(client, "add_todo", {"title": "Vertrag mit Glynkania mit Stefan klären", "people": ["Stefan"]})
+    text = text_of(response)
+    assert "'Glynkania' -> 'Glycania'" in text and "Ambiguous" in text and "Stephan Simmang" in text
+    with session_factory() as s:
+        todo = s.scalars(select(Todo)).one()
+        assert todo.title == "Vertrag mit Glycania mit Stefan klären" and todo.people == "Stefan"
+    assert "Glycania | misspellings: Glynkania" in text_of(call(client, "get_glossary"))
+    assert "Suggested" in text_of(call(client, "suggest_spelling", {"wrong": "Wiss", "right": "Wiz"}))

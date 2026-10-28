@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}{{ t("ui_admin_glossary") }}{% endblock %}
+{% block crumbs %}
+<nav class="crumbs" aria-label="breadcrumb"><a href="/admin">{{ t("ui_nav_admin") }}</a><span class="sep">/</span><span aria-current="page">{{ t("ui_admin_glossary") }}</span></nav>
+{% endblock %}
+{% block content %}
+<div class="head"><h1>{{ t("ui_admin_glossary") }}</h1></div>
+{% if done %}<p class="notice ok">{{ t("ui_glossary_done_" ~ done) }}</p>{% endif %}
+<p class="muted" style="font-size:.9rem;margin-top:-.4rem">{{ t("ui_glossary_intro") }}</p>
+
+<h2>{{ t("ui_glossary_suggestions") }}</h2>
+{% if suggestions %}
+<ul class="list">
+  {% for s in suggestions %}
+  <li><div class="item" style="cursor:default;flex-wrap:wrap;gap:.6rem">
+    <div class="item-main">
+      <div class="item-title"><span class="gl-wrong">{{ s.wrong }}</span> → <strong>{{ s.right }}</strong></div>
+      <div class="item-meta">{{ t("ui_glossary_from_" ~ ("claude" if s.source == "claude" else "owner")) }}{% if s.source.startswith("task:") %} · <a href="/todos/{{ s.source[5:] }}">{{ t("ui_col_task") }} {{ s.source[5:] }}</a>{% endif %}{% if s.hint %} · {{ s.hint }}{% endif %}</div>
+    </div>
+    <form class="inline" method="post" action="/admin/glossary/suggestion" style="display:flex;gap:.4rem">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="suggestion_id" value="{{ s.id }}">
+      <button class="small" type="submit" name="decision" value="accept">{{ t("ui_glossary_accept") }}</button>
+      <button class="small" type="submit" name="decision" value="reject">{{ t("ui_glossary_reject") }}</button>
+    </form>
+  </div></li>
+  {% endfor %}
+</ul>
+{% else %}<div class="card empty">{{ t("ui_glossary_no_suggestions") }}</div>{% endif %}
+
+<h2>{{ t("ui_glossary_terms") }}</h2>
+<form class="card quick" method="post" action="/admin/glossary/term">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <input type="text" name="canonical" maxlength="120" required placeholder="{{ t('ui_glossary_canonical') }}" style="flex:1 1 12rem">
+  <input type="text" name="aliases" maxlength="2000" placeholder="{{ t('ui_glossary_aliases') }}" style="flex:2 1 16rem">
+  <input type="text" name="hint" maxlength="300" placeholder="{{ t('ui_glossary_hint') }}" style="flex:2 1 16rem">
+  <button type="submit">{{ t("ui_glossary_add") }}</button>
+</form>
+{% if terms %}
+<ul class="list" style="margin-top:.8rem">
+  {% for term, aliases in terms %}
+  <li><div class="item" style="cursor:default;flex-direction:column;align-items:stretch;gap:.5rem">
+    <form method="post" action="/admin/glossary/term/{{ term.id }}" class="gl-row">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="text" name="canonical" value="{{ term.canonical }}" maxlength="120" required aria-label="{{ t('ui_glossary_canonical') }}" class="gl-canonical">
+      <input type="text" name="hint" value="{{ term.hint }}" maxlength="300" placeholder="{{ t('ui_glossary_hint') }}" aria-label="{{ t('ui_glossary_hint') }}" style="flex:2 1 14rem">
+      <input type="text" name="add_alias" maxlength="2000" placeholder="{{ t('ui_glossary_more_aliases') }}" aria-label="{{ t('ui_glossary_more_aliases') }}" style="flex:1 1 12rem">
+      <button class="small" type="submit">{{ t("ui_save") }}</button>
+    </form>
+    <div class="gl-row">
+      {% for alias in aliases %}
+      <form class="inline" method="post" action="/admin/glossary/term/{{ term.id }}/alias/remove">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="alias" value="{{ alias }}">
+        <button type="submit" class="gl-alias{% if alias.lower() in ambiguous %} unclear{% endif %}" title="{% if alias.lower() in ambiguous %}{{ t('ui_glossary_ambiguous', names=ambiguous[alias.lower()] | join(', ')) }} · {% endif %}{{ t('ui_glossary_remove_alias') }}">{{ alias }} ✕</button>
+      </form>
+      {% else %}<span class="muted" style="font-size:.85rem">{{ t("ui_glossary_no_aliases") }}</span>{% endfor %}
+      <form class="inline" method="post" action="/admin/glossary/term/{{ term.id }}/delete" data-confirm="{{ t('ui_glossary_delete_confirm', term=term.canonical) }}" style="margin-left:auto">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="small danger" type="submit">{{ t("ui_glossary_delete") }}</button>
+      </form>
+    </div>
+  </div></li>
+  {% endfor %}
+</ul>
+{% else %}<div class="card empty" style="margin-top:.8rem">{{ t("ui_glossary_empty") }}</div>{% endif %}
+<script src="/static/confirm.js" defer></script>
+{% endblock %}

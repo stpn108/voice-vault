@@ -45,6 +45,7 @@
     </form>
     <div class="task-main">
       <a class="task-title" href="/todos/{{ row.id }}{{ '?person=' ~ person | urlencode if person else '' }}">{{ row.title }}</a>
+      {% for word, names in unclear[row.id].items() %}<span class="pill unclear" title="{{ t('ui_glossary_ambiguous', names=names | join(', ')) }}">{{ word }}?</span>{% endfor %}
       {# Layout (D-037): title / status, topic, age (then due date, priority) / people #}
       <div class="task-meta">
         {% for s in statuses %}<span class="pill status-chip s-{{ s }}">{{ t("todo_status_" ~ s) }}</span>{% endfor %}

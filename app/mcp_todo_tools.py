@@ -3,6 +3,7 @@
 These tools write, but only to the task tables and the analyzed flag. Every change is
 attributed to "claude" and logged by todo_service. There is deliberately no delete tool.
 """
+import glossary_service as glossary
 import person_service as people
 import todo_service as svc
 from mcp_args import ToolArgumentError, bool_arg, enum_arg, int_arg, str_arg, text_result
@@ -414,7 +415,72 @@ def set_person_topic_tool(session, arguments, now, stability_minutes):
                                   text_result(f"Saved where '{topic.strip()}' stands with {name.strip()}."))[1])
 
 
+TOOLS += [
+    {
+        "name": "get_glossary",
+        "description": "The owner's glossary of spellings: the right spelling of names and terms, their known "
+                       "misspellings and a hint for telling similar names apart. Read it before writing; write names "
+                       "and terms in the right spelling. Known misspellings in what you write are corrected "
+                       "automatically, and the answer of a write tool says what was corrected or is ambiguous.",
+        "inputSchema": _props(),
+        "annotations": READ,
+    },
+    {
+        "name": "suggest_spelling",
+        "description": "Suggest a spelling correction to the owner, for example when a recording spells the same "
+                       "name or term in different ways. wrong: the misheard form; right: the right spelling; hint: "
+                       "optional, what it is (\"vendor for the SOC\", \"CEO of X\"). The owner confirms or "
+                       "turns it down; nothing changes before that.",
+        "inputSchema": {**_props(
+            wrong={"type": "string", "maxLength": glossary.TERM_MAX},
+            right={"type": "string", "maxLength": glossary.TERM_MAX},
+            hint={"type": "string", "maxLength": glossary.HINT_MAX}), "required": ["wrong", "right"]},
+        "annotations": WRITE,
+    },
+]
+
+
+def get_glossary_tool(session, arguments, now, stability_minutes):
+    return text_result(glossary.glossary_text(session))
+
+
+def suggest_spelling_tool(session, arguments, now, stability_minutes):
+    wrong = str_arg(arguments, "wrong", glossary.TERM_MAX)
+    right = str_arg(arguments, "right", glossary.TERM_MAX)
+    hint = str_arg(arguments, "hint", glossary.HINT_MAX)
+    try:
+        queued = glossary.suggest(session, wrong, right, source="claude", hint=hint)
+    except glossary.GlossaryError as exc:
+        return text_result(str(exc), is_error=True)
+    return text_result("Suggested to the owner." if queued else "Already known, queued or turned down; nothing to do.")
+
+
+# Text arguments of the write tools that get the glossary's spellings before they are saved (D-062).
+SPELLED = {
+    "add_todo": ("title", "detail", "note", "people"), "update_todo": ("title", "detail", "note", "people"),
+    "add_topic_note": ("note",), "save_digest": ("body",),
+    "update_person": ("name", "role", "current_work", "next_points"), "set_person_topic": ("name", "note"),
+}
+
+
+def apply_glossary(session, name: str, arguments: dict):
+    """(arguments with corrected spellings, Fixer or None)."""
+    fields = SPELLED.get(name)
+    if not fields:
+        return arguments, None
+    fixer = glossary.Fixer(session)
+    fixed = dict(arguments)
+    for field in fields:
+        value = fixed.get(field)
+        if isinstance(value, list):
+            fixed[field] = [fixer.fix(v) if isinstance(v, str) else v for v in value]
+        elif isinstance(value, str):
+            fixed[field] = fixer.fix(value)
+    return fixed, fixer
+
+
 HANDLERS = {
+    "get_glossary": get_glossary_tool, "suggest_spelling": suggest_spelling_tool,
     "get_person": get_person_tool, "update_person": update_person_tool, "set_person_topic": set_person_topic_tool,
     "list_todos": list_todos_tool, "add_todo": add_todo_tool, "update_todo": update_todo_tool,
     "list_topics": list_topics_tool, "get_topic": get_topic_tool, "add_topic_note": add_topic_note_tool,

@@ -32,6 +32,8 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 import recording_service as svc
 import todo_service as todos
 import briefing_service
+import glossary_admin
+import glossary_service as glossary
 import people_admin
 import person_service
 import stats_service
@@ -306,7 +308,9 @@ def todo_list(request: Request, status: str = Query("open", max_length=12), topi
         for row in todos.list_todos(session, now_utc(), kind="waiting", limit=todos.LIST_LIMIT_MAX)[0]:
             owed.update(n for n in row.people if n.lower() not in hidden)
     shown_people = {row.id: [n for n in row.people if n.lower() not in hidden] for row in rows}
-    return render(request, cfg, "todos.html", rows=rows, truncated=truncated, status=status, topic=topic, person=person,
+    known = glossary.mapping(session)  # titles with a name that could mean several people get a mark (D-062)
+    unclear = {row.id: glossary.ambiguous_words(known, "\n".join([row.title] + shown_people[row.id])) for row in rows}
+    return render(request, cfg, "todos.html", rows=rows, unclear=unclear, truncated=truncated, status=status, topic=topic, person=person,
                   kind=kind, kinds=todos.KINDS, kind_counts={k: todos.counts(session, k)["open"] for k in todos.KINDS},
                   sort=sort, sorts=todos.SORTS, today=now_utc().astimezone(LOCAL_TZ).date(),
                   counts=todos.counts(session, kind), statuses=statuses, priorities=todos.PRIORITIES,
@@ -415,7 +419,30 @@ def todo_detail(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX
     return render(request, cfg, "todo.html", row=row, events=events, undoable=undoable, candidates=candidates, via_person=via_person,
                   via_waiting=came_from == "waiting", linked=linked, link_targets=targets,
                   topic_candidates=topic_candidates[:TOPIC_TAGS], known_topics=allowed,
-                  speakers=speakers, known=todos.known_people(session), statuses=todos.STATUSES, priorities=todos.PRIORITIES)
+                  speakers=speakers, known=todos.known_people(session), statuses=todos.STATUSES, priorities=todos.PRIORITIES,
+                  unclear=glossary.ambiguous_words(glossary.mapping(session), "\n".join([row.title, row.detail] + row.people)))
+
+
+@app.post("/todos/{todo_id}/clarify")
+def todo_clarify(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX_ID)],
+                 word: str = Form(..., max_length=glossary.TERM_MAX), choice: str = Form(..., max_length=glossary.TERM_MAX),
+                 csrf: str = Form(""), session: Session = Depends(get_session)):
+    """Pick who or what an ambiguous word means (D-062): replaced in title, description and people, logged."""
+    require_csrf(request, csrf)
+    found = todos.get_todo(session, now_utc(), todo_id)
+    if found is None:
+        raise HTTPException(status_code=404, detail="task not found")
+    row = found[0]
+    if choice not in glossary.mapping(session).get(" ".join(word.split()).lower(), []):
+        raise HTTPException(status_code=400, detail="not a candidate for this word")
+    people = [choice if p.lower() == word.lower() else glossary.resolve(session, p, word, choice) for p in row.people]
+    try:
+        todos.update_todo(session, now_utc(), todo_id, actor="owner", note=f"'{word}' -> '{choice}'",
+                          title=glossary.resolve(session, row.title, word, choice),
+                          detail=glossary.resolve(session, row.detail, word, choice), people=people)
+    except todos.TodoError as exc:
+        raise _todo_error(exc)
+    return RedirectResponse(f"/todos/{todo_id}", status_code=303)
 
 
 @app.post("/todos/{todo_id}")
@@ -428,6 +455,7 @@ def todo_edit(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX_I
     require_csrf(request, csrf)
     names = people + people_more.split(",")
     topic = topic_more.strip() or topic
+    before = todos.get_todo(session, now_utc(), todo_id)
     try:
         todos.update_todo(session, now_utc(), todo_id, actor="owner", title=title, detail=detail,
                           priority=priority, due=due, topic=topic, status=status, people=names)
@@ -435,6 +463,9 @@ def todo_edit(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX_I
         if "no task" in str(exc):
             raise HTTPException(status_code=404, detail=str(exc))
         raise _todo_error(exc)
+    if before is not None:  # the owner's corrections become spelling suggestions (D-062)
+        glossary.learn(session, before[0].title, title, source=f"task:{todo_id}")
+        glossary.learn(session, before[0].detail, detail, source=f"task:{todo_id}")
     if "application/json" in request.headers.get("accept", ""):
         # Saved in the background from the task page (D-032); the header reminder follows the status.
         return JSONResponse({"ok": True, "id": todo_id, "status": status, "wip": todos.counts(session)["in_progress"],
@@ -541,18 +572,23 @@ def person_profile_save(request: Request, name: str = Form(..., max_length=todos
     """One field of the living profile, saved when the owner leaves it (D-057). `field` is a profile field
     or "topic:<id>" for the note on a shared topic."""
     require_csrf(request, csrf)
+    old = ""
     try:
         if field in ("role", "current_work", "next_points"):
+            found = person_service.profile(session, name)
+            old = getattr(found, field) if found else ""
             person_service.update_profile(session, now_utc(), name, actor="owner", **{field: value})
         elif field.startswith("topic:") and field[6:].isdigit():
             topic = session.get(Topic, int(field[6:]))
             if topic is None:
                 raise HTTPException(status_code=404, detail="unknown topic")
+            old = next((n.note for t, n in person_service.clusters(session, name) if t.id == topic.id), "")
             person_service.set_topic_note(session, now_utc(), name, topic.name, value, actor="owner")
         else:
             raise HTTPException(status_code=400, detail="unknown field")
     except (person_service.PersonError, todos.TodoError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+    glossary.learn(session, old, value, source="person")
     return JSONResponse({"ok": True})
 
 
@@ -597,8 +633,71 @@ def stats_page(request: Request, session: Session = Depends(get_session), cfg: C
 # under /admin/..., its template and strings.
 ADMIN_TOOLS = [
     {"path": "/admin/people", "title": "ui_admin_people", "text": "ui_admin_people_text"},
+    {"path": "/admin/glossary", "title": "ui_admin_glossary", "text": "ui_admin_glossary_text"},
     {"path": "/cleanup", "title": "ui_cleanup", "text": "ui_admin_cleanup_text"},
 ]
+GLOSSARY_MESSAGES = ("added", "accepted", "rejected", "saved", "deleted")
+
+
+@app.get("/admin/glossary", response_class=HTMLResponse)
+def admin_glossary(request: Request, done: str = Query("", max_length=10), session: Session = Depends(get_session),
+                   cfg: Config = Depends(get_config)):
+    """Spellings (D-062): suggestions from the owner's corrections and from Claude, and the confirmed terms."""
+    return render(request, cfg, "glossary.html", suggestions=glossary_admin.open_suggestions(session),
+                  terms=glossary.terms(session), ambiguous=glossary_admin.ambiguous_spellings(session),
+                  done=done if done in GLOSSARY_MESSAGES else "")
+
+
+def _glossary_action(request: Request, csrf: str, action, done: str):
+    require_csrf(request, csrf)
+    try:
+        action()
+    except glossary.GlossaryError as exc:
+        raise HTTPException(status_code=404 if "unknown" in str(exc) else 400, detail=str(exc))
+    return RedirectResponse(f"/admin/glossary?done={done}", status_code=303)
+
+
+@app.post("/admin/glossary/suggestion")
+def admin_glossary_suggestion(request: Request, suggestion_id: int = Form(..., ge=1, le=MAX_ID),
+                              decision: str = Form(..., max_length=10), csrf: str = Form(""),
+                              session: Session = Depends(get_session)):
+    if decision not in ("accept", "reject"):
+        raise HTTPException(status_code=400, detail="unknown decision")
+    action = glossary_admin.accept if decision == "accept" else glossary_admin.reject
+    return _glossary_action(request, csrf, lambda: action(session, suggestion_id),
+                            "accepted" if decision == "accept" else "rejected")
+
+
+@app.post("/admin/glossary/term")
+def admin_glossary_term(request: Request, canonical: str = Form(..., max_length=glossary.TERM_MAX),
+                        aliases: str = Form("", max_length=2000), hint: str = Form("", max_length=glossary.HINT_MAX),
+                        csrf: str = Form(""), session: Session = Depends(get_session)):
+    return _glossary_action(request, csrf, lambda: glossary_admin.add_term(session, canonical, hint, aliases), "added")
+
+
+@app.post("/admin/glossary/term/{term_id}")
+def admin_glossary_term_edit(request: Request, term_id: Annotated[int, PathParam(ge=1, le=MAX_ID)],
+                             canonical: str = Form(..., max_length=glossary.TERM_MAX),
+                             hint: str = Form("", max_length=glossary.HINT_MAX), add_alias: str = Form("", max_length=2000),
+                             csrf: str = Form(""), session: Session = Depends(get_session)):
+    def run():
+        glossary_admin.update_term(session, term_id, canonical, hint)
+        for alias in [a for a in add_alias.split(",") if a.strip()]:
+            glossary_admin.add_alias(session, term_id, alias)
+    return _glossary_action(request, csrf, run, "saved")
+
+
+@app.post("/admin/glossary/term/{term_id}/alias/remove")
+def admin_glossary_alias_remove(request: Request, term_id: Annotated[int, PathParam(ge=1, le=MAX_ID)],
+                                alias: str = Form(..., max_length=glossary.TERM_MAX), csrf: str = Form(""),
+                                session: Session = Depends(get_session)):
+    return _glossary_action(request, csrf, lambda: glossary_admin.remove_alias(session, term_id, alias), "saved")
+
+
+@app.post("/admin/glossary/term/{term_id}/delete")
+def admin_glossary_term_delete(request: Request, term_id: Annotated[int, PathParam(ge=1, le=MAX_ID)],
+                               csrf: str = Form(""), session: Session = Depends(get_session)):
+    return _glossary_action(request, csrf, lambda: glossary_admin.delete_term(session, term_id), "deleted")
 PEOPLE_MESSAGES = ("renamed", "deleted", "assigned", "excluded", "allowed", "restored")
 
 
