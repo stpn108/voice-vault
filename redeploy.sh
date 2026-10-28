@@ -43,7 +43,7 @@ REQ_HASH_SAVED=$(cat "$REQ_HASH_FILE" 2>/dev/null || echo "")
 
 if [ "$REQ_HASH_CURRENT" != "$REQ_HASH_SAVED" ]; then
     warn "   requirements.txt changed -> rebuilding app-tests image..."
-    docker compose build app-tests
+    docker compose build --no-cache app-tests
     echo "$REQ_HASH_CURRENT" > "$REQ_HASH_FILE"
     REBUILT=1
 fi
