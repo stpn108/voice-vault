@@ -726,3 +726,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner request: misheard terms and names ("Stefan" vs "Stephan") have to be corrected by hand again and again. Correcting the output instead of the transcripts keeps the source intact and the changes small and checkable; learning from the owner's own edits fills the glossary without extra work. |
 | **Rejected alternatives** | (A) running a dictionary over all transcripts: wrong replacements go unnoticed and the original is lost; (B) taking corrections into the glossary automatically: every content change would become a rule; (C) letting Claude resolve ambiguous names on its own: a confident wrong name is worse than an open one; (D) fuzzy matching on write: replaces words nobody listed. |
 | **Status** | **FINAL** |
+
+### D-063: Security audit 2026-10 dependency bump; vulnerable transitive packages are pinned (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-10-28 |
+| **Decision** | Following the callisto security audit (stpn108/callisto-services#5): `python-multipart` 0.0.20 → 0.0.31, `pytest` 8.3.4 → 9.0.3 (with `pytest-asyncio` 0.25.0 → 1.3.0, the first release that allows pytest 9). `anyio` (4.14.2) and `certifi` (2026.10.19) come in through httpx and Starlette and are now pinned in `requirements.txt` as well, so an image rebuild cannot keep or fall back to a version with known advisories. Verified with `pip-audit -r app/requirements.txt` (no findings) and the full test suite. |
+| **In plain words** | Libraries with known security holes are replaced by fixed versions. Nothing changes in how the app works. |
+| **Reasoning** | The audit found the vulnerable versions in the running image of the public MCP service. Transitive packages left unpinned resolve to whatever the image build cached, which is how the old anyio and certifi stayed in place. |
+| **Rejected alternatives** | (A) a separate constraints file for transitive packages: a second file for two lines; (B) leaving anyio and certifi unpinned and relying on a rebuild: the Docker layer cache keeps the old versions as long as `requirements.txt` is unchanged. |
+| **Status** | **FINAL** |
