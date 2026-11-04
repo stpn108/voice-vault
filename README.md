@@ -62,8 +62,9 @@ Requirements: `requirements/`. Decisions: `DECISIONS.md` (D-001 to D-004).
   Plaud may rotate the refresh token on every renewal, so the pair is kept in
   the database. Do not log out of web.plaud.ai in the browser session you took
   the tokens from; that probably invalidates the refresh token. If the
-  refresh token dies (log: "token refresh" error, mail if SMTP is set), paste
-  a new refresh token into `.env`: a changed value replaces the stored pair.
+  refresh token dies (log: "token refresh" error, mail if SMTP is set, reminder in the UI), paste
+  a new refresh token under "Verwaltung → Plaud-Zugang" (`/admin/plaud`, no restart, D-066). A changed value
+  in `.env` still replaces the stored pair; `PLAUD_REFRESH_TOKEN` there is only needed for the first start.
 - The database dump (`volumes/backups/`) contains the token pair. Protect the
   backup directory like `.env`.
 - `DATABASE_URL` needs the driver prefix `postgresql+psycopg://`.

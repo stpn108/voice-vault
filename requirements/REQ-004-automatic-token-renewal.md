@@ -39,6 +39,8 @@ The owner pastes the access token and the refresh token once. From then on the b
    Given a renewal answers with a region redirect, then it is followed once and only to a `*.plaud.ai` host; the refresh cookie is never sent to any other host.
 9. **Reminder in the UI (D-064).**
     Given the refresh token (or, without one, the access token) has fewer than `TOKEN_WARN_DAYS` days left or has expired, when the owner opens any page, then a dialog says until when it is valid and how to renew it; "Später erinnern" or Esc hides it for 8 hours in that browser, and a new token removes it.
+10. **Replace the refresh token in the UI (D-066).**
+    Given "Verwaltung → Plaud-Zugang", then it shows whether a refresh token is stored and until when it and the access token are valid; when the owner pastes a new refresh token, then it is checked (readable, not expired), stored with an empty access token, an import is requested, and the job uses it from its next cycle on without a restart; the page never shows a token. Every renewal logs the names (never values) of the cookies and body fields Plaud returned, to settle whether Plaud rotates the refresh token.
 
 ## Out of scope
 

@@ -652,10 +652,44 @@ def stats_page(request: Request, session: Session = Depends(get_session), cfg: C
 # under /admin/..., its template and strings.
 ADMIN_TOOLS = [
     {"path": "/admin/people", "title": "ui_admin_people", "text": "ui_admin_people_text"},
+    {"path": "/admin/plaud", "title": "ui_admin_plaud", "text": "ui_admin_plaud_text"},
     {"path": "/admin/glossary", "title": "ui_admin_glossary", "text": "ui_admin_glossary_text"},
     {"path": "/cleanup", "title": "ui_cleanup", "text": "ui_admin_cleanup_text"},
 ]
 GLOSSARY_MESSAGES = ("added", "accepted", "rejected", "saved", "deleted")
+
+
+def _expiry(token):
+    exp = plaud_auth.token_expiry(token) if token else None
+    return dt.datetime.fromtimestamp(exp, tz=dt.timezone.utc) if exp is not None else None
+
+
+@app.get("/admin/plaud", response_class=HTMLResponse)
+def admin_plaud(request: Request, done: str = Query("", max_length=10), error: str = Query("", max_length=20),
+                session: Session = Depends(get_session), cfg: Config = Depends(get_config)):
+    """Plaud access (D-066): until when the stored tokens are valid, and a field for a new refresh token."""
+    row = session.get(PlaudSession, 1)
+    return render(request, cfg, "plaud.html", has_row=row is not None,
+                  has_refresh=bool(row and row.refresh_token), refresh_expiry=_expiry(row.refresh_token if row else ""),
+                  access_expiry=_expiry(row.access_token if row else ""), renewed_at=row.refreshed_at if row else None,
+                  env_seed=bool(cfg.plaud_refresh_token or cfg.plaud_token), now=now_utc(),
+                  done=done if done == "saved" else "", error=error if error in ("unreadable", "expired") else "")
+
+
+@app.post("/admin/plaud")
+def admin_plaud_save(request: Request, refresh_token: str = Form(..., max_length=8000), csrf: str = Form(""),
+                     session: Session = Depends(get_session), cfg: Config = Depends(get_config)):
+    require_csrf(request, csrf)
+    token = plaud_auth.clean_pasted_token(refresh_token)
+    exp = plaud_auth.token_expiry(token) if token else None
+    if exp is None:
+        return RedirectResponse("/admin/plaud?error=unreadable", status_code=303)
+    if exp <= now_utc().timestamp():
+        return RedirectResponse("/admin/plaud?error=expired", status_code=303)
+    plaud_auth.store_owner_refresh_token(session, token, plaud_auth.seed_fingerprint(cfg.plaud_token,
+                                                                                      cfg.plaud_refresh_token))
+    svc.request_sync(session, now_utc())  # the next cycle proves the token works
+    return RedirectResponse("/admin/plaud?done=saved", status_code=303)
 
 
 @app.get("/admin/glossary", response_class=HTMLResponse)

@@ -295,6 +295,9 @@
   .token-dialog h2 { margin: 0 0 .6rem; color: var(--danger); font-size: 1rem; letter-spacing: 0; text-transform: none; }
   .token-dialog ol { padding-left: 1.2rem; line-height: 1.5; }
   .token-dialog code { font-size: .85em; }
+  .plaud-facts { display: grid; grid-template-columns: max-content 1fr; gap: .35rem 1.2rem; margin: 0; }
+  .plaud-facts dt { color: var(--muted); } .plaud-facts dd { margin: 0; }
+  .danger-text { color: var(--danger); }
   .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: .8rem; }
   a.tile { display: block; padding: 1rem 1.1rem; text-decoration: none; color: var(--text); }
   a.tile:hover { border-color: var(--accent); } a.tile strong { display: block; margin-bottom: .3rem; } a.tile span { color: var(--muted); font-size: .9rem; }
@@ -372,7 +375,6 @@
     <li>{{ t("ui_token_step1") | safe }}</li>
     <li>{{ t("ui_token_step2") | safe }}</li>
     <li>{{ t("ui_token_step3") | safe }}</li>
-    <li>{{ t("ui_token_step4") | safe }}</li>
   </ol>
   <p class="muted" style="font-size:.85rem">{{ t("ui_token_secret") }}</p>
   <div style="text-align:right"><button type="button" data-token-later autofocus>{{ t("ui_token_later") }}</button></div>

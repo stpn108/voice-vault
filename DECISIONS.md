@@ -770,3 +770,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner noticed that logs vanish on every redeploy: `redeploy.sh` removes the containers, and `json-file` logs live with the container. The journal is already on the server, rotates by itself and needs no extra software. |
 | **Rejected alternatives** | (A) a log file in a volume: own rotation code and invisible to `docker compose logs`; (B) Loki/Grafana or a log service: another stack to run for one owner; (C) `local` driver: also removed with the container. |
 | **Status** | **FINAL** |
+
+### D-066: The owner replaces the Plaud refresh token in the UI (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-11-04 |
+| **Decision** | Amends D-005 and D-064. "Verwaltung → Plaud-Zugang" (`/admin/plaud`) shows until when the stored credential is valid and when it was last renewed, and takes a new refresh token (cookie `pld_urt`) in a password field. The value is checked (a readable JWT that has not expired; a pasted `pld_urt=` prefix and quotes are removed), then written to `plaud_sessions` with an empty access token, so the job fetches a fresh one with it; an import cycle is requested at once (D-045), which proves the token works. The page never shows a token, the log never contains one. The job reads the stored pair again at the start of every cycle, so no restart is needed. The stored row keeps the fingerprint of the current `.env` seed; `.env` therefore only wins again when its value is changed, as before. `PLAUD_REFRESH_TOKEN` in `.env` becomes optional; the reminder (D-064) and the daily mail point to the new page. |
+| **In plain words** | When the Plaud login runs out, you paste the new token on a page of the app. No server access, no restart. |
+| **Reasoning** | Owner request: changing `.env` and restarting the server for a token that has to be renewed regularly is cumbersome. The token already lives in the database (D-005); `.env` was only its first source. |
+| **Rejected alternatives** | (A) keeping `.env` as the only way: needs server access and a restart; (B) showing the stored token for checking: a secret on a page can be copied by anyone who sees the screen; (C) logging into Plaud from the app: would need the owner's Plaud credentials on the server. |
+| **Status** | **FINAL** |

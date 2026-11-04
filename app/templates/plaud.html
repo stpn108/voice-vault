@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}{{ t("ui_admin_plaud") }}{% endblock %}
+{% block crumbs %}
+<nav class="crumbs" aria-label="breadcrumb"><a href="/admin">{{ t("ui_nav_admin") }}</a><span class="sep">/</span><span aria-current="page">{{ t("ui_admin_plaud") }}</span></nav>
+{% endblock %}
+{% block content %}
+<div class="head"><h1>{{ t("ui_admin_plaud") }}</h1></div>
+{% if done %}<p class="notice ok">{{ t("ui_plaud_saved") }}</p>{% endif %}
+{% if error %}<p class="notice">{{ t("ui_plaud_error_" ~ error) }}</p>{% endif %}
+<section class="card" style="padding:1rem 1.1rem">
+  <dl class="plaud-facts">
+    <dt>{{ t("ui_plaud_refresh") }}</dt>
+    <dd>{% if not has_refresh %}<strong class="danger-text">{{ t("ui_plaud_none") }}</strong>
+        {% elif refresh_expiry %}{{ t("ui_plaud_valid_until", at=refresh_expiry | localtime) }}{% if refresh_expiry < now %} · <strong class="danger-text">{{ t("ui_plaud_expired") }}</strong>{% endif %}
+        {% else %}{{ t("ui_plaud_unknown") }}{% endif %}</dd>
+    <dt>{{ t("ui_plaud_access") }}</dt>
+    <dd>{% if access_expiry %}{{ t("ui_plaud_valid_until", at=access_expiry | localtime) }}{% else %}{{ t("ui_plaud_fetched_next") }}{% endif %}</dd>
+    <dt>{{ t("ui_plaud_renewed") }}</dt>
+    <dd>{{ renewed_at | localtime if renewed_at else "–" }}</dd>
+  </dl>
+  <p class="muted" style="font-size:.85rem;margin:.6rem 0 0">{{ t("ui_plaud_how_it_works") }}{% if env_seed %} {{ t("ui_plaud_env_seed") }}{% endif %}</p>
+</section>
+<h2>{{ t("ui_plaud_new") }}</h2>
+<form class="card" method="post" action="/admin/plaud" style="padding:1rem 1.1rem;display:grid;gap:.7rem">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <ol style="margin:0;padding-left:1.2rem;line-height:1.5">
+    <li>{{ t("ui_token_step1") | safe }}</li>
+    <li>{{ t("ui_token_step2") | safe }}</li>
+  </ol>
+  <input type="password" name="refresh_token" required maxlength="8000" autocomplete="off" spellcheck="false"
+         placeholder="{{ t('ui_plaud_paste') }}" aria-label="{{ t('ui_plaud_paste') }}">
+  <div><button type="submit">{{ t("ui_plaud_save") }}</button></div>
+  <p class="muted" style="font-size:.85rem;margin:0">{{ t("ui_token_secret") }}</p>
+</form>
+{% endblock %}

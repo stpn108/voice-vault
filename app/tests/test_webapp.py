@@ -390,4 +390,44 @@ def test_d064_pages_remind_when_the_plaud_token_runs_out(client, session_factory
     html = client.get("/todos").text
     assert ("data-token-dialog" in html) is shown
     if shown:
-        assert title in html and "PLAUD_REFRESH_TOKEN" in html and "pld_urt" in html
+        assert title in html and "/admin/plaud" in html and "pld_urt" in html
+
+
+@pytest.mark.parametrize("pasted, location", [
+    ("pld_urt=" + "{token}", "/admin/plaud?done=saved"),
+    ('"{token}"', "/admin/plaud?done=saved"),
+    ("garbage", "/admin/plaud?error=unreadable"),
+    ("{expired}", "/admin/plaud?error=expired"),
+])
+def test_d066_owner_replaces_the_plaud_refresh_token(client, session_factory, pasted, location):
+    import time
+    from database import PlaudSession, SyncRequest
+    token, expired = _jwt(time.time() + 30 * 86400), _jwt(time.time() - 60)
+    response = client.post("/admin/plaud", data={"csrf": webapp.csrf_token(),
+                                                 "refresh_token": pasted.format(token=token, expired=expired)},
+                           follow_redirects=False)
+    assert response.headers["location"] == location
+    with session_factory() as s:
+        row = s.get(PlaudSession, 1)
+        if "saved" in location:
+            assert (row.refresh_token, row.access_token) == (token, "") and s.query(SyncRequest).count() == 1
+        else:
+            assert row is None
+    page = client.get(location).text
+    assert token not in page and "pld_urt" in page
+
+
+def test_d066_the_job_picks_up_a_pasted_token_without_restart(session_factory):
+    import time
+    import plaud_auth
+    from database import PlaudSession
+    store = plaud_auth.DbTokenStore(session_factory)
+    old, new = _jwt(time.time() + 86400), _jwt(time.time() + 30 * 86400)
+    auth = plaud_auth.PlaudAuth(store, http=None, seed_refresh=old)
+    assert auth.tokens.refresh_token == old
+    with session_factory() as s:
+        plaud_auth.store_owner_refresh_token(s, new, plaud_auth.seed_fingerprint("", old))
+    auth.reload()
+    assert auth.tokens.refresh_token == new  # the unchanged .env seed does not override it
+    with session_factory() as s:
+        assert s.get(PlaudSession, 1).refresh_token == new

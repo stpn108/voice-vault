@@ -134,6 +134,9 @@ class PlaudClient:
         self._sleep = sleep
 
     # -- auth ---------------------------------------------------------
+    def reload_tokens(self) -> None:
+        self._auth.reload()
+
     def ensure_fresh_token(self, now_epoch: float) -> None:
         """Renew the access token ahead of its expiry. Raises PlaudAuthError if none is usable."""
         if not self._auth.needs_refresh(now_epoch):

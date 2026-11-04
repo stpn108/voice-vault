@@ -186,6 +186,33 @@ def _cookie(resp: httpx.Response, name: str) -> Optional[str]:
     return found
 
 
+def seed_fingerprint(seed_access: str, seed_refresh: str) -> str:
+    """Identifies the `.env` seed a stored pair came from or was checked against (a changed seed wins)."""
+    return hashlib.sha256(f"{seed_access.strip()}\n{seed_refresh.strip()}".encode()).hexdigest()[:16]
+
+
+def clean_pasted_token(value: str) -> str:
+    """A token as copied from the browser: without whitespace, quotes or a leading `pld_urt=`."""
+    value = "".join(value.split()).strip("\"'")
+    for prefix in (f"{REFRESH_COOKIE}=", f"{ACCESS_COOKIE}="):
+        if value.startswith(prefix):
+            value = value[len(prefix):].strip("\"'")
+    return value
+
+
+def store_owner_refresh_token(session, refresh_token: str, fingerprint: str) -> None:
+    """The owner pasted a new refresh token (D-066). The access token is cleared so the job fetches a new one
+    with it; the fingerprint of the current seed keeps `.env` from overriding it."""
+    row = session.get(PlaudSession, 1)
+    if row is None:
+        row = PlaudSession(id=1)
+        session.add(row)
+    row.access_token, row.refresh_token, row.seed_fingerprint = "", refresh_token, fingerprint
+    row.refreshed_at = now_utc()
+    session.commit()
+    log.info("Plaud refresh token replaced by the owner %s", describe_token(refresh_token))
+
+
 class PlaudAuth:
     def __init__(self, store: TokenStore, http: httpx.Client, seed_access: str = "",
                  seed_refresh: str = "", now_fn: Callable[[], dt.datetime] = now_utc):
@@ -204,8 +231,11 @@ class PlaudAuth:
         return self._tokens
 
     def _fingerprint(self) -> str:
-        blob = f"{self._seed_access}\n{self._seed_refresh}".encode()
-        return hashlib.sha256(blob).hexdigest()[:16]
+        return seed_fingerprint(self._seed_access, self._seed_refresh)
+
+    def reload(self) -> None:
+        """Read the stored pair again on next use: the owner may have pasted a new token (D-066)."""
+        self._tokens = None
 
     def _load_or_seed(self) -> StoredTokens:
         """The stored pair wins, unless the environment seed changed since it was stored."""
@@ -259,10 +289,16 @@ class PlaudAuth:
                 new_refresh = _cookie(resp, REFRESH_COOKIE) or refresh
                 self._tokens = StoredTokens(new_access, new_refresh, self.tokens.seed_fingerprint)
                 self._store.save(self._tokens)
+                now_epoch = self._now_fn().timestamp()
+                # Names only, never values: tells whether Plaud hands out a new refresh token, and where (D-066).
+                data = _payload(resp).get("data")
                 log.info(
-                    "Plaud token refreshed rotated=%s access_days_left=%s",
+                    "Plaud token refreshed rotated=%s access_days_left=%s refresh_days_left=%s cookies=%s body_keys=%s",
                     new_refresh != refresh,
-                    _days(self.access_seconds_left(self._now_fn().timestamp())),
+                    _days(self.access_seconds_left(now_epoch)),
+                    _days(self.refresh_seconds_left(now_epoch)),
+                    sorted({h.split("=", 1)[0] for h in resp.headers.get_list("set-cookie")}),
+                    sorted(data) if isinstance(data, dict) else sorted(_payload(resp)),
                 )
                 return base_url
             payload = _payload(resp)
