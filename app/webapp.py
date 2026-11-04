@@ -93,16 +93,18 @@ def load_in_progress(request: Request, session: Session = Depends(get_session)) 
     if request.method == "GET":
         request.state.in_progress = _in_progress(session)
         request.state.wip_count = todos.counts(session)["in_progress"]
-        request.state.plaud_expiry = plaud_expiry(session, load_config())
+        request.state.plaud_expiry, request.state.plaud_warn_seconds = plaud_expiry(session, load_config())
 
 
-def plaud_expiry(session: Session, cfg: Config):
-    """When the Plaud credential that keeps the import running expires (D-064), or None if unknown.
-    Same rule as the job: the refresh token, or the access token if there is none. Only the date leaves here."""
+def plaud_expiry(session: Session, cfg: Config) -> tuple:
+    """(expiry, seconds before it a warning is due) of the Plaud credential that keeps the import running
+    (D-064, D-067); expiry None if unknown. Same rule as the job: the refresh token, or the access token if
+    there is none. Only the date leaves here."""
     row = session.get(PlaudSession, 1)
     token = (row.refresh_token or row.access_token) if row else (cfg.plaud_refresh_token or cfg.plaud_token)
     exp = plaud_auth.token_expiry(token) if token else None
-    return dt.datetime.fromtimestamp(exp, tz=dt.timezone.utc) if exp is not None else None
+    expiry = dt.datetime.fromtimestamp(exp, tz=dt.timezone.utc) if exp is not None else None
+    return expiry, plaud_auth.warn_seconds(token or "", cfg.token_warn_days)
 
 
 def _in_progress(session: Session) -> list:
@@ -186,7 +188,8 @@ def render(request: Request, cfg: Config, name: str, status_code: int = 200, **c
     expiry = getattr(request.state, "plaud_expiry", None)
     days_left = (expiry - now_utc()).total_seconds() / 86400 if expiry else None
     context.update(t=t, lang=cfg.ui_lang, csrf=csrf_token(), plaud_note=plaud_note,
-                   plaud_expiry=expiry if days_left is not None and days_left < cfg.token_warn_days else None,
+                   plaud_expiry=expiry if days_left is not None and days_left * 86400 < getattr(
+                       request.state, "plaud_warn_seconds", cfg.token_warn_days * 86400) else None,
                    plaud_days_left=days_left,
                    plaud_days_text=(f"{days_left:.1f}".replace(".", ",") if cfg.ui_lang == "de" else f"{days_left:.1f}")
                    if days_left is not None else "",
@@ -673,7 +676,7 @@ def admin_plaud(request: Request, done: str = Query("", max_length=10), error: s
                   has_refresh=bool(row and row.refresh_token), refresh_expiry=_expiry(row.refresh_token if row else ""),
                   access_expiry=_expiry(row.access_token if row else ""), renewed_at=row.refreshed_at if row else None,
                   env_seed=bool(cfg.plaud_refresh_token or cfg.plaud_token), now=now_utc(),
-                  done=done if done == "saved" else "", error=error if error in ("unreadable", "expired") else "")
+                  done=done if done == "saved" else "", error=error if error in ("unreadable", "expired", "older") else "")
 
 
 @app.post("/admin/plaud")
@@ -686,6 +689,12 @@ def admin_plaud_save(request: Request, refresh_token: str = Form(..., max_length
         return RedirectResponse("/admin/plaud?error=unreadable", status_code=303)
     if exp <= now_utc().timestamp():
         return RedirectResponse("/admin/plaud?error=expired", status_code=303)
+    stored = session.get(PlaudSession, 1)
+    stored_token = stored.refresh_token if stored else ""
+    stored_exp, stored_iat, new_iat = (plaud_auth.token_expiry(stored_token or ""), plaud_auth.issued_at(stored_token or ""),
+                                       plaud_auth.issued_at(token))
+    if (stored_exp and stored_exp > now_utc().timestamp() and stored_iat and new_iat and new_iat < stored_iat):
+        return RedirectResponse("/admin/plaud?error=older", status_code=303)  # D-067: it would replace a newer one
     plaud_auth.store_owner_refresh_token(session, token)
     svc.request_sync(session, now_utc())  # the next cycle proves the token works
     return RedirectResponse("/admin/plaud?done=saved", status_code=303)

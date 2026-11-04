@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 
 from plaud_auth import (
     DbTokenStore, PlaudAuth, PlaudAuthError, PlaudError, USER_AGENT, is_plaud_host,
-    redirect_host, token_expiry,
+    redirect_host, token_expiry, warn_seconds,
 )
 
 log = logging.getLogger(__name__)
@@ -155,6 +155,11 @@ class PlaudClient:
                 log.warning("Token refresh failed, using the current token reason=%s", exc)
                 return
             raise PlaudAuthError(f"token refresh failed and the access token is unusable: {exc}") from exc
+
+    def credential_warn_seconds(self, warn_days: float) -> float:
+        """When the credential's expiry warning is due (D-067)."""
+        token = self._auth.tokens.refresh_token if self._auth.can_refresh() else self._auth.access_token()
+        return warn_seconds(token or "", warn_days)
 
     def credential_seconds_left(self, now_epoch: float) -> Optional[float]:
         """Seconds until the credential that keeps the job running dies.

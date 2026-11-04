@@ -368,11 +368,12 @@ def test_d045_fetch_now_shows_a_running_notice_that_the_script_hides_when_done(c
     assert "/sync/status" in client.get("/static/sync.js").text
 
 
-def _jwt(exp):
+def _jwt(exp, iat=None):
     import base64
     import json as _json
     part = lambda d: base64.urlsafe_b64encode(_json.dumps(d).encode()).rstrip(b"=").decode()  # noqa: E731
-    return f"{part({'alg': 'none'})}.{part({'exp': exp})}.sig"
+    claims = {"exp": exp} if iat is None else {"exp": exp, "iat": iat}
+    return f"{part({'alg': 'none'})}.{part(claims)}.sig"
 
 
 @pytest.mark.parametrize("days, shown, title", [
@@ -438,3 +439,37 @@ def test_d066_the_job_picks_up_a_pasted_token_without_restart(session_factory):
     assert fresh_process.tokens.refresh_token == new  # a restart keeps it too
     changed_env = plaud_auth.PlaudAuth(store, http=None, seed_refresh=newer)
     assert changed_env.tokens.refresh_token == newer  # a changed .env still wins
+
+
+@pytest.mark.parametrize("issued_hours_ago, shown", [(2, False), (18, False), (24, True)])
+def test_d067_a_rotating_day_token_warns_only_when_it_was_not_renewed(client, session_factory, issued_hours_ago, shown):
+    """Plaud issues refresh tokens for about 1.1 days and rotates them; a quarter of that (6.6 h) is the alarm."""
+    import time
+    from database import PlaudSession
+    iat = time.time() - issued_hours_ago * 3600
+    with session_factory() as s:
+        s.add(PlaudSession(id=1, access_token="", refresh_token=_jwt(iat + 1.1 * 86400, iat), seed_fingerprint=""))
+        s.commit()
+    assert ("data-token-dialog" in client.get("/todos").text) is shown
+
+
+def test_d067_an_older_token_does_not_replace_a_valid_newer_one(client, session_factory):
+    import time
+    from database import PlaudSession
+    now = time.time()
+    newer, older = _jwt(now + 86400, now - 600), _jwt(now + 3600, now - 86400)
+    with session_factory() as s:
+        s.add(PlaudSession(id=1, access_token="", refresh_token=newer, seed_fingerprint=""))
+        s.commit()
+    response = client.post("/admin/plaud", data={"csrf": webapp.csrf_token(), "refresh_token": older},
+                           follow_redirects=False)
+    assert response.headers["location"] == "/admin/plaud?error=older"
+    with session_factory() as s:
+        assert s.get(PlaudSession, 1).refresh_token == newer
+
+
+@pytest.mark.parametrize("lifetime_days, expected_hours", [(1.1, 6.6), (30, 120)])
+def test_d067_warn_seconds_follow_the_token_lifetime(lifetime_days, expected_hours):
+    import plaud_auth
+    token = _jwt(1_000_000 + lifetime_days * 86400, 1_000_000)
+    assert plaud_auth.warn_seconds(token, 5) == pytest.approx(expected_hours * 3600)

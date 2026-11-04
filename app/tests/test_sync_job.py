@@ -30,6 +30,13 @@ class FakeClient:
         pass
 
 
+    def credential_warn_seconds(self, warn_days):
+
+
+        return warn_days * 86400
+
+
+
     def credential_seconds_left(self, now_epoch):
         return self.seconds_left
 

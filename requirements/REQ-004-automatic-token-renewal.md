@@ -41,6 +41,8 @@ The owner pastes the access token and the refresh token once. From then on the b
     Given the refresh token (or, without one, the access token) has fewer than `TOKEN_WARN_DAYS` days left or has expired, when the owner opens any page, then a dialog says until when it is valid and how to renew it; "Später erinnern" or Esc hides it for 8 hours in that browser, and a new token removes it.
 10. **Replace the refresh token in the UI (D-066).**
     Given "Verwaltung → Plaud-Zugang", then it shows whether a refresh token is stored and until when it and the access token are valid; when the owner pastes a new refresh token, then it is checked (readable, not expired), stored with an empty access token, an import is requested, and the job uses it from its next cycle on without a restart; the page never shows a token. Every renewal logs the names (never values) of the cookies and body fields Plaud returned, to settle whether Plaud rotates the refresh token.
+11. **Warnings fit rotating day tokens (D-067).**
+    Given a credential whose lifetime is shorter than `TOKEN_WARN_DAYS` (Plaud: about 1.1 days, rotated on every renewal), then log, mail and dialog warn only when less than a quarter of its lifetime is left; given a pasted refresh token issued before the stored, still valid one, then the page refuses it and keeps the stored one.
 
 ## Out of scope
 
@@ -57,8 +59,8 @@ Days between manual token pastes. Target: none after the first one, until Plaud 
 | Date | Question | Answer |
 |------|----------|--------|
 | 2026-10-06 | Endpoint and cookie names come from Plaud-Sync's source, not from a live test. Does the renewal work from the server? | open, `plaud_live_check.py` |
-| 2026-10-06 | Does Plaud rotate the refresh token on every renewal, and does it log out the browser session? | open, live check log shows `rotated=` |
-| 2026-10-06 | Is the refresh token a JWT with a readable `exp`? Otherwise the expiry warning cannot fire. | open |
+| 2026-10-06 | Does Plaud rotate the refresh token on every renewal, and does it log out the browser session? | 2026-11-04: yes, it rotates (`rotated=True`, cookie `pld_urt` and `refresh_token` in the body), lifetime about 1.1 days (D-067). Browser logout not tested. |
+| 2026-10-06 | Is the refresh token a JWT with a readable `exp`? Otherwise the expiry warning cannot fire. | 2026-11-04: yes, typ `URT` with `exp` and `iat`. |
 
 ## Tests
 

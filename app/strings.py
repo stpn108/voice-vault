@@ -292,6 +292,7 @@ TEXTS = {
     "ui_plaud_save": {"de": "Speichern und abholen", "en": "Save and fetch"},
     "ui_plaud_saved": {"de": "Gespeichert. Die App holt jetzt ab und prüft dabei den Token.", "en": "Saved. The app fetches now and checks the token."},
     "ui_plaud_error_unreadable": {"de": "Das ist kein lesbarer Token. Bitte den Wert von pld_urt komplett kopieren.", "en": "That is not a readable token. Copy the whole value of pld_urt."},
+    "ui_plaud_error_older": {"de": "Dieser Token ist älter als der gespeicherte, und der gespeicherte gilt noch. Die App erneuert ihn selbst; nichts zu tun. Einen älteren Token einzusetzen würde den funktionierenden ersetzen.", "en": "This token is older than the stored one, which is still valid. The app renews it itself; nothing to do. An older token would replace the working one."},
     "ui_plaud_error_expired": {"de": "Dieser Token ist schon abgelaufen. Bitte bei web.plaud.ai neu anmelden und erneut kopieren.", "en": "This token has already expired. Sign in again at web.plaud.ai and copy it again."},
     "ui_token_secret": {"de": "Den Token nicht in Chats oder Tickets kopieren: Er öffnet Dein Plaud-Konto.", "en": "Never paste the token into chats or tickets: it opens your Plaud account."},
     "ui_token_later": {"de": "Später erinnern", "en": "Remind me later"},

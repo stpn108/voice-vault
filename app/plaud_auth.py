@@ -186,6 +186,22 @@ def _cookie(resp: httpx.Response, name: str) -> Optional[str]:
     return found
 
 
+def warn_seconds(token: str, warn_days: float) -> float:
+    """How long before expiry a warning is due (D-067). Plaud rotates its refresh tokens and issues them for
+    about a day, so for a token shorter-lived than `warn_days` the warning comes only when a quarter of its
+    lifetime is left: by then it should long have been renewed."""
+    claims = token_claims(token) or {}
+    exp, iat = claims.get("exp"), claims.get("iat")
+    if isinstance(exp, (int, float)) and isinstance(iat, (int, float)) and 0 < exp - iat < warn_days * 86400:
+        return 0.25 * (exp - iat)
+    return warn_days * 86400
+
+
+def issued_at(token: str) -> Optional[float]:
+    iat = (token_claims(token) or {}).get("iat")
+    return float(iat) if isinstance(iat, (int, float)) else None
+
+
 def seed_fingerprint(seed_access: str, seed_refresh: str) -> str:
     """Identifies the `.env` seed a stored pair came from or was checked against (a changed seed wins)."""
     return hashlib.sha256(f"{seed_access.strip()}\n{seed_refresh.strip()}".encode()).hexdigest()[:16]

@@ -781,3 +781,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner request: changing `.env` and restarting the server for a token that has to be renewed regularly is cumbersome. The token already lives in the database (D-005); `.env` was only its first source. |
 | **Rejected alternatives** | (A) keeping `.env` as the only way: needs server access and a restart; (B) showing the stored token for checking: a secret on a page can be copied by anyone who sees the screen; (C) logging into Plaud from the app: would need the owner's Plaud credentials on the server. |
 | **Status** | **FINAL** |
+
+### D-067: Expiry warnings fit short-lived, rotating Plaud tokens; an older token is not accepted (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-11-04 |
+| **Decision** | Amends D-064 and D-066. The first renewal with diagnostics showed that Plaud rotates the refresh token on every renewal (cookie `pld_urt`, also `refresh_token` in the body) and issues it for about 1.1 days. A fixed "fewer than `TOKEN_WARN_DAYS` days" rule therefore warns all the time. Now: for a credential whose lifetime (`exp - iat`) is shorter than `TOKEN_WARN_DAYS`, the log warning, the daily mail and the UI dialog come only when less than a quarter of its lifetime is left, which in normal operation never happens because it is renewed earlier; for a long-lived credential the day rule stays. The "Plaud-Zugang" page refuses a pasted refresh token that was issued before the stored one while the stored one is still valid, because pasting an old token (for example the first one from `.env`) replaces a working pair with a dead one. |
+| **In plain words** | No more false alarms: the app warns only when the Plaud login really stops renewing itself. And the page no longer accepts an older token than the one it already has. |
+| **Reasoning** | Owner log after D-066: `rotated=True … refresh_days_left=1.1`. The owner had pasted the `.env` token, which Plaud had long replaced; that overwrote the working pair. |
+| **Rejected alternatives** | (A) lowering `TOKEN_WARN_DAYS` to below a day: would hide the warning for long-lived tokens; (B) warning based on the time since the last renewal: needs a second clock, the token's own lifetime already says it; (C) accepting an older token after a confirmation: there is no case in which an older token is the better one while the stored one is valid. |
+| **Status** | **FINAL** |

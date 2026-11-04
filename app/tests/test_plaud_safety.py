@@ -202,7 +202,7 @@ def test_review_the_cycle_passes_its_own_import_result_to_the_deletion(session_f
     seen = {}
     monkeypatch.setattr("sync_job.run_import", lambda *a, **k: ImportStats(seen={"x"}, confirmed={"x"}))
     monkeypatch.setattr("sync_job.run_deletion", lambda *a, **k: seen.setdefault("imported", a[4]))
-    client = type("C", (), {"reload_tokens": lambda s: None, "ensure_fresh_token": lambda s, n: None, "credential_seconds_left": lambda s, n: 10**9})()
+    client = type("C", (), {"reload_tokens": lambda s: None, "credential_warn_seconds": lambda s, d: d * 86400, "ensure_fresh_token": lambda s, n: None, "credential_seconds_left": lambda s, n: 10**9})()
     SyncJob(CFG, client, session_factory, notifier=lambda *a: True, now_fn=lambda: NOW).run()
     assert seen["imported"].confirmed == {"x"}
 
@@ -211,7 +211,7 @@ def test_review_repeated_failing_cycles_send_one_mail_a_day(session_factory, mon
     mails = []
     monkeypatch.setattr("sync_job.run_import", lambda *a, **k: ImportStats(failed=1))
     monkeypatch.setattr("sync_job.run_deletion", lambda *a, **k: None)
-    client = type("C", (), {"reload_tokens": lambda s: None, "ensure_fresh_token": lambda s, n: None, "credential_seconds_left": lambda s, n: 10**9})()
+    client = type("C", (), {"reload_tokens": lambda s: None, "credential_warn_seconds": lambda s, d: d * 86400, "ensure_fresh_token": lambda s, n: None, "credential_seconds_left": lambda s, n: 10**9})()
     job = SyncJob(CFG, client, session_factory, notifier=lambda cfg, s, b: mails.append(s) or True, now_fn=lambda: NOW)
     for _ in range(5):
         job.run()
@@ -224,7 +224,7 @@ def test_review_an_unexpected_exception_in_a_cycle_is_counted_not_raised(session
     def boom(*a, **k):
         raise RuntimeError("x")
     monkeypatch.setattr("sync_job.run_import", boom)
-    client = type("C", (), {"reload_tokens": lambda s: None, "ensure_fresh_token": lambda s, n: None, "credential_seconds_left": lambda s, n: 10**9})()
+    client = type("C", (), {"reload_tokens": lambda s: None, "credential_warn_seconds": lambda s, d: d * 86400, "ensure_fresh_token": lambda s, n: None, "credential_seconds_left": lambda s, n: 10**9})()
     job = SyncJob(CFG, client, session_factory, notifier=lambda cfg, s, b: mails.append(s) or True, now_fn=lambda: NOW)
     for _ in range(3):
         job.run()
@@ -415,7 +415,7 @@ def test_d023_the_cycle_passes_the_configured_share_to_the_import(session_factor
     seen = {}
     monkeypatch.setattr("sync_job.run_import", lambda *a, **k: seen.setdefault("args", a) and ImportStats())
     monkeypatch.setattr("sync_job.run_deletion", lambda *a, **k: None)
-    client = type("C", (), {"reload_tokens": lambda s: None, "ensure_fresh_token": lambda s, n: None, "credential_seconds_left": lambda s, n: 10**9})()
+    client = type("C", (), {"reload_tokens": lambda s: None, "credential_warn_seconds": lambda s, d: d * 86400, "ensure_fresh_token": lambda s, n: None, "credential_seconds_left": lambda s, n: 10**9})()
     cfg = dataclasses.replace(CFG, min_speakers_named_percent=70)
     SyncJob(cfg, client, session_factory, notifier=lambda *a: True, now_fn=lambda: NOW).run()
     assert seen["args"][3] == 70 and seen["args"][4] == 7
