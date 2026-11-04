@@ -33,6 +33,9 @@ class MemoryStore:
         self.tokens = tokens
         self.saves += 1
 
+    def mark_rejected(self):
+        self.rejected = True
+
 
 def refresh_response(access, refresh=None, clearing=True):
     """Plaud's refresh answer: cookies only, a clearing cookie first."""

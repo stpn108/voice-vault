@@ -93,18 +93,21 @@ def load_in_progress(request: Request, session: Session = Depends(get_session)) 
     if request.method == "GET":
         request.state.in_progress = _in_progress(session)
         request.state.wip_count = todos.counts(session)["in_progress"]
-        request.state.plaud_expiry, request.state.plaud_warn_seconds = plaud_expiry(session, load_config())
+        (request.state.plaud_expiry, request.state.plaud_warn_seconds,
+         request.state.plaud_rejected) = plaud_expiry(session, load_config())
 
 
 def plaud_expiry(session: Session, cfg: Config) -> tuple:
-    """(expiry, seconds before it a warning is due) of the Plaud credential that keeps the import running
-    (D-064, D-067); expiry None if unknown. Same rule as the job: the refresh token, or the access token if
-    there is none. Only the date leaves here."""
+    """(expiry, seconds before it a warning is due, rejected by Plaud) of the Plaud credential that keeps the
+    import running (D-064, D-068); expiry None if unknown. Same rule as the job: the refresh token, or the access
+    token if there is none. A refresh token renews itself, so it warns only once expired or rejected. Only the
+    date leaves here."""
     row = session.get(PlaudSession, 1)
-    token = (row.refresh_token or row.access_token) if row else (cfg.plaud_refresh_token or cfg.plaud_token)
+    refresh = row.refresh_token if row else cfg.plaud_refresh_token
+    token = refresh or (row.access_token if row else cfg.plaud_token)
     exp = plaud_auth.token_expiry(token) if token else None
     expiry = dt.datetime.fromtimestamp(exp, tz=dt.timezone.utc) if exp is not None else None
-    return expiry, plaud_auth.warn_seconds(token or "", cfg.token_warn_days)
+    return expiry, 0 if refresh else cfg.token_warn_days * 86400, bool(row and row.rejected_at)
 
 
 def _in_progress(session: Session) -> list:
@@ -188,8 +191,10 @@ def render(request: Request, cfg: Config, name: str, status_code: int = 200, **c
     expiry = getattr(request.state, "plaud_expiry", None)
     days_left = (expiry - now_utc()).total_seconds() / 86400 if expiry else None
     context.update(t=t, lang=cfg.ui_lang, csrf=csrf_token(), plaud_note=plaud_note,
-                   plaud_expiry=expiry if days_left is not None and days_left * 86400 < getattr(
-                       request.state, "plaud_warn_seconds", cfg.token_warn_days * 86400) else None,
+                   plaud_expiry=expiry if getattr(request.state, "plaud_rejected", False) or (
+                       days_left is not None and days_left * 86400 < getattr(
+                           request.state, "plaud_warn_seconds", cfg.token_warn_days * 86400)) else None,
+                   plaud_rejected=getattr(request.state, "plaud_rejected", False),
                    plaud_days_left=days_left,
                    plaud_days_text=(f"{days_left:.1f}".replace(".", ",") if cfg.ui_lang == "de" else f"{days_left:.1f}")
                    if days_left is not None else "",

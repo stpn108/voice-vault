@@ -41,8 +41,8 @@ The owner pastes the access token and the refresh token once. From then on the b
     Given the refresh token (or, without one, the access token) has fewer than `TOKEN_WARN_DAYS` days left or has expired, when the owner opens any page, then a dialog says until when it is valid and how to renew it; "Später erinnern" or Esc hides it for 8 hours in that browser, and a new token removes it.
 10. **Replace the refresh token in the UI (D-066).**
     Given "Verwaltung → Plaud-Zugang", then it shows whether a refresh token is stored and until when it and the access token are valid; when the owner pastes a new refresh token, then it is checked (readable, not expired), stored with an empty access token, an import is requested, and the job uses it from its next cycle on without a restart; the page never shows a token. Every renewal logs the names (never values) of the cookies and body fields Plaud returned, to settle whether Plaud rotates the refresh token.
-11. **Warnings fit rotating day tokens (D-067).**
-    Given a credential whose lifetime is shorter than `TOKEN_WARN_DAYS` (Plaud: about 1.1 days, rotated on every renewal), then log, mail and dialog warn only when less than a quarter of its lifetime is left; given a pasted refresh token issued before the stored, still valid one, then the page refuses it and keeps the stored one.
+11. **Warn only when the app cannot help itself (D-067, D-068).**
+    Given a stored refresh token, then nothing warns ahead of time; when it has expired or Plaud rejected it (HTTP 401/403 on renewal, remembered until the next good renewal or a pasted token), then log, mail and the dialog on every page tell the owner. Without a refresh token, the warning `TOKEN_WARN_DAYS` ahead stays. Given a pasted refresh token issued before the stored, still valid one, then the page refuses it and keeps the stored one.
 
 ## Out of scope
 

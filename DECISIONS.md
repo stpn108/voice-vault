@@ -782,7 +782,7 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Rejected alternatives** | (A) keeping `.env` as the only way: needs server access and a restart; (B) showing the stored token for checking: a secret on a page can be copied by anyone who sees the screen; (C) logging into Plaud from the app: would need the owner's Plaud credentials on the server. |
 | **Status** | **FINAL** |
 
-### D-067: Expiry warnings fit short-lived, rotating Plaud tokens; an older token is not accepted (FINAL)
+### D-067: Expiry warnings fit short-lived, rotating Plaud tokens; an older token is not accepted (warning rule SUPERSEDED by D-068)
 
 | | |
 |---|---|
@@ -791,4 +791,15 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **In plain words** | No more false alarms: the app warns only when the Plaud login really stops renewing itself. And the page no longer accepts an older token than the one it already has. |
 | **Reasoning** | Owner log after D-066: `rotated=True … refresh_days_left=1.1`. The owner had pasted the `.env` token, which Plaud had long replaced; that overwrote the working pair. |
 | **Rejected alternatives** | (A) lowering `TOKEN_WARN_DAYS` to below a day: would hide the warning for long-lived tokens; (B) warning based on the time since the last renewal: needs a second clock, the token's own lifetime already says it; (C) accepting an older token after a confirmation: there is no case in which an older token is the better one while the stored one is valid. |
+| **Status** | **FINAL** |
+
+### D-068: The Plaud reminder comes only when the app cannot renew by itself (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-11-04 |
+| **Decision** | Replaces the warning rule of D-064 and D-067; the refusal of an older token (D-067) stays. While a refresh token is stored, there is no warning ahead of time at all: the job renews it every cycle that needs it, and Plaud hands out a new one each time. The owner is told (log error, daily mail, dialog on every page) only when the app cannot help itself: the refresh token has expired, or Plaud rejected it (new column `plaud_sessions.rejected_at`, migration 008, set on HTTP 401/403 from the renewal, cleared by the next good renewal or a pasted token). Without a refresh token the access token cannot be renewed, so the warning `TOKEN_WARN_DAYS` ahead stays for that case only. |
+| **In plain words** | You hear about the Plaud login only when you really have to act. |
+| **Reasoning** | Owner: a warning after 24 of about 26 hours of a token's life is nonsense when the app renews it anyway; only a state the system cannot fix itself deserves a reminder. |
+| **Rejected alternatives** | (A) D-067's quarter-of-lifetime rule: still warns in cases the app would fix by itself (for example after the server was off for some hours); (B) warning after N failed cycles: a rejected token does not get better by waiting, it needs the owner at once. |
 | **Status** | **FINAL** |

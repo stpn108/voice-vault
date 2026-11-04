@@ -55,7 +55,7 @@ class SyncJob:
                 "Copy the cookie pld_urt from web.plaud.ai and paste it under Verwaltung -> Plaud-Zugang in the app.",
             )
             raise PlaudAuthError("Plaud token expired")
-        if left < self._client.credential_warn_seconds(self._cfg.token_warn_days):  # D-067
+        if left < self._client.credential_warn_seconds(self._cfg.token_warn_days):  # only without refresh token (D-068)
             log.warning("Plaud token expires soon days_left=%.1f", days)
             self._notify_once_a_day(
                 "voice-vault: Plaud token expires soon",

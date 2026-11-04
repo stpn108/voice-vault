@@ -377,7 +377,7 @@ def _jwt(exp, iat=None):
 
 
 @pytest.mark.parametrize("days, shown, title", [
-    (2, True, "Plaud-Zugang läuft bald ab"),
+    (2, False, None),  # a refresh token renews itself (D-068)
     (-1, True, "Plaud-Zugang ist abgelaufen"),
     (30, False, None),
 ])
@@ -441,16 +441,25 @@ def test_d066_the_job_picks_up_a_pasted_token_without_restart(session_factory):
     assert changed_env.tokens.refresh_token == newer  # a changed .env still wins
 
 
-@pytest.mark.parametrize("issued_hours_ago, shown", [(2, False), (18, False), (24, True)])
-def test_d067_a_rotating_day_token_warns_only_when_it_was_not_renewed(client, session_factory, issued_hours_ago, shown):
-    """Plaud issues refresh tokens for about 1.1 days and rotates them; a quarter of that (6.6 h) is the alarm."""
+@pytest.mark.parametrize("refresh_hours_left, rejected, shown, text", [
+    (20, False, False, None),          # renews itself: no warning, however short its life
+    (2, False, False, None),
+    (-1, False, True, "seit"),        # expired: the app cannot help itself
+    (20, True, True, "abgelehnt"),    # Plaud turned it down
+])
+def test_d068_the_reminder_comes_only_when_the_app_cannot_renew_by_itself(client, session_factory, refresh_hours_left,
+                                                                         rejected, shown, text):
     import time
     from database import PlaudSession
-    iat = time.time() - issued_hours_ago * 3600
+    from utils import now_utc as _now
     with session_factory() as s:
-        s.add(PlaudSession(id=1, access_token="", refresh_token=_jwt(iat + 1.1 * 86400, iat), seed_fingerprint=""))
+        s.add(PlaudSession(id=1, access_token="", refresh_token=_jwt(time.time() + refresh_hours_left * 3600),
+                           seed_fingerprint="", rejected_at=_now() if rejected else None))
         s.commit()
-    assert ("data-token-dialog" in client.get("/todos").text) is shown
+    html = client.get("/todos").text
+    assert ("data-token-dialog" in html) is shown
+    if text:
+        assert text in html
 
 
 def test_d067_an_older_token_does_not_replace_a_valid_newer_one(client, session_factory):
@@ -466,10 +475,3 @@ def test_d067_an_older_token_does_not_replace_a_valid_newer_one(client, session_
     assert response.headers["location"] == "/admin/plaud?error=older"
     with session_factory() as s:
         assert s.get(PlaudSession, 1).refresh_token == newer
-
-
-@pytest.mark.parametrize("lifetime_days, expected_hours", [(1.1, 6.6), (30, 120)])
-def test_d067_warn_seconds_follow_the_token_lifetime(lifetime_days, expected_hours):
-    import plaud_auth
-    token = _jwt(1_000_000 + lifetime_days * 86400, 1_000_000)
-    assert plaud_auth.warn_seconds(token, 5) == pytest.approx(expected_hours * 3600)

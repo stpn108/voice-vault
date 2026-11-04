@@ -369,8 +369,8 @@
 {% if plaud_expiry %}
 {# Plaud token runs out soon (D-064): a dialog every 8 hours, dismissed per browser. #}
 <dialog class="token-dialog" data-token-dialog data-key="vv-plaud-token-{{ plaud_expiry.timestamp() | int }}" aria-labelledby="token-title">
-  <h2 id="token-title">{{ t("ui_token_expired_title") if plaud_days_left <= 0 else t("ui_token_soon_title") }}</h2>
-  <p>{% if plaud_days_left <= 0 %}{{ t("ui_token_expired_text", at=plaud_expiry | localtime) }}{% else %}{{ t("ui_token_soon_text", at=plaud_expiry | localtime, days=plaud_days_text) }}{% endif %}</p>
+  <h2 id="token-title">{{ t("ui_token_expired_title") if plaud_rejected or plaud_days_left <= 0 else t("ui_token_soon_title") }}</h2>
+  <p>{% if plaud_rejected %}{{ t("ui_token_rejected_text") }}{% elif plaud_days_left <= 0 %}{{ t("ui_token_expired_text", at=plaud_expiry | localtime) }}{% else %}{{ t("ui_token_soon_text", at=plaud_expiry | localtime, days=plaud_days_text) }}{% endif %}</p>
   <ol>
     <li>{{ t("ui_token_step1") | safe }}</li>
     <li>{{ t("ui_token_step2") | safe }}</li>

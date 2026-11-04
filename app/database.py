@@ -305,6 +305,8 @@ class PlaudSession(Base):
     refresh_token: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     seed_fingerprint: Mapped[str] = mapped_column(String(16), default="")
     refreshed_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Plaud turned the refresh token down (D-068); cleared by the next good renewal or a pasted token.
+    rejected_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -380,6 +382,11 @@ def _migrate_007_sync_requests_finished(conn):
         conn.execute(sqltext("ALTER TABLE IF EXISTS sync_requests ADD COLUMN IF NOT EXISTS new_recordings INTEGER NOT NULL DEFAULT 0;"))
 
 
+def _migrate_008_plaud_sessions_rejected(conn):
+    if conn.dialect.name == "postgresql":
+        conn.execute(sqltext("ALTER TABLE IF EXISTS plaud_sessions ADD COLUMN IF NOT EXISTS rejected_at TIMESTAMP WITH TIME ZONE;"))
+
+
 MIGRATIONS: list = [
     ("001_recordings_discarded_at", _migrate_001_recordings_discarded_at),
     ("002_recordings_analyzed_at", _migrate_002_recordings_analyzed_at),
@@ -388,6 +395,7 @@ MIGRATIONS: list = [
     ("005_todos_people", _migrate_005_todos_people),
     ("006_todos_kind", _migrate_006_todos_kind),
     ("007_sync_requests_finished", _migrate_007_sync_requests_finished),
+    ("008_plaud_sessions_rejected", _migrate_008_plaud_sessions_rejected),
 ]
 
 # Advisory lock key: serialises schema setup when several replicas start at

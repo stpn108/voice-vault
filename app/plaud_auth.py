@@ -137,6 +137,7 @@ class StoredTokens:
 class TokenStore(Protocol):
     def load(self) -> Optional[StoredTokens]: ...
     def save(self, tokens: StoredTokens) -> None: ...
+    def mark_rejected(self) -> None: ...
 
 
 class DbTokenStore:
@@ -152,6 +153,13 @@ class DbTokenStore:
                 return None
             return StoredTokens(row.access_token, row.refresh_token, row.seed_fingerprint)
 
+    def mark_rejected(self) -> None:
+        with self._session_factory() as session:
+            row = session.get(PlaudSession, 1)
+            if row is not None and row.rejected_at is None:
+                row.rejected_at = now_utc()
+                session.commit()
+
     def save(self, tokens: StoredTokens) -> None:
         """Persist the pair. A rotated refresh token that is lost locks the owner out, so retry."""
         for attempt in range(1, SAVE_ATTEMPTS + 1):
@@ -165,6 +173,7 @@ class DbTokenStore:
                     row.refresh_token = tokens.refresh_token
                     row.seed_fingerprint = tokens.seed_fingerprint
                     row.refreshed_at = now_utc()
+                    row.rejected_at = None  # a good pair again (D-068)
                     session.commit()
                 return
             except Exception as exc:  # noqa: BLE001
@@ -184,17 +193,6 @@ def _cookie(resp: httpx.Response, name: str) -> Optional[str]:
             if value:
                 found = value
     return found
-
-
-def warn_seconds(token: str, warn_days: float) -> float:
-    """How long before expiry a warning is due (D-067). Plaud rotates its refresh tokens and issues them for
-    about a day, so for a token shorter-lived than `warn_days` the warning comes only when a quarter of its
-    lifetime is left: by then it should long have been renewed."""
-    claims = token_claims(token) or {}
-    exp, iat = claims.get("exp"), claims.get("iat")
-    if isinstance(exp, (int, float)) and isinstance(iat, (int, float)) and 0 < exp - iat < warn_days * 86400:
-        return 0.25 * (exp - iat)
-    return warn_days * 86400
 
 
 def issued_at(token: str) -> Optional[float]:
@@ -228,7 +226,7 @@ def store_owner_refresh_token(session, refresh_token: str) -> None:
         row = PlaudSession(id=1)
         session.add(row)
     row.access_token, row.refresh_token, row.seed_fingerprint = "", refresh_token, OWNER_SET
-    row.refreshed_at = now_utc()
+    row.refreshed_at, row.rejected_at = now_utc(), None
     session.commit()
     log.info("Plaud refresh token replaced by the owner %s", describe_token(refresh_token))
 
@@ -309,7 +307,11 @@ class PlaudAuth:
         if not refresh:
             raise PlaudAuthError("no refresh token available")
         for hop in range(2):
-            resp = self._post_refresh(base_url, refresh)
+            try:
+                resp = self._post_refresh(base_url, refresh)
+            except PlaudAuthError:
+                self._store.mark_rejected()  # the app cannot help itself any more: the owner is told (D-068)
+                raise
             new_access = _cookie(resp, ACCESS_COOKIE)
             if new_access:
                 new_refresh = _cookie(resp, REFRESH_COOKIE) or refresh

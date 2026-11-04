@@ -300,3 +300,24 @@ def test_db_token_store_roundtrip_and_overwrite(session_factory):
     assert store.load() == StoredTokens("A2", None, "fp2")
     with session_factory() as s:
         assert len(s.scalars(select(PlaudSession)).all()) == 1
+
+
+def test_d068_a_rejected_refresh_token_is_remembered_until_a_good_renewal(session_factory):
+    store = DbTokenStore(session_factory)
+    refreshes = []
+
+    def handler(request):
+        if "refresh" not in request.url.path:
+            return httpx.Response(401)  # the bearer probe after a rejection
+        refreshes.append(1)
+        if len(refreshes) == 1:
+            return httpx.Response(401)
+        return httpx.Response(200, headers=[("set-cookie", "pld_ut=A2; Path=/")], json={"status": 0})
+    auth, _ = make_auth(handler, store=store, access="A1", refresh="R1")
+    with pytest.raises(PlaudAuthError):
+        auth.refresh(BASE)
+    with session_factory() as s:
+        assert s.get(PlaudSession, 1).rejected_at is not None
+    auth.refresh(BASE)
+    with session_factory() as s:
+        assert s.get(PlaudSession, 1).rejected_at is None
