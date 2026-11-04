@@ -418,16 +418,23 @@ def test_d066_owner_replaces_the_plaud_refresh_token(client, session_factory, pa
 
 
 def test_d066_the_job_picks_up_a_pasted_token_without_restart(session_factory):
+    """The web container has no Plaud seed; the job has the old one in .env. The pasted token must win, and
+    keep winning, until .env itself changes."""
     import time
     import plaud_auth
     from database import PlaudSession
     store = plaud_auth.DbTokenStore(session_factory)
-    old, new = _jwt(time.time() + 86400), _jwt(time.time() + 30 * 86400)
+    old, new, newer = (_jwt(time.time() + d * 86400) for d in (1, 30, 60))
     auth = plaud_auth.PlaudAuth(store, http=None, seed_refresh=old)
     assert auth.tokens.refresh_token == old
     with session_factory() as s:
-        plaud_auth.store_owner_refresh_token(s, new, plaud_auth.seed_fingerprint("", old))
-    auth.reload()
-    assert auth.tokens.refresh_token == new  # the unchanged .env seed does not override it
+        plaud_auth.store_owner_refresh_token(s, new)
+    for _ in range(2):  # taken over, and still kept on the following cycle
+        auth.reload()
+        assert auth.tokens.refresh_token == new
     with session_factory() as s:
-        assert s.get(PlaudSession, 1).refresh_token == new
+        assert s.get(PlaudSession, 1).seed_fingerprint == plaud_auth.seed_fingerprint("", old)
+    fresh_process = plaud_auth.PlaudAuth(store, http=None, seed_refresh=old)
+    assert fresh_process.tokens.refresh_token == new  # a restart keeps it too
+    changed_env = plaud_auth.PlaudAuth(store, http=None, seed_refresh=newer)
+    assert changed_env.tokens.refresh_token == newer  # a changed .env still wins

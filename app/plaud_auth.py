@@ -200,14 +200,18 @@ def clean_pasted_token(value: str) -> str:
     return value
 
 
-def store_owner_refresh_token(session, refresh_token: str, fingerprint: str) -> None:
+OWNER_SET = "owner"  # fingerprint of a pair the owner pasted in the UI; the job binds it to its own seed
+
+
+def store_owner_refresh_token(session, refresh_token: str) -> None:
     """The owner pasted a new refresh token (D-066). The access token is cleared so the job fetches a new one
-    with it; the fingerprint of the current seed keeps `.env` from overriding it."""
+    with it. The web container does not know the `.env` seed, so the pair is marked OWNER_SET and the job,
+    which knows it, keeps the pair and records its seed's fingerprint on the next load."""
     row = session.get(PlaudSession, 1)
     if row is None:
         row = PlaudSession(id=1)
         session.add(row)
-    row.access_token, row.refresh_token, row.seed_fingerprint = "", refresh_token, fingerprint
+    row.access_token, row.refresh_token, row.seed_fingerprint = "", refresh_token, OWNER_SET
     row.refreshed_at = now_utc()
     session.commit()
     log.info("Plaud refresh token replaced by the owner %s", describe_token(refresh_token))
@@ -240,6 +244,12 @@ class PlaudAuth:
     def _load_or_seed(self) -> StoredTokens:
         """The stored pair wins, unless the environment seed changed since it was stored."""
         stored = self._store.load()
+        if stored is not None and stored.seed_fingerprint == OWNER_SET:
+            # Pasted by the owner (D-066): it wins over the unchanged seed; a later change of `.env` still wins.
+            adopted = StoredTokens(stored.access_token, stored.refresh_token, self._fingerprint())
+            self._store.save(adopted)
+            log.info("Plaud tokens set by the owner in the UI taken over has_refresh=%s", bool(adopted.refresh_token))
+            return adopted
         has_seed = bool(self._seed_access or self._seed_refresh)
         if has_seed and (stored is None or stored.seed_fingerprint != self._fingerprint()):
             seeded = StoredTokens(self._seed_access, self._seed_refresh or None, self._fingerprint())

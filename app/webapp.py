@@ -686,8 +686,7 @@ def admin_plaud_save(request: Request, refresh_token: str = Form(..., max_length
         return RedirectResponse("/admin/plaud?error=unreadable", status_code=303)
     if exp <= now_utc().timestamp():
         return RedirectResponse("/admin/plaud?error=expired", status_code=303)
-    plaud_auth.store_owner_refresh_token(session, token, plaud_auth.seed_fingerprint(cfg.plaud_token,
-                                                                                      cfg.plaud_refresh_token))
+    plaud_auth.store_owner_refresh_token(session, token)
     svc.request_sync(session, now_utc())  # the next cycle proves the token works
     return RedirectResponse("/admin/plaud?done=saved", status_code=303)
 
