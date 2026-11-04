@@ -748,3 +748,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner request: there was no way from a task into the Mindmap. |
 | **Rejected alternatives** | (A) a link to the plain Mindmap: the task may be hidden there and has to be searched for; (B) a separate Mindmap per task: the context of the other tasks is what the map is for. |
 | **Status** | **FINAL** |
+
+### D-064: A reminder on every page when the Plaud token runs out soon (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-11-04 |
+| **Decision** | When the credential that keeps the import running (the refresh token, or the access token if there is none; the same rule as `credential_seconds_left` of the job) has fewer than `TOKEN_WARN_DAYS` days left (default 5), or has expired, every page of the web UI opens a dialog: how long the token still lasts, and the steps to renew it (copy the cookie `pld_urt` from web.plaud.ai, put it into `.env` as `PLAUD_REFRESH_TOKEN`, restart the app). "Später erinnern" closes it for 8 hours in this browser (`localStorage`); closing with Esc counts the same. The expiry is read from the token stored in `plaud_sessions` (the environment seed if there is none yet); only the date leaves the server, never the token. |
+| **In plain words** | When the Plaud login runs out within five days, the app tells you once every eight hours what to do. |
+| **Reasoning** | Owner request: the warning existed only in the log and, with SMTP set, as a daily mail. |
+| **Rejected alternatives** | (A) a permanent banner: the owner asked for something he can dismiss; (B) storing the dismissal on the server: a browser convenience, no shared state needed; (C) renewing the token from the UI: the refresh token comes from the owner's Plaud login in the browser and has to be pasted somewhere; `.env` stays the one place for secrets. |
+| **Status** | **FINAL** |

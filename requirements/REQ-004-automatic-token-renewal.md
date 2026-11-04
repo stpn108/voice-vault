@@ -37,6 +37,8 @@ The owner pastes the access token and the refresh token once. From then on the b
    Given a renewal fails with a network error or HTTP 5xx and the access token is still valid, then the cycle continues with the current token.
 8. **Region and host safety.**
    Given a renewal answers with a region redirect, then it is followed once and only to a `*.plaud.ai` host; the refresh cookie is never sent to any other host.
+9. **Reminder in the UI (D-064).**
+    Given the refresh token (or, without one, the access token) has fewer than `TOKEN_WARN_DAYS` days left or has expired, when the owner opens any page, then a dialog says until when it is valid and how to renew it; "Später erinnern" or Esc hides it for 8 hours in that browser, and a new token removes it.
 
 ## Out of scope
 

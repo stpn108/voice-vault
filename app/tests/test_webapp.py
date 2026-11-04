@@ -366,3 +366,28 @@ def test_d045_fetch_now_shows_a_running_notice_that_the_script_hides_when_done(c
     assert 'id="sync-notice"' not in client.get("/").text
     assert client.post("/sync", data={"csrf": "bad"}).status_code == 403
     assert "/sync/status" in client.get("/static/sync.js").text
+
+
+def _jwt(exp):
+    import base64
+    import json as _json
+    part = lambda d: base64.urlsafe_b64encode(_json.dumps(d).encode()).rstrip(b"=").decode()  # noqa: E731
+    return f"{part({'alg': 'none'})}.{part({'exp': exp})}.sig"
+
+
+@pytest.mark.parametrize("days, shown, title", [
+    (2, True, "Plaud-Zugang läuft bald ab"),
+    (-1, True, "Plaud-Zugang ist abgelaufen"),
+    (30, False, None),
+])
+def test_d064_pages_remind_when_the_plaud_token_runs_out(client, session_factory, days, shown, title):
+    import time
+    from database import PlaudSession
+    with session_factory() as s:
+        s.add(PlaudSession(id=1, access_token=_jwt(time.time() + 3600), refresh_token=_jwt(time.time() + days * 86400),
+                           seed_fingerprint=""))
+        s.commit()
+    html = client.get("/todos").text
+    assert ("data-token-dialog" in html) is shown
+    if shown:
+        assert title in html and "PLAUD_REFRESH_TOKEN" in html and "pld_urt" in html

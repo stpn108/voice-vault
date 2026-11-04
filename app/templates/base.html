@@ -290,6 +290,11 @@
   .gl-alias.unclear { border-color: var(--warn); }
   .gl-wrong { text-decoration: line-through; color: var(--muted); }
   .mindmap-jump { float: right; margin-left: 1rem; }
+  .token-dialog { max-width: 34rem; border: 1px solid var(--line); border-radius: .8rem; padding: 1.2rem 1.4rem; background: var(--surface); color: var(--text); }
+  .token-dialog::backdrop { background: rgba(0, 0, 0, .35); }
+  .token-dialog h2 { margin: 0 0 .6rem; color: var(--danger); font-size: 1rem; letter-spacing: 0; text-transform: none; }
+  .token-dialog ol { padding-left: 1.2rem; line-height: 1.5; }
+  .token-dialog code { font-size: .85em; }
   .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: .8rem; }
   a.tile { display: block; padding: 1rem 1.1rem; text-decoration: none; color: var(--text); }
   a.tile:hover { border-color: var(--accent); } a.tile strong { display: block; margin-bottom: .3rem; } a.tile span { color: var(--muted); font-size: .9rem; }
@@ -358,5 +363,21 @@
 {% block crumbs %}{% endblock %}
 {% block content %}{% endblock %}
 </main>
+{% if plaud_expiry %}
+{# Plaud token runs out soon (D-064): a dialog every 8 hours, dismissed per browser. #}
+<dialog class="token-dialog" data-token-dialog data-key="vv-plaud-token-{{ plaud_expiry.timestamp() | int }}" aria-labelledby="token-title">
+  <h2 id="token-title">{{ t("ui_token_expired_title") if plaud_days_left <= 0 else t("ui_token_soon_title") }}</h2>
+  <p>{% if plaud_days_left <= 0 %}{{ t("ui_token_expired_text", at=plaud_expiry | localtime) }}{% else %}{{ t("ui_token_soon_text", at=plaud_expiry | localtime, days=plaud_days_text) }}{% endif %}</p>
+  <ol>
+    <li>{{ t("ui_token_step1") | safe }}</li>
+    <li>{{ t("ui_token_step2") | safe }}</li>
+    <li>{{ t("ui_token_step3") | safe }}</li>
+    <li>{{ t("ui_token_step4") | safe }}</li>
+  </ol>
+  <p class="muted" style="font-size:.85rem">{{ t("ui_token_secret") }}</p>
+  <div style="text-align:right"><button type="button" data-token-later autofocus>{{ t("ui_token_later") }}</button></div>
+</dialog>
+<script src="/static/token.js" defer></script>
+{% endif %}
 </body>
 </html>
