@@ -81,6 +81,8 @@ Once a day Claude reads the recordings that are new since its last run, adds the
     Given a topic on a person's profile or Mindmap, when the owner presses its ✕ and confirms, then the topic leaves the person's profile, Mindmap, shared-topics card and probable connections, tasks, recordings and notes stay unchanged, and Claude's `set_person_topic` refuses that pair; "Verwaltung → Personen" lists the pair and "Zurückholen" restores it with its old note. Given a conversation, then it connects a person to its topics only when the person spoke at least 20 % of its passages.
 30. **Glossary of spellings (D-062).**
     Given the owner corrects a word in a task's title or description or in a person's profile, when the old and new word look like a spelling fix, then "Verwaltung → Schreibweisen" offers it as a suggestion to accept or reject; Claude can suggest with `suggest_spelling` and reads the glossary with `get_glossary`. Given a confirmed misspelling that belongs to one term, when Claude writes a task, note, overview or profile, then it is stored in the right spelling and Claude is told; given one that belongs to several terms ("Stefan"), then it stays, the task list marks it ("Stefan?") and the task page offers the candidates as buttons. A search for a term finds every spelling. Transcripts are never changed.
+31. **From a task into the Mindmap (D-063).**
+    Given a task page, when the owner clicks "In der Mindmap zeigen", then the Mindmap opens with the views the task needs to be visible (finished tasks, "Zusagen an mich", unlinked tasks) and shows the task marked, with its direct links in view and its links highlighted.
 
 ## Out of scope
 
