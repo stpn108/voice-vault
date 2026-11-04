@@ -165,6 +165,7 @@ TEXTS = {
     "todo_event_linked": {"de": "verknüpft", "en": "linked"},
     "todo_event_unlinked": {"de": "Verknüpfung entfernt", "en": "link removed"},
     "ui_graph": {"de": "Mindmap", "en": "Mind map"},
+    "ui_show_in_mindmap": {"de": "In der Mindmap zeigen", "en": "Show in mind map"},
     "ui_links": {"de": "Verknüpft mit", "en": "Linked to"},
     "ui_links_none": {"de": "Noch keine Verknüpfung. In der Liste eine Linie vom Punkt rechts zu einer anderen Aufgabe ziehen, oder hier auswählen.", "en": "No links yet. Draw a line from the dot on the right to another task in the list, or pick one here."},
     "ui_links_more": {"de": "+{count} weitere", "en": "+{count} more"},

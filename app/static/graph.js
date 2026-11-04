@@ -202,6 +202,18 @@
   });
   cy.on("mouseout", "node", clearFocus);
 
+  // Opened from a task page (D-063): centre on that task, mark it and show what it is linked to.
+  var target = payload.focus ? cy.$("#t" + payload.focus) : cy.collection();
+  if (target.length) {
+    // The task and its direct links in view, readable; with many links the task stays in the middle.
+    cy.fit(target.closedNeighborhood(), 80);
+    if (cy.zoom() > 1.2) { cy.zoom(1.2); }
+    if (cy.zoom() < 0.75) { cy.zoom(0.75); }
+    cy.center(target);
+    target.addClass("focus");
+    focus(target);
+  }
+
   // Full screen (D-050): the browser's own when it has one, else the box fills the window.
   var wrapBox = document.querySelector(".graph-wrap");
   var fullButton = document.querySelector("[data-fullscreen]");

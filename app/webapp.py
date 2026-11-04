@@ -388,12 +388,13 @@ def todo_graph_layout(request: Request, layout: str = Form(..., max_length=200_0
 @app.get("/todos/graph", response_class=HTMLResponse)
 def todo_graph(request: Request, done: int = Query(0, ge=0, le=1), topics: int = Query(0, ge=0, le=1),
                everything: int = Query(0, ge=0, le=1, alias="all"), waiting: int = Query(0, ge=0, le=1),
+               focus: int = Query(0, ge=0, le=MAX_ID),
                session: Session = Depends(get_session), cfg: Config = Depends(get_config)):
     """The tasks and their links as a graph (D-047)."""
     data = task_links.graph(session, done=bool(done), topics=bool(topics), everything=bool(everything),
                             waiting=bool(waiting))
     return render(request, cfg, "graph.html", data=data, done=done, topics=topics, everything=everything,
-                  waiting=waiting)
+                  waiting=waiting, focus=focus)
 
 
 @app.get("/todos/{todo_id}", response_class=HTMLResponse)

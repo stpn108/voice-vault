@@ -809,3 +809,23 @@ def test_d062_admin_glossary_accepts_and_adds_terms(client, session_factory):
     with session_factory() as s:
         assert glossary_service.mapping(s)["whiz"] == ["Wiz"] and glossary_service.mapping(s)["glucania"] == ["Glycania"]
     assert post(client, "/admin/glossary/term", canonical="x").status_code == 400
+
+
+@pytest.mark.parametrize("kind, status, linked, params", [
+    ("mine", "open", True, "done=0&amp;topics=0&amp;all=0&amp;waiting=0"),
+    ("mine", "done", False, "done=1&amp;topics=0&amp;all=1&amp;waiting=0"),
+    ("waiting", "open", False, "done=0&amp;topics=0&amp;all=1&amp;waiting=1"),
+])
+def test_d063_task_page_jumps_into_the_mindmap_with_the_task_visible(client, make_todo, session_factory,
+                                                                   kind, status, linked, params):
+    import task_links
+    todo = make_todo(title="Focus me", kind=kind, people=["Anna"] if kind == "waiting" else [])
+    other = make_todo(title="Other one")
+    with session_factory() as s:
+        if linked:
+            task_links.link(s, now_utc(), todo, other)
+        if status != "open":
+            svc.update_todo(s, now_utc(), todo, actor="owner", status=status)
+    assert f'href="/todos/graph?focus={todo}&amp;{params}"' in client.get(f"/todos/{todo}").text
+    page = client.get(f"/todos/graph?focus={todo}&" + params.replace("&amp;", "&")).text
+    assert f'"focus": {todo}' in page and "Focus me" in page

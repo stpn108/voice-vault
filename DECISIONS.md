@@ -737,3 +737,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | The audit found the vulnerable versions in the running image of the public MCP service. Transitive packages left unpinned resolve to whatever the image build cached, which is how the old anyio and certifi stayed in place. |
 | **Rejected alternatives** | (A) a separate constraints file for transitive packages: a second file for two lines; (B) leaving anyio and certifi unpinned and relying on a rebuild: the Docker layer cache keeps the old versions as long as `requirements.txt` is unchanged. |
 | **Status** | **FINAL** |
+
+### D-063: A task page leads into the Mindmap, centred on that task (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-11-04 |
+| **Decision** | The task page gets the link "In der Mindmap zeigen". It opens `/todos/graph` with `focus=<id>` and switches on what the task needs to be visible: finished tasks for a done or dropped task, "Zusagen an mich" for a waiting entry, unlinked tasks for a task without links. The Mindmap shows the task with its direct links (zoom kept between 0.75 and 1.2, the task in the middle), marks it and highlights its links as on hover (D-052) until the pointer moves to another box. A `focus` that is not on the map is ignored. |
+| **In plain words** | From a task you jump straight to its place in the Mindmap. |
+| **Reasoning** | Owner request: there was no way from a task into the Mindmap. |
+| **Rejected alternatives** | (A) a link to the plain Mindmap: the task may be hidden there and has to be searched for; (B) a separate Mindmap per task: the context of the other tasks is what the map is for. |
+| **Status** | **FINAL** |

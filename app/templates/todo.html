@@ -23,7 +23,9 @@
     <div><span>{{ t("ui_glossary_which", word=word) }}</span>
       {% for name in names %}<button class="small" type="submit" form="clarify-{{ n }}" name="choice" value="{{ name }}">{{ name }}</button>{% endfor %}</div>
   {% endfor %}</div>{% endif %}
-  <p class="sub" style="margin:0 0 1.2rem">{{ t("ui_created_by") }} {{ row.created_by }}, {{ row.created_at | localtime }}
+  <p class="sub" style="margin:0 0 1.2rem">
+    <a class="mindmap-jump" href="/todos/graph?focus={{ row.id }}&amp;done={{ 1 if row.status in ('done', 'dropped') else 0 }}&amp;topics=0&amp;all={{ 0 if linked else 1 }}&amp;waiting={{ 1 if row.kind == 'waiting' else 0 }}">{{ t("ui_show_in_mindmap") }} →</a>
+    {{ t("ui_created_by") }} {{ row.created_by }}, {{ row.created_at | localtime }}
     {% if row.recording_id %} · <a href="/recordings/{{ row.recording_id }}">{{ t("ui_recording") }} {{ row.recording_id }}</a>{% endif %}
     {% if row.topic %} · <a href="/topics/{{ row.topic_id }}">{{ row.topic }}</a>{% endif %}</p>
   <div class="split">
