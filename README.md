@@ -199,6 +199,7 @@ replaced blindly:
 ```bash
 ./redeploy.sh                      # tests -> build -> deploy -> verify
 docker compose logs -f app         # cycle log, look for "Cycle start/end"
+journalctl -t voice-vault-app-1 --since "2 days ago"   # same log, kept across redeploys (D-065)
 docker compose ps
 ls -lh volumes/backups/
 cd app && pytest                   # tests + ruff

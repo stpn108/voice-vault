@@ -759,3 +759,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner request: the warning existed only in the log and, with SMTP set, as a daily mail. |
 | **Rejected alternatives** | (A) a permanent banner: the owner asked for something he can dismiss; (B) storing the dismissal on the server: a browser convenience, no shared state needed; (C) renewing the token from the UI: the refresh token comes from the owner's Plaud login in the browser and has to be pasted somewhere; `.env` stays the one place for secrets. |
 | **Status** | **FINAL** |
+
+### D-065: Container logs go to the systemd journal (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-11-04 |
+| **Decision** | The shared logging block of `docker-compose.yml` uses the `journald` driver instead of `json-file` (which kept 3 × 10 MB per container). Every entry is tagged with the container name (`tag: "{{.Name}}"`), so `journalctl -t voice-vault-app-1` and `journalctl CONTAINER_NAME=voice-vault-app-1` find it; `docker compose logs` keeps working. How long logs are kept is the host's journald setting (`SystemMaxUse`, `Storage=persistent`). |
+| **In plain words** | The logs now survive every redeploy and restart and can be searched by date. |
+| **Reasoning** | Owner noticed that logs vanish on every redeploy: `redeploy.sh` removes the containers, and `json-file` logs live with the container. The journal is already on the server, rotates by itself and needs no extra software. |
+| **Rejected alternatives** | (A) a log file in a volume: own rotation code and invisible to `docker compose logs`; (B) Loki/Grafana or a log service: another stack to run for one owner; (C) `local` driver: also removed with the container. |
+| **Status** | **FINAL** |

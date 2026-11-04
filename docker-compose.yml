@@ -1,10 +1,10 @@
 name: ${COMPOSE_PROJECT_NAME:-voice-vault}
 
 x-logging: &default-logging
-  driver: "json-file"
+  # systemd journal (D-065): survives redeploys; journalctl -t <container name>. Retention: host journald.conf.
+  driver: "journald"
   options:
-    max-size: "10m"
-    max-file: "3"
+    tag: "{{.Name}}"
 
 services:
   db:
