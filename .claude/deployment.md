@@ -6,7 +6,7 @@
 docker-compose.yml
 ├── db          Postgres 16, healthcheck pg_isready; Ofelia labels run scripts/db-backup.sh into ./volumes/backups
 ├── app         Production app (own image, no volume mount), healthcheck via healthcheck.py
-└── app-tests   Test runner (same image, ./app mounted, pytest --testmon in watch mode)
+└── app-tests   Test runner (same image, ./app mounted, full suite on 4 workers in watch mode)
 ```
 
 - All app containers run as the host user via `HOST_UID`/`HOST_GID`
@@ -36,7 +36,7 @@ Owner:           reads "What changes for users", presses Merge on GitHub
 GitHub Actions:  "Auto-bump version" (VERSION += 0.1) on main
                    └── on completion: "Deploy" on the self-hosted runner
 Server (runner): cd $DEPLOY_DIR && git pull && ./redeploy.sh
-                   ├── pytest --testmon in the app-tests container
+                   ├── pytest (full suite, 4 workers) in the app-tests container
                    ├── FAIL → stop, nothing deployed, workflow red
                    ├── build image while old app keeps running
                    ├── stop / rm / up -d app

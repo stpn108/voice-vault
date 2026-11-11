@@ -33,7 +33,7 @@ TIMESTAMP=$(date +%s)
 TEST_CONTAINER_NAME="test_run_${TIMESTAMP}"
 REBUILT=0
 
-log "0. Running tests (testmon: only affected tests)..."
+log "0. Running tests (full suite, 4 workers)..."
 echo "   Container name: ${TEST_CONTAINER_NAME}"
 
 # Only rebuild image if requirements.txt changed (source comes via volume mount)
@@ -48,7 +48,7 @@ if [ "$REQ_HASH_CURRENT" != "$REQ_HASH_SAVED" ]; then
     REBUILT=1
 fi
 
-docker compose run --name "$TEST_CONTAINER_NAME" --rm app-tests pytest --testmon
+docker compose run --name "$TEST_CONTAINER_NAME" --rm app-tests pytest
 TEST_EXIT_CODE=$?
 
 if [ $REBUILT -ne 0 ]; then

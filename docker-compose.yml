@@ -176,7 +176,7 @@ services:
     environment:
       DATABASE_URL: "sqlite:///:memory:"
       TZ: ${TZ:-Europe/Berlin}
-    command: /bin/sh -c "rm -fr .testmondata .pytest_cache; pytest --testmon --cov=. --cov-report=term || true; ptw . --delay 2 --testmon -v"
+    command: /bin/sh -c "rm -fr .testmondata .pytest_cache; pytest --cov=. --cov-report=term || true; ptw . --delay 2 -v"
     restart: unless-stopped
     tty: true
     stdin_open: true

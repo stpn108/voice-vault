@@ -3,9 +3,9 @@
 ## Execution
 
 ```bash
-cd app && pytest                 # all tests + ruff (addopts = --ruff)
+cd app && pytest                 # all tests + ruff on 4 workers (addopts = --ruff -n 4, D-069)
 pytest tests/test_example.py -v  # one file
-pytest --testmon                 # only tests affected by the change
+pytest -n 0 tests/test_x.py -k y # without workers, e.g. for a debugger
 pytest --cov=. --cov-report=html # coverage
 ```
 

@@ -803,3 +803,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner: a warning after 24 of about 26 hours of a token's life is nonsense when the app renews it anyway; only a state the system cannot fix itself deserves a reminder. |
 | **Rejected alternatives** | (A) D-067's quarter-of-lifetime rule: still warns in cases the app would fix by itself (for example after the server was off for some hours); (B) warning after N failed cycles: a rejected token does not get better by waiting, it needs the owner at once. |
 | **Status** | **FINAL** |
+
+### D-069: Tests run in parallel on 4 workers; testmon is dropped (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-11-11 |
+| **Decision** | `pytest-xdist` (3.8.0) runs the suite on 4 worker processes: `-n 4` in the `addopts` of `pytest.ini`, so it applies everywhere `pytest` runs (locally, in the CI workflow without changing it, in `redeploy.sh`, in the `app-tests` watch container). `pytest-testmon` is removed: it does not work with xdist, and the full suite in parallel (about 7 s for 1150 tests, 9 s with coverage) is faster than testmon's selection was worth. `redeploy.sh` and the `app-tests` container run the full suite. Every test already uses its own in-memory SQLite database, so tests do not share state across workers. A single test can still run without workers with `pytest -n 0 …`. |
+| **In plain words** | The tests run four at a time and finish in a third of the time; the deploy always runs all of them. |
+| **Reasoning** | Owner request. Measured on a 4-core machine: 15.8 s serial, 6.6–6.9 s on 4 workers, stable over repeated runs. |
+| **Rejected alternatives** | (A) keeping testmon next to xdist: incompatible; (B) `-n auto`: the worker count would differ between the CI runner, the server and a laptop, which makes timing and resource use less predictable; (C) passing `-n 4` only in `redeploy.sh`: local runs and CI would stay serial. |
+| **Status** | **FINAL** |
