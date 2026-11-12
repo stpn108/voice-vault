@@ -825,3 +825,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner standard for all projects on callisto: request and error history in files that `tail`, `grep` and log tools on the host read directly, independent of the container lifecycle. The Referer can carry the same OAuth query string as the `/authorize` path (the consent form posts from it), so it is cut at `?` as well. The web health check probed `/`, the recordings list; skipping `/` would hide real page views, a dedicated `/healthz` can be skipped without losing anything. The sudo check runs before anything is stopped, so a missing setup never leaves the services down. |
 | **Rejected alternatives** | (A) uvicorn's own access log: logs the query string and cannot add `xff`/`rt`/`svc`; (B) a FastAPI `@app.middleware("http")`: framework-bound and inside the exception handlers, so it misses the final status of some responses; (C) `RotatingFileHandler` in the app: two processes share the files and would rotate over each other; logrotate with `WatchedFileHandler` reopens cleanly; (D) running `sudo` on every deploy: would need passwordless sudo for every deploy; (E) adding `/` to `ACCESS_LOG_SKIP` for `web`: drops real requests. |
 | **Status** | **FINAL** |
+
+### D-071: The test container gets 1280 MB for the 4 test workers (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-11-12 |
+| **Decision** | Amends D-069. `app-tests` in `docker-compose.yml`: `mem_limit` and `memswap_limit` 512m → 1280m. The number of workers stays at 4. |
+| **In plain words** | The automatic tests before every deploy get enough memory again, so the deploy no longer stops for no real reason. |
+| **Reasoning** | The first server deploy with D-069 failed: five xdist workers "node down: Not properly terminated" in different, unrelated tests, the sign of the kernel's out-of-memory kill. Measured on the full suite (1175 tests): about 830–840 MB peak for controller plus 4 workers (about 220 MB per worker), the same before and after D-070, so the limit, not a test, is the cause. 1280m leaves about 50 % headroom for a growing suite. The limit only applies to the test container; the app services keep theirs. |
+| **Rejected alternatives** | (A) `-n 2` (about 620 MB): still above 512m and halves the speed the owner asked for in D-069; (B) 1g: only about 20 % headroom, the next large test file would bring the failure back; (C) no limit: one runaway test could take the host down (`.claude/deployment.md`). |
+| **Status** | **FINAL** |

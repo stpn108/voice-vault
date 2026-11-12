@@ -179,8 +179,9 @@ services:
     build:
       context: ./app
     logging: *default-logging
-    mem_limit: 512m
-    memswap_limit: 512m
+    # 4 pytest workers (D-069) peak at about 840 MB together; 512m let the kernel kill workers (D-071).
+    mem_limit: 1280m
+    memswap_limit: 1280m
     user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     volumes:
       - ./app:/app
