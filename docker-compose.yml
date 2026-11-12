@@ -91,7 +91,7 @@ services:
   web:
     image: ${COMPOSE_PROJECT_NAME:-voice-vault}-app
     pull_policy: never
-    command: ["uvicorn", "webapp:app", "--host", "0.0.0.0", "--port", "8000"]
+    command: ["uvicorn", "webapp:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
     logging: *default-logging
     mem_limit: 256m
     memswap_limit: 256m
@@ -109,10 +109,16 @@ services:
       UI_LANG: ${UI_LANG:-de}
       UI_ALLOWED_HOSTS: ${UI_ALLOWED_HOSTS:-}
       UI_SECRET: ${UI_SECRET:-}
+      # Host log files next to stdout (D-070); redeploy.sh creates the directory.
+      LOG_DIR: /var/log/app
+      SERVICE_NAME: web
+      ACCESS_LOG_SKIP: ${ACCESS_LOG_SKIP:-/health,/healthz}
+    volumes:
+      - /var/log/${COMPOSE_PROJECT_NAME:?}:/var/log/app
     ports:
       - "127.0.0.1:${PORTS_PREFIX}010:8000"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=5)"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=5)"]
       interval: 30s
       timeout: 10s
       start_period: 20s
@@ -129,7 +135,7 @@ services:
     profiles: ["mcp"]
     image: ${COMPOSE_PROJECT_NAME:-voice-vault}-app
     pull_policy: never
-    command: ["uvicorn", "mcp_server:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+    command: ["uvicorn", "mcp_server:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
     logging: *default-logging
     mem_limit: 256m
     memswap_limit: 256m
@@ -151,6 +157,11 @@ services:
       MCP_OAUTH_REDIRECT_URIS: ${MCP_OAUTH_REDIRECT_URIS:-https://claude.ai/api/mcp/auth_callback}
       MCP_TRUST_FORWARDED_FOR: ${MCP_TRUST_FORWARDED_FOR:-false}
       UI_LANG: ${UI_LANG:-de}
+      LOG_DIR: /var/log/app
+      SERVICE_NAME: mcp
+      ACCESS_LOG_SKIP: ${ACCESS_LOG_SKIP:-/health,/healthz}
+    volumes:
+      - /var/log/${COMPOSE_PROJECT_NAME:?}:/var/log/app
     ports:
       - "127.0.0.1:${PORTS_PREFIX}020:8000"
     healthcheck:

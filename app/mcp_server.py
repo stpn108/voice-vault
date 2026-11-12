@@ -25,6 +25,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 import mcp_tools
+from access_log import AccessLogMiddleware
 from config import Config, ConfigError, host_name, load_config
 from database import engine, migrate_schema
 from mcp_oauth_web import build_settings, setup_oauth
@@ -237,4 +238,5 @@ def create_app(cfg: Optional[Config] = None, session_factory: Optional[Callable[
             return Response(status_code=202)
         return JSONResponse(response)
 
+    app.add_middleware(AccessLogMiddleware)  # added last = outermost: sees every request and its final status (D-070)
     return app

@@ -33,6 +33,34 @@ def setup_logging():
     # security token and signature in the query string and must not reach the logs.
     for noisy in ("httpx", "httpcore"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
+    access = logging.getLogger("access")
+    access.setLevel(logging.INFO)  # request lines stay visible when LOG_LEVEL is WARNING
+    log_dir = os.getenv("LOG_DIR")
+    if log_dir:
+        _add_file_handlers(log_dir, access)
+
+
+def _add_file_handlers(log_dir: str, access: logging.Logger) -> None:
+    """error.log (WARNING and above) and access.log (logger "access") in LOG_DIR, next to stdout (D-070).
+    uvicorn's loggers do not propagate to root, so they get the error.log handler as well.
+    A missing or read-only directory only warns: no service may fail to start because of it."""
+    from logging.handlers import WatchedFileHandler
+    error_fmt = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    targets = (("error.log", logging.WARNING, error_fmt, (logging.getLogger(), logging.getLogger("uvicorn"))),
+               ("access.log", logging.INFO, "%(message)s", (access,)))
+    for name, level, fmt, loggers in targets:
+        path = os.path.abspath(os.path.join(log_dir, name))
+        if any(isinstance(h, WatchedFileHandler) and h.baseFilename == path for h in loggers[0].handlers):
+            continue  # already set up in this process
+        try:
+            handler = WatchedFileHandler(path, encoding="utf-8")
+        except OSError as exc:
+            logging.getLogger(__name__).warning("Log files disabled: cannot write %s (%s)", path, exc)
+            return
+        handler.setLevel(level)
+        handler.setFormatter(logging.Formatter(fmt))
+        for logger in loggers:
+            logger.addHandler(handler)
 
 
 # ---------------------------------------------------------

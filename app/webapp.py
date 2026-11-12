@@ -26,10 +26,12 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from access_log import AccessLogMiddleware
 import recording_service as svc
 import todo_service as todos
 import briefing_service
@@ -157,6 +159,9 @@ async def security_headers(request: Request, call_next):
     return secure(await call_next(request))
 
 
+app.add_middleware(AccessLogMiddleware)  # added last = outermost: sees every request and its final status (D-070)
+
+
 @app.exception_handler(StarletteHTTPException)
 async def error_page(request: Request, exc: StarletteHTTPException) -> HTMLResponse:
     """A readable page instead of bare JSON; the status code stays."""
@@ -216,6 +221,13 @@ def require_csrf(request: Request, token: str) -> None:
         raise HTTPException(status_code=403, detail="origin mismatch")
     if fetch_site in ("cross-site", "same-site"):
         raise HTTPException(status_code=403, detail="cross-site request")
+
+
+@app.get("/healthz")
+def healthz(session: Session = Depends(get_session)):
+    """Container health check: the database answers. Its own path, so the access log can skip it (D-070)."""
+    session.execute(text("SELECT 1"))
+    return JSONResponse({"status": "ok"})
 
 
 @app.get("/", response_class=HTMLResponse)

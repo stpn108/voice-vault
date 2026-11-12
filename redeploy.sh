@@ -103,6 +103,43 @@ if [ ! -w volumes/backups ]; then
 fi
 chmod 700 volumes/backups 2>/dev/null || warn "Could not restrict volumes/backups to the owner (chmod 700)."
 
+# Host log files of the HTTP services (D-070): /var/log/<project>/{access,error}.log, rotated by logrotate.
+# sudo only for these two steps, and only when something is missing or different.
+# Same default as the top-level "name:" of docker-compose.yml.
+LOG_PROJECT=${COMPOSE_PROJECT_NAME:-$(grep -E '^COMPOSE_PROJECT_NAME=' .env 2>/dev/null | cut -d= -f2 | tr -d '[:space:]')}
+LOG_PROJECT=${LOG_PROJECT:-voice-vault}
+if ! [[ "$LOG_PROJECT" =~ ^[a-z0-9][a-z0-9_-]*$ ]]; then
+    err "COMPOSE_PROJECT_NAME in .env is not a valid project name ('${LOG_PROJECT}'); it names /var/log/<project>."
+    exit 1
+fi
+LOG_HOST_DIR="/var/log/${LOG_PROJECT}"
+LOG_USER=$(id -un "$HOST_UID")
+LOGROTATE_FILE="/etc/logrotate.d/${LOG_PROJECT}"
+LOGROTATE_NEW=$(mktemp)
+trap 'rm -f "$LOGROTATE_NEW"' EXIT
+sed -e "s/<NAME>/${LOG_PROJECT}/g" -e "s/<USER>/${LOG_USER}/g" deploy/logrotate.conf > "$LOGROTATE_NEW"
+DIR_OK=0
+[ "$(stat -c '%U:%G:%a' "$LOG_HOST_DIR" 2>/dev/null)" = "${LOG_USER}:adm:750" ] && DIR_OK=1
+ROTATE_OK=0
+cmp -s "$LOGROTATE_NEW" "$LOGROTATE_FILE" && ROTATE_OK=1
+if [ $DIR_OK -eq 0 ] || [ $ROTATE_OK -eq 0 ]; then
+    if ! sudo -n true 2>/dev/null && ! [ -t 0 ]; then
+        err "Setting up the log files needs sudo, which asks for a password, and there is no terminal."
+        err "Run these two commands once by hand in $(pwd), then deploy again:"
+        err "  sudo install -d -m 0750 -o ${LOG_USER} -g adm ${LOG_HOST_DIR}"
+        err "  sed -e 's/<NAME>/${LOG_PROJECT}/g' -e 's/<USER>/${LOG_USER}/g' deploy/logrotate.conf | sudo install -m 0644 /dev/stdin ${LOGROTATE_FILE}"
+        exit 1
+    fi
+    if [ $DIR_OK -eq 0 ]; then
+        log "Creating ${LOG_HOST_DIR} (owner ${LOG_USER}, group adm, 0750)..."
+        sudo install -d -m 0750 -o "$LOG_USER" -g adm "$LOG_HOST_DIR" || { err "Could not create ${LOG_HOST_DIR}."; exit 1; }
+    fi
+    if [ $ROTATE_OK -eq 0 ]; then
+        log "Installing ${LOGROTATE_FILE}..."
+        sudo install -m 0644 "$LOGROTATE_NEW" "$LOGROTATE_FILE" || { err "Could not install ${LOGROTATE_FILE}."; exit 1; }
+    fi
+fi
+
 # 2. Stop the service (image is already built -> short downtime)
 log "2. Stopping services: ${SERVICES}..."
 docker compose stop $SERVICES

@@ -475,3 +475,9 @@ def test_d067_an_older_token_does_not_replace_a_valid_newer_one(client, session_
     assert response.headers["location"] == "/admin/plaud?error=older"
     with session_factory() as s:
         assert s.get(PlaudSession, 1).refresh_token == newer
+
+
+def test_webapp_healthz_answers_ok(client):
+    # Own path for the container health check, so the access log can skip it (D-070).
+    response = client.get("/healthz")
+    assert response.status_code == 200 and response.json() == {"status": "ok"}

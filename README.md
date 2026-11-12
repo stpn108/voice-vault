@@ -203,7 +203,35 @@ docker compose logs -f app         # cycle log, look for "Cycle start/end"
 journalctl -t voice-vault-app-1 --since "2 days ago"   # same log, kept across redeploys (D-065)
 docker compose ps
 ls -lh volumes/backups/
+tail -f /var/log/voice-vault/access.log   # one line per web/mcp request (D-070)
+tail -f /var/log/voice-vault/error.log    # warnings, errors, tracebacks of web/mcp
 cd app && pytest                   # tests + ruff
 ```
+
+### Log files on the host (D-070)
+
+`web` and `mcp` write two files to `/var/log/${COMPOSE_PROJECT_NAME}/` in addition to stdout
+(journald, `docker compose logs`):
+
+- `access.log`: one line per HTTP request, combined-log style plus `xff="…"`, `rt=<seconds>` and
+  `svc=web|mcp`. The path and the Referer are logged without query string (OAuth codes and state
+  travel there); bodies, cookies and Authorization headers are never logged. Health checks
+  (`ACCESS_LOG_SKIP`, default `/health,/healthz`) are left out.
+- `error.log`: everything at WARNING and above, same format as the console, including tracebacks.
+
+`redeploy.sh` creates the directory (owner = the deploy user, group `adm`, mode 0750) and installs
+`/etc/logrotate.d/${COMPOSE_PROJECT_NAME}` from `deploy/logrotate.conf` (daily, 14 days, compressed).
+It uses `sudo` only for these two steps and only when something is missing or different. When sudo
+needs a password and there is no terminal (the deploy pipeline), it stops and prints the two
+commands to run once by hand:
+
+```bash
+sudo install -d -m 0750 -o <deploy user> -g adm /var/log/<project>
+sed -e 's/<NAME>/<project>/g' -e 's/<USER>/<deploy user>/g' deploy/logrotate.conf \
+  | sudo install -m 0644 /dev/stdin /etc/logrotate.d/<project>
+```
+
+If the directory is missing or not writable inside a container, the service logs one warning and
+runs without the files.
 
 See `.claude/operations.md` and `SETUP.md` for the deploy pipeline.
