@@ -100,3 +100,40 @@ def test_d030_people_migration_is_registered():
 def test_d038_kind_migration_is_registered():
     from database import MIGRATIONS, Todo
     assert "006_todos_kind" in [name for name, _ in MIGRATIONS] and "kind" in Todo.__table__.c
+
+
+def _db_down():
+    from sqlalchemy.exc import OperationalError
+    return OperationalError("SELECT 1", {}, Exception("[Errno -3] Temporary failure in name resolution"))
+
+
+class _FlakyEngine:
+    """Fails `failures` times to connect, then works."""
+
+    def __init__(self, failures):
+        self.failures = failures
+
+    def connect(self):
+        if self.failures:
+            self.failures -= 1
+            raise _db_down()
+        from sqlalchemy import create_engine
+        return create_engine("sqlite:///:memory:").connect()
+
+
+def test_d070_the_start_waits_for_the_database_with_one_warning_per_try(caplog):
+    import database
+    slept = []
+    database.wait_for_database(_FlakyEngine(2), sleep=slept.append, clock=lambda: 0)
+    assert slept == [database.DB_RETRY_SECONDS] * 2
+    warnings = [r.getMessage() for r in caplog.records if r.levelname == "WARNING"]
+    assert len(warnings) == 2 and "name resolution" in warnings[0] and "Traceback" not in caplog.text
+
+
+def test_d070_the_start_gives_up_after_the_timeout():
+    import pytest
+    from sqlalchemy.exc import OperationalError
+    import database
+    ticks = iter([0, 30, 61])
+    with pytest.raises(OperationalError):
+        database.wait_for_database(_FlakyEngine(10), sleep=lambda s: None, clock=lambda: next(ticks))

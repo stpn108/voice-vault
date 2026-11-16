@@ -9,12 +9,14 @@ Rules (see .claude/database.md):
 """
 import os
 import logging
+import time
 import datetime as dt
 from typing import Optional
 from sqlalchemy import (
     create_engine, Column, Integer, String, Float, DateTime,
     Text, Boolean, Date, ForeignKey, UniqueConstraint, func, text as sqltext,
 )
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import DeclarativeBase, mapped_column, Mapped, Session
 
 log = logging.getLogger(__name__)
@@ -403,6 +405,27 @@ MIGRATIONS: list = [
 _SCHEMA_LOCK_KEY = 0x56564C54  # "VVLT"
 
 
+DB_WAIT_SECONDS = 60
+DB_RETRY_SECONDS = 5
+
+
+def wait_for_database(db_engine, timeout: float = DB_WAIT_SECONDS, sleep=time.sleep, clock=time.monotonic) -> None:
+    """Wait until the database answers (D-070). After Docker restarts all containers, a service can be up
+    before Postgres is: one warning per try instead of a crash, and the error only after `timeout`."""
+    deadline = clock() + timeout
+    while True:
+        try:
+            with db_engine.connect() as conn:
+                conn.execute(sqltext("SELECT 1"))
+            return
+        except OperationalError as exc:
+            if clock() >= deadline:
+                raise
+            reason = str(exc.orig or exc).strip().splitlines()[0][:120]
+            log.warning("Database not reachable yet, retrying in %d s reason=%s", DB_RETRY_SECONDS, reason)
+            sleep(DB_RETRY_SECONDS)
+
+
 def migrate_schema(db_engine=None):
     """
     Create tables and apply pending migrations. Called once at startup.
@@ -410,6 +433,7 @@ def migrate_schema(db_engine=None):
     and safe to re-run (tracked versions are skipped).
     """
     db_engine = db_engine or engine
+    wait_for_database(db_engine)
     with db_engine.begin() as conn:
         if db_engine.dialect.name == "postgresql":
             conn.execute(sqltext("SELECT pg_advisory_xact_lock(:k)"), {"k": _SCHEMA_LOCK_KEY})

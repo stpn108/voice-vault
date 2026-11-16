@@ -6,6 +6,7 @@ import os
 import logging
 
 from apscheduler.schedulers.blocking import BlockingScheduler
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from config import load_config
@@ -42,9 +43,15 @@ SYNC_POLL_SECONDS = 20
 
 
 def poll_sync_requests(scheduler) -> bool:
-    with session_factory() as session:
-        if not claim_sync_request(session, now_utc()):
-            return False
+    try:
+        with session_factory() as session:
+            if not claim_sync_request(session, now_utc()):
+                return False
+    except OperationalError as exc:
+        # The database is away for a moment (Docker restart, redeploy): one line, the next poll tries again (D-070).
+        log.warning("Database not reachable, fetch requests checked again in %d s reason=%s", SYNC_POLL_SECONDS,
+                    str(exc.orig or exc).strip().splitlines()[0][:120])
+        return False
     log.info("Import requested in the web UI, starting the cycle now")
     scheduler.modify_job("plaud_sync", next_run_time=now_utc())
     return True

@@ -172,3 +172,19 @@ def test_d045_every_cycle_marks_the_fetch_requests_it_served_as_done(monkeypatch
     job.run()
     with session_factory() as s:
         assert rs.sync_state(s, NOW) == {"state": "done", "new": 3}
+
+
+def test_d070_a_database_outage_in_the_fetch_poll_is_one_warning(monkeypatch, caplog):
+    from sqlalchemy.exc import OperationalError
+
+    def down():
+        raise OperationalError("SELECT", {}, Exception("[Errno -3] Temporary failure in name resolution"))
+
+    class NoScheduler:
+        def modify_job(self, *args, **kwargs):
+            raise AssertionError("no cycle without a database")
+
+    monkeypatch.setattr(main, "session_factory", down)
+    assert main.poll_sync_requests(NoScheduler()) is False
+    warnings = [r.getMessage() for r in caplog.records if r.levelname == "WARNING"]
+    assert len(warnings) == 1 and "Database not reachable" in warnings[0] and "name resolution" in warnings[0]

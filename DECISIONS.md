@@ -836,3 +836,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | The first server deploy with D-069 failed: five xdist workers "node down: Not properly terminated" in different, unrelated tests, the sign of the kernel's out-of-memory kill. Measured on the full suite (1175 tests): about 830–840 MB peak for controller plus 4 workers (about 220 MB per worker), the same before and after D-070, so the limit, not a test, is the cause. 1280m leaves about 50 % headroom for a growing suite. The limit only applies to the test container; the app services keep theirs. |
 | **Rejected alternatives** | (A) `-n 2` (about 620 MB): still above 512m and halves the speed the owner asked for in D-069; (B) 1g: only about 20 % headroom, the next large test file would bring the failure back; (C) no limit: one runaway test could take the host down (`.claude/deployment.md`). |
 | **Status** | **FINAL** |
+
+### D-070: A short database outage gives one warning line, not a traceback; services wait for the database at start (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-11-16 |
+| **Decision** | (1) `migrate_schema()`, which every service (app, web, mcp) runs at start, first waits for the database: it tries `SELECT 1` every 5 seconds for up to 60 seconds and logs one warning per try (`Database not reachable yet …`, first line of the driver's message); only after that it fails and the container restart takes over. (2) The 20-second poll for fetch requests (D-045) catches `OperationalError` and logs one warning line instead of letting APScheduler print a traceback; it tries again on its next run. The import cycle already ends with a one-line error on any exception and is unchanged. |
+| **In plain words** | When the database is gone for a moment (an update restarts Docker), the log shows a short warning instead of pages of error text, and the app waits for the database instead of crashing. |
+| **Reasoning** | Twice in two weeks (redeploy on 2026-11-04, Docker update by `apt-get dist-upgrade` on 2026-11-16) the database went away for seconds; the log showed long tracebacks and a crash at start, although nothing was wrong with the app. |
+| **Rejected alternatives** | (A) `pool_pre_ping` only: does not help when the database host is gone, and the start would still crash; (B) catching every exception in the poll: would hide real bugs; (C) Compose `depends_on: service_healthy` alone: already set, but does not apply when Docker restarts all containers at once. |
+| **Status** | **FINAL** |
