@@ -73,8 +73,8 @@ docker compose ps                    # every service running / healthy?
 docker compose logs -f app           # live, Ctrl+C to stop
 docker compose logs --tail=200 app
 docker compose restart app
-tail -f /var/log/<project>/access.log   # web + mcp requests, one line each (D-070)
-tail -f /var/log/<project>/error.log    # web + mcp warnings, errors, tracebacks
+tail -f /var/log/<project>/access.log   # web requests, one line each (D-070)
+tail -f /var/log/<project>/error.log    # web warnings, errors, tracebacks
 ```
 
 `redeploy.sh` sets up `/var/log/<project>/` and `/etc/logrotate.d/<project>` (needs sudo once; it

@@ -22,11 +22,8 @@ export HOST_GID=$(id -g)
 # Keep the build as it is; setting the variable silences Compose's "delegate builds to bake" hint.
 export COMPOSE_BAKE=false
 
-# Services this deploy manages. The MCP server is opt-in: COMPOSE_PROFILES=mcp in .env.
+# Services this deploy manages. The mcp service is gone (D-073); --remove-orphans below drops a running one.
 SERVICES="app web"
-if grep -Eq '^COMPOSE_PROFILES=.*mcp' .env 2>/dev/null; then
-    SERVICES="$SERVICES mcp"
-fi
 
 # --- STEP 0: PRE-FLIGHT TESTS ---
 TIMESTAMP=$(date +%s)
@@ -164,7 +161,7 @@ else
     echo "No orphaned containers found. All clean."
 fi
 
-# 5. Start container with new image (--remove-orphans drops the retired db-backup service)
+# 5. Start container with new image (--remove-orphans drops the retired db-backup and mcp services)
 log "5. Starting container with new image..."
 docker compose up -d --remove-orphans $SERVICES
 
