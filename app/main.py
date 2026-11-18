@@ -1,14 +1,16 @@
 """
 voice-vault entrypoint: migrate the schema, then run the import/delete cycle
-on a schedule (REQ-001).
+on a schedule (REQ-001) and, with an API key, the analysis of new recordings (REQ-007).
 """
 import os
 import logging
+from typing import Optional
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
+from analysis_job import AnalysisJob, build_analysis_job
 from config import load_config
 from database import engine, migrate_schema
 from plaud_client import build_client
@@ -23,7 +25,7 @@ log = logging.getLogger(__name__)
 logging.getLogger("apscheduler").setLevel(logging.WARNING)
 
 
-def build_scheduler(job: SyncJob, interval_minutes: int) -> BlockingScheduler:
+def build_scheduler(job: SyncJob, interval_minutes: int, analysis: Optional[AnalysisJob] = None) -> BlockingScheduler:
     scheduler = BlockingScheduler(timezone=LOCAL_TZ)
     # max_instances=1: a cycle still running when the next one is due is skipped.
     scheduler.add_job(
@@ -36,6 +38,12 @@ def build_scheduler(job: SyncJob, interval_minutes: int) -> BlockingScheduler:
         lambda: poll_sync_requests(scheduler), "interval", seconds=SYNC_POLL_SECONDS, id="sync_requests",
         max_instances=1, coalesce=True,
     )
+    if analysis is not None:
+        # Its own job (REQ-007): a long analysis never delays the import cycle; one run at a time.
+        scheduler.add_job(
+            analysis.run, "interval", minutes=interval_minutes, id="analysis",
+            max_instances=1, coalesce=True,
+        )
     return scheduler
 
 
@@ -73,7 +81,8 @@ def main():
         log.warning("Shadow mode: nothing is deleted at Plaud (PLAUD_DELETE_ENABLED=false)")
     client = build_client(cfg, session_factory)
     job = SyncJob(cfg, client, session_factory)
-    build_scheduler(job, cfg.import_interval_minutes).start()
+    analysis = build_analysis_job(cfg, session_factory)
+    build_scheduler(job, cfg.import_interval_minutes, analysis).start()
 
 
 if __name__ == "__main__":

@@ -848,7 +848,7 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Rejected alternatives** | (A) `pool_pre_ping` only: does not help when the database host is gone, and the start would still crash; (B) catching every exception in the poll: would hide real bugs; (C) Compose `depends_on: service_healthy` alone: already set, but does not apply when Docker restarts all containers at once. |
 | **Status** | **FINAL** |
 
-### D-072: The app container analyses new recordings itself through the Claude API, with the MCP tools in-process (TENTATIVE)
+### D-072: The app container analyses new recordings itself through the Claude API, with the MCP tools in-process (FINAL)
 
 | | |
 |---|---|
@@ -857,4 +857,4 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **In plain words** | Your server now reads new recordings itself and fills in tasks, profiles and the daily overview, with the same rules as before. The scheduled task in claude.ai is no longer needed, so no conversation ends up in a claude.ai session. |
 | **Reasoning** | Owner request: the scheduled task keeps every recording it reads in a session transcript of the owner's claude.ai account. Through the API the content is not used for training and is deleted at Anthropic within 30 days, and no session is kept in the account. A tool loop over the existing tools keeps the behaviour of the routine that has run since October and reuses every guard, so the change is small and the risk is known; that is also why the owner skips the shadow phase (`.claude/architecture.md` §6, `.claude/llm.md` §9). The key goes only to the container that does not face the internet. D-041 rejected an account credential on the server; an API key is limited to API use, and the owner chose it. 180 s instead of the 30 s of `.claude/llm.md` §7 because one turn with thinking over a long transcript can take longer; a timeout is a failed run, nothing partial is lost because every write is a complete, logged tool call. |
 | **Rejected alternatives** | (A) One structured call per recording whose JSON the code applies: duplicates the tool logic and cannot react to a tool error (a duplicate, an ambiguous name); (B) Claude Managed Agents: keeps the session history at Anthropic, which is what the owner wants to end, and the tools are database functions inside the app; (C) the SDK tool runner: beta and built for decorated functions; the tools already exist as JSON schemas with one dispatcher, and every request needs its own trace row; (D) a local model on callisto: no GPU, much weaker at telling who has to act (owner chose the API); (E) the key in the `mcp` container: that one faces the internet. |
-| **Status** | **TENTATIVE** (until REQ-007 is approved) |
+| **Status** | **FINAL** |

@@ -5,7 +5,8 @@ from config import load_config
 
 ENV_KEYS = ["PLAUD_DELETE_ENABLED", "STORE_AUDIO", "MIN_AGE_MINUTES", "IMPORT_INTERVAL_MINUTES",
             "PERMANENT_DELETE_AFTER_HOURS", "TOKEN_WARN_DAYS", "MIN_SPEAKERS_NAMED_PERCENT",
-            "SPEAKER_NAMING_WAIT_DAYS"]
+            "SPEAKER_NAMING_WAIT_DAYS", "ANTHROPIC_API_KEY", "ANALYSIS_MODEL", "ANALYSIS_EFFORT",
+            "ANALYSIS_LOOKBACK_DAYS", "ANALYSIS_MAX_RECORDINGS", "ANALYSIS_MAX_REQUESTS"]
 
 
 @pytest.fixture(autouse=True)
@@ -23,6 +24,12 @@ def clean_env(monkeypatch):
     ("speaker_naming_wait_days", 7),  # D-024
     ("import_interval_minutes", 10),
     ("token_warn_days", 5),
+    ("anthropic_api_key", ""),  # REQ-007: analysis off until a key is set
+    ("analysis_model", "claude-opus-5-5"),
+    ("analysis_effort", "medium"),
+    ("analysis_lookback_days", 7),
+    ("analysis_max_recordings", 5),
+    ("analysis_max_requests", 40),
 ])
 def test_req_001_defaults(field, expected):
     assert getattr(load_config(), field) == expected
@@ -51,3 +58,11 @@ def test_redirect_uris_fall_back_to_the_claude_callback_when_unset_or_empty(monk
 def test_redirect_uris_can_be_extended(monkeypatch):
     monkeypatch.setenv("MCP_OAUTH_REDIRECT_URIS", "https://claude.ai/api/mcp/auth_callback, http://localhost/callback")
     assert load_config().mcp_oauth_redirect_uris == ("https://claude.ai/api/mcp/auth_callback", "http://localhost/callback")
+
+
+@pytest.mark.parametrize("value", ["extreme", "0"])
+def test_req_007_unknown_effort_stops_the_start(monkeypatch, value):
+    from config import ConfigError
+    monkeypatch.setenv("ANALYSIS_EFFORT", value)
+    with pytest.raises(ConfigError):
+        load_config()

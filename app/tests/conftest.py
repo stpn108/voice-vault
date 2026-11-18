@@ -42,3 +42,14 @@ def session_factory():
     )
     database.Base.metadata.create_all(test_engine)
     return lambda: Session(test_engine)
+
+
+@pytest.fixture(autouse=True)
+def no_live_claude_api(monkeypatch):
+    """A unit test never calls the Claude API (.claude/llm.md §8): building a real SDK client fails loudly."""
+    import llm_client
+
+    def refuse(api_key):
+        raise AssertionError("a unit test tried to build a live Claude API client")
+
+    monkeypatch.setattr(llm_client, "_new_sdk_client", refuse)

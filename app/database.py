@@ -299,6 +299,42 @@ class SyncRequest(Base):
     new_recordings: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
 
+class AnalysisRun(Base):
+    """One run of the server-side analysis (REQ-007). Ids only, no recording content."""
+    __tablename__ = "analysis_runs"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    started_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), index=True)
+    finished_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="running")
+    recording_ids: Mapped[str] = mapped_column(String(200), default="")
+    done_ids: Mapped[str] = mapped_column(String(200), default="")
+    requests: Mapped[int] = mapped_column(Integer, default=0)
+    tool_calls: Mapped[int] = mapped_column(Integer, default=0)
+    error: Mapped[str] = mapped_column(String(300), default="")
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class LlmTrace(Base):
+    """One Claude API request (.claude/llm.md §3, REQ-007). Hashes and counts only, never content."""
+    __tablename__ = "llm_traces"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    ts_utc: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), index=True)
+    call_type: Mapped[str] = mapped_column(String(32))
+    run_id: Mapped[Optional[int]] = mapped_column(ForeignKey("analysis_runs.id"), nullable=True, index=True)
+    model: Mapped[str] = mapped_column(String(64), default="")
+    status: Mapped[str] = mapped_column(String(16))
+    stop_reason: Mapped[str] = mapped_column(String(32), default="")
+    latency_ms: Mapped[int] = mapped_column(Integer, default=0)
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    cache_read_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    cache_write_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    request_id: Mapped[str] = mapped_column(String(64), default="")
+    request_hash: Mapped[str] = mapped_column(String(64), default="")
+    response_hash: Mapped[str] = mapped_column(String(64), default="")
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class PlaudSession(Base):
     """The one current Plaud token pair (single row, id=1). Secret: never log or export."""
     __tablename__ = "plaud_sessions"

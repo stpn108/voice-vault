@@ -195,6 +195,27 @@ replaced blindly:
 > 04:00; one call per recording day, and read `list_digests` for that day first so you extend it): what is
 > new, what changed, what is most urgent.
 
+## Analysis on the server (REQ-007, D-072)
+
+With `ANTHROPIC_API_KEY` in `.env` the app runs the routine above itself: every `IMPORT_INTERVAL_MINUTES` it
+takes the recordings of the last `ANALYSIS_LOOKBACK_DAYS` days that are not analyzed and not waiting for Plaud,
+at most `ANALYSIS_MAX_RECORDINGS` per run, oldest first, and lets Claude (`ANALYSIS_MODEL`, default
+`claude-opus-5-5`) work through them with the same tools and rules as over MCP. Without new recordings no request
+is sent. Only the `app` service gets the key. Each request writes a row to `llm_traces` (tokens, model, status,
+hashes, no content), each run a row to `analysis_runs`. A failed run sends at most one mail a day; a recording that
+failed twice within 24 hours waits 24 hours. The cost in dollars is in the Anthropic Console; a workspace with a
+spend limit for this key is the cap.
+
+Switching over: pause the claude.ai scheduled task first, then put the key into `.env` and run
+`docker compose up -d app` (or deploy). Both at once would work through the same recordings twice.
+
+```sql
+-- runs per status per day
+SELECT date(started_at), status, count(*) FROM analysis_runs GROUP BY 1, 2 ORDER BY 1 DESC;
+-- tokens per day
+SELECT date(ts_utc), sum(input_tokens), sum(cache_read_tokens), sum(output_tokens) FROM llm_traces GROUP BY 1 ORDER BY 1 DESC;
+```
+
 ## Operations
 
 ```bash

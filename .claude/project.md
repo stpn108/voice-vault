@@ -20,7 +20,7 @@ explicitly out of scope, so a request that lands here is escalated instead
 of built:
 
 - NOT a Plaud replacement: the UI only shows, searches and deletes stored recordings (REQ-002)
-- NOT a processing pipeline: no summarising, tagging or analysis of recordings here; that happens later with Claude
+- NOT a general processing pipeline: the only analysis is the REQ-006 routine, which the app runs itself through the Claude API (REQ-007, D-072); no other summarising, tagging or analysis of recordings here
 - NOT an audio archive: audio is exported only when an explicit flag is set, default off
 - NOT built on plaud-tools: only a minimal own client with the endpoints needed
 - NOT multi-account or multi-tenant: one Plaud account, one Google account
@@ -40,6 +40,7 @@ of built:
 - **Scheduling**: APScheduler (as in google-contacts-sync), every 10 minutes
 - **Web**: FastAPI + Jinja2 + uvicorn, service `web`, viewing and cleanup UI (REQ-002, D-008)
 - **Claude access**: MCP server, service `mcp`, bearer token or OAuth; reads recordings, writes only tasks (REQ-003, REQ-006, D-011, D-013)
+- **Analysis**: scheduler job in `app`, Claude API through `llm_client.py`, the MCP tools in-process (REQ-007, D-072)
 - **External**: Plaud web API (unofficial, EU region)
 - **LLM** (optional): see `.claude/llm.md`
 - **Deployment**: Docker Compose on one server; GitHub Actions self-hosted runner runs `./redeploy.sh`

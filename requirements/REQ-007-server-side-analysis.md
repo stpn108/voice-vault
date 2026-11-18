@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | DRAFT |
+| **Status** | APPROVED (owner's yes in chat, 2026-11-18, developer mode) |
 | **Date** | 2026-11-18 |
 | **Requested by** | Dennis Winter |
 | **Implemented in** | — (branch `claude/REQ-007-server-analysis`) |
@@ -64,7 +64,8 @@ Runs per status per day from table `analysis_runs`, column `status` (target: no 
 
 | Date | Question | Answer |
 |------|----------|--------|
-| | | |
+| 2026-11-18 | The scheduled task ran on Claude Fable 5.2 (the account default). Opus 5.5 or Fable 5.2? | Opus 5.5 ("Opus 5.5 reicht") |
+| 2026-11-18 | The scheduled task sent a push message after every run. A message after every run, or a mail on failures only? | Mail on failures only ("Mail bei Fehlern reicht auch") |
 
 ## Tests
 

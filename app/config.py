@@ -43,6 +43,17 @@ def _int(name: str, default: int, minimum: int, maximum: int = None) -> int:
     return value
 
 
+ANALYSIS_EFFORTS = ("low", "medium", "high", "xhigh", "max")
+
+
+def _effort() -> str:
+    """Effort of the analysis (REQ-007); an unknown value stops the start instead of failing every run."""
+    value = os.getenv("ANALYSIS_EFFORT", "").strip().lower() or "medium"
+    if value not in ANALYSIS_EFFORTS:
+        raise ConfigError(f"ANALYSIS_EFFORT must be one of {', '.join(ANALYSIS_EFFORTS)}, got '{value[:20]}'")
+    return value
+
+
 def _hosts(name: str) -> tuple:
     return tuple(h for h in (host_name(v) for v in _csv(name)) if h)
 
@@ -79,6 +90,12 @@ class Config:
     mcp_oauth_password: str
     mcp_oauth_redirect_uris: tuple
     mcp_trust_forwarded_for: bool
+    anthropic_api_key: str
+    analysis_model: str
+    analysis_effort: str
+    analysis_lookback_days: int
+    analysis_max_recordings: int
+    analysis_max_requests: int
 
 
 def load_config() -> Config:
@@ -113,4 +130,10 @@ def load_config() -> Config:
         mcp_oauth_password=os.getenv("MCP_OAUTH_PASSWORD", ""),
         mcp_oauth_redirect_uris=_csv("MCP_OAUTH_REDIRECT_URIS", "https://claude.ai/api/mcp/auth_callback"),
         mcp_trust_forwarded_for=_bool("MCP_TRUST_FORWARDED_FOR", False),
+        anthropic_api_key=os.getenv("ANTHROPIC_API_KEY", "").strip(),
+        analysis_model=os.getenv("ANALYSIS_MODEL", "").strip() or "claude-opus-5-5",
+        analysis_effort=_effort(),
+        analysis_lookback_days=_int("ANALYSIS_LOOKBACK_DAYS", 7, 1),
+        analysis_max_recordings=_int("ANALYSIS_MAX_RECORDINGS", 5, 1, 20),
+        analysis_max_requests=_int("ANALYSIS_MAX_REQUESTS", 40, 1, 200),
     )

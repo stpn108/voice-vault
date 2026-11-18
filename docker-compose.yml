@@ -75,6 +75,13 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       MAIL_FROM: ${MAIL_FROM:-}
       MAIL_TO: ${MAIL_TO:-}
+      # Analysis with the Claude API (REQ-007, D-072): only this service gets the key, never web or mcp.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANALYSIS_MODEL: ${ANALYSIS_MODEL:-claude-opus-5-5}
+      ANALYSIS_EFFORT: ${ANALYSIS_EFFORT:-medium}
+      ANALYSIS_LOOKBACK_DAYS: ${ANALYSIS_LOOKBACK_DAYS:-7}
+      ANALYSIS_MAX_RECORDINGS: ${ANALYSIS_MAX_RECORDINGS:-5}
+      ANALYSIS_MAX_REQUESTS: ${ANALYSIS_MAX_REQUESTS:-40}
     healthcheck:
       test: ["CMD", "python", "healthcheck.py"]
       interval: 30s

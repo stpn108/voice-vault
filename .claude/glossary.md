@@ -34,6 +34,7 @@ contract that keeps conversation and code from drifting apart.
 | Thema | A subject that runs through several conversations. | `topics`, `topic_notes` | Matched by name without regard to case. |
 | Tagesübersicht | The daily overview Claude writes, one per day. | `digests`, `save_digest` | Saving again replaces the day. |
 | Mindestalter | Minimum age of a recording before it may be trashed, default 1 minute (D-022); it can be raised in `.env`. A recording with unknown (0) duration is never trashed. | `MIN_AGE_MINUTES` | Measured from the end of the recording (`start_time + duration`). |
+| Auswertung | The server reading new recordings with Claude and keeping tasks, promises, topic notes, person profiles and daily overviews up to date, like the former claude.ai routine. | `analysis_service.py`, `analysis_runs`, `llm_client.py`, `llm_traces` | REQ-007. Runs only with `ANTHROPIC_API_KEY`; `llm_traces` holds no content, only hashes and token counts. |
 | Sprechernamen | The share of the speakers of a transcript that carry a real name instead of "Speaker 2". Needed before an import, default 60 percent (D-023, D-024, D-041); after 7 days the recording is imported anyway. | `MIN_SPEAKERS_NAMED_PERCENT`, `import_service.speakers_named_enough()` | Counted over the different speaker labels. 0 switches the check off. |
 
 ## Units and formats
