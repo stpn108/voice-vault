@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block crumbs %}
-<nav class="crumbs" aria-label="breadcrumb"><a href="/">{{ t("ui_nav_recordings") }}</a><span class="sep">/</span><a href="/recordings/{{ rec.id }}">{{ rec.title or t("ui_untitled") }}</a><span class="sep">/</span><span aria-current="page">{{ t("ui_discard") }}</span></nav>
+<nav class="crumbs" aria-label="breadcrumb"><a href="/recordings">{{ t("ui_nav_recordings") }}</a><span class="sep">/</span><a href="/recordings/{{ rec.id }}">{{ rec.title or t("ui_untitled") }}</a><span class="sep">/</span><span aria-current="page">{{ t("ui_discard") }}</span></nav>
 {% endblock %}
 {% block content %}
 <div class="card">

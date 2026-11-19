@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ rec.title or t("ui_untitled") }}{% endblock %}
 {% block crumbs %}
-<nav class="crumbs" aria-label="breadcrumb"><a href="/">{{ t("ui_nav_recordings") }}</a><span class="sep">/</span><span aria-current="page">{{ rec.title or t("ui_untitled") }}</span></nav>
+<nav class="crumbs" aria-label="breadcrumb"><a href="/recordings">{{ t("ui_nav_recordings") }}</a><span class="sep">/</span><span aria-current="page">{{ rec.title or t("ui_untitled") }}</span></nav>
 {% endblock %}
 {% block content %}
 <div class="head" style="margin-bottom:.2rem">

@@ -488,9 +488,10 @@ def _order(sort: str) -> tuple:
 
 
 def list_todos(session: Session, now: dt.datetime, *, status: str = "open", topic: Optional[str] = None,
-               person: Optional[str] = None, kind: str = "mine", limit: int = 50, include_excluded: bool = False, sort: str = "priority") -> tuple:
+               person: Optional[str] = None, kind: str = "mine", limit: int = 50, include_excluded: bool = False, sort: str = "priority",
+               done_since: Optional[dt.datetime] = None) -> tuple:
     """Without tasks of excluded topics; most urgent first unless `sort` says otherwise.
-    Returns (rows, truncated)."""
+    `done_since` keeps only tasks finished at or after that time. Returns (rows, truncated)."""
     limit = min(max(limit, 1), LIST_LIMIT_MAX)
     stmt = select(Todo).outerjoin(Topic, Topic.id == Todo.topic_id)
     if not include_excluded:
@@ -508,6 +509,8 @@ def list_todos(session: Session, now: dt.datetime, *, status: str = "open", topi
         if found is None:
             return [], False
         stmt = stmt.where(Todo.topic_id == found.id)
+    if done_since is not None:
+        stmt = stmt.where(Todo.done_at >= done_since)
     if person:
         line = "\n" + " ".join(person.split()).lower() + "\n"
         stmt = stmt.where(func.lower(literal("\n") + Todo.people + literal("\n")).contains(line, autoescape=True))

@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}{{ t("ui_nav_todos") }}{% endblock %}
+{% block body_class %}wide{% endblock %}
+{% block content %}
+{# The owner's unfinished tasks as a board (REQ-008, D-074): status as columns, priority or topic as rows. #}
+{% include "_todos_head.html" %}
+{% set keep = ("&topic=" ~ topic | urlencode if topic else "") ~ ("&person=" ~ person | urlencode if person else "") %}
+{% macro cells(lane) %}
+<div class="lane-cells">
+  {% for s in columns %}
+  <div class="cell" data-status="{{ s }}" {% if lane.priority %}data-priority="{{ lane.priority }}"{% endif %}>
+    {% for row in lane.cells[s] %}
+    {% set linked = links.get(row.id, []) %}
+    <article class="bcard {% if row.status == 'done' %}finished{% endif %}" draggable="true" data-id="{{ row.id }}" data-status="{{ row.status }}" data-priority="{{ row.priority }}" data-links="{{ linked | map(attribute=0) | join(',') }}">
+      <form class="check" data-move method="post" action="/todos/{{ row.id }}/status">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="page">
+        <button class="check" type="submit" name="status" value="{{ 'open' if row.status == 'done' else 'done' }}" title="{{ t('ui_todo_reopen') if row.status == 'done' else t('ui_todo_check') }}" aria-label="{{ t('ui_todo_reopen') if row.status == 'done' else t('ui_todo_check') }}">✓</button>
+      </form>
+      <div class="bcard-main">
+        <a class="task-title" draggable="false" href="/todos/{{ row.id }}{{ '?person=' ~ person | urlencode if person else '' }}"><span class="dot p{{ row.priority }}" title="{{ t('todo_prio_' ~ row.priority) }}"></span>{{ row.title }}</a>
+        {% for word, names in unclear[row.id].items() %}<span class="pill unclear" title="{{ t('ui_glossary_ambiguous', names=names | join(', ')) }}">{{ word }}?</span>{% endfor %}
+      </div>
+      <div class="task-meta">
+        {% if row.id in fresh %}<span class="pill new">{{ t("ui_board_new") }}</span>{% endif %}
+        {% if row.topic and group != "topic" %}<a draggable="false" href="/todos?group={{ group }}&amp;topic={{ row.topic | urlencode }}">{{ row.topic }}</a>{% endif %}
+        {% set active = row.status != "done" %}
+        {% if row.due_date %}<span class="due {% if active and row.due_date < today %}overdue{% endif %}">{{ t("ui_overdue") if active and row.due_date < today else t("ui_due") }} {{ row.due_date.strftime("%d.%m.") }}</span>
+        {% else %}<span>{{ row.age_days }} {{ t("ui_day") if row.age_days == 1 else t("ui_days") }}</span>{% endif %}
+        {% if linked %}<span title="{{ linked | map(attribute=1) | join(', ') }}">🔗 {{ linked | length }}</span>{% endif %}
+        {% if shown_people[row.id] %}<span class="inis">{% for name in shown_people[row.id] %}<a class="ini" draggable="false" href="/person?name={{ name | urlencode }}" title="{{ name }}">{{ (name.split() | map("first") | join)[:2] }}</a>{% endfor %}</span>{% endif %}
+      </div>
+      <form class="bcard-actions" data-move method="post" action="/todos/{{ row.id }}/status">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="page">
+        <button class="ghost btn-start" type="submit" name="status" value="in_progress">{{ t("ui_todo_start") }}</button>
+        <button class="ghost btn-pause" type="submit" name="status" value="open">{{ t("ui_todo_pause") }}</button>
+        <button class="ghost" type="submit" name="status" value="dropped" title="{{ t('ui_todo_drop') }}">{{ t("ui_todo_drop_short") }}</button>
+      </form>
+    </article>
+    {% endfor %}
+  </div>
+  {% endfor %}
+</div>
+{% endmacro %}
+<div class="pager board-tools" style="margin-top:-.2rem">
+  <span class="muted" style="font-size:.85rem">{{ t("ui_board_group") }}</span>
+  {% for g in groups %}<a class="chip {% if g == group %}current{% endif %}" href="/todos?group={{ g }}{{ '&only=' ~ only if only else '' }}{{ keep }}">{{ t("ui_board_group_" ~ g) }}</a>{% endfor %}
+  <span class="tools-gap"></span>
+  {% for f in filters %}<a class="chip only-{{ f }} {% if f == only %}current{% endif %}" href="/todos?group={{ group }}{{ '' if f == only else '&only=' ~ f }}{{ keep }}">{{ t("ui_board_only_" ~ f) }} <b>{{ board.filter_counts[f] }}</b></a>{% endfor %}
+  <details class="board-add">
+    <summary>+ {{ t("ui_todo_new_mine") }}</summary>
+    <form class="card quick" method="post" action="/todos">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="kind" value="mine">
+      <input type="text" name="title" placeholder="{{ t('ui_todo_new_mine') }}" maxlength="300" required>
+      <select name="priority" aria-label="{{ t('ui_col_prio') }}">{% for p in priorities %}<option value="{{ p }}" {% if p == 3 %}selected{% endif %}>{{ t("todo_prio_" ~ p) }}</option>{% endfor %}</select>
+      <input type="date" name="due" aria-label="{{ t('ui_col_due') }}">
+      <input type="text" name="topic" placeholder="{{ t('ui_topic') }}" maxlength="120">
+      <button class="primary" type="submit">{{ t("ui_todo_add") }}</button>
+    </form>
+  </details>
+</div>
+{% if topic or person %}<p class="sub" style="margin:-.5rem 0 1rem">{% if topic %}{{ t("ui_topic") }}: <strong>{{ topic }}</strong> · {% endif %}{% if person %}{{ t("ui_person") }}: <strong>{{ person }}</strong> · {% endif %}<a href="/todos?group={{ group }}">{{ t("ui_filter_clear") }}</a></p>{% endif %}
+<div class="board" data-board data-check="{{ t('ui_todo_check') }}" data-reopen="{{ t('ui_todo_reopen') }}">
+  {% for s in columns %}<input class="col-pick" type="radio" name="col" id="col-{{ s }}" aria-label="{{ t('todo_status_' ~ s) }}" {% if loop.first %}checked{% endif %}>{% endfor %}
+  <div class="board-cols">
+    {% for s in columns %}<label class="col-h" for="col-{{ s }}"><span>{{ t("todo_status_" ~ s) }}</span><b data-col="{{ s }}">{{ board.counts[s] }}</b>{% if s == "done" %}<small>{{ t("ui_board_done_days", days=done_days) }}</small><a href="/todos?status=done">{{ t("ui_board_all") }} →</a>{% endif %}</label>{% endfor %}
+  </div>
+  {% for lane in board.lanes %}
+  {% if group == "none" %}<div class="lane" data-lane="{{ lane.key }}">{{ cells(lane) }}</div>
+  {% else %}<details class="lane" data-lane="{{ lane.key }}" {% if lane.priority != 4 %}open{% endif %}>
+    <summary>{% if lane.priority %}<span class="dot p{{ lane.priority }}"></span><strong>{{ t("todo_prio_" ~ lane.priority) }}</strong>{% else %}<strong>{{ lane.label or t("ui_board_no_topic") }}</strong>{% endif %}
+      <span class="sum"><span data-n="open">{{ lane.cells["open"] | length }}</span> {{ t("ui_board_n_open") }} · <span data-n="in_progress">{{ lane.cells["in_progress"] | length }}</span> {{ t("ui_board_n_wip") }}</span></summary>
+    {{ cells(lane) }}
+  </details>{% endif %}
+  {% endfor %}
+</div>
+{% if not rows %}<div class="card empty">{{ t("ui_todo_empty") }}</div>{% endif %}
+{% if truncated %}<p class="muted">{{ t("ui_todo_truncated") }}</p>{% endif %}
+<div id="toast" class="toast" role="status" aria-live="polite" hidden data-csrf="{{ csrf }}"
+     data-done="{{ t('todo_toast_done') }}" data-dropped="{{ t('todo_toast_dropped') }}">
+  <span data-toast-text></span><button type="button">{{ t("ui_undo") }}</button>
+</div>
+<script src="/static/board.js" defer></script>
+{% endblock %}

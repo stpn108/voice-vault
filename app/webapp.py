@@ -17,7 +17,7 @@ import secrets
 from collections import Counter
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Annotated, Iterator
+from typing import Annotated, Iterator, Optional
 from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Query, Request
@@ -33,6 +33,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from access_log import AccessLogMiddleware
 import recording_service as svc
+import task_board
 import todo_service as todos
 import briefing_service
 import glossary_admin
@@ -230,7 +231,13 @@ def healthz(session: Session = Depends(get_session)):
     return JSONResponse({"status": "ok"})
 
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/")
+def home():
+    """The app opens with the task board (REQ-008, D-074)."""
+    return RedirectResponse("/todos", status_code=307)
+
+
+@app.get("/recordings", response_class=HTMLResponse)
 def index(request: Request, q: str = Query("", max_length=200), cursor: str = Query("", max_length=200),
           session: Session = Depends(get_session), cfg: Config = Depends(get_config)):
     try:
@@ -246,7 +253,7 @@ def sync_now(request: Request, csrf: str = Form(""), session: Session = Depends(
     """"Jetzt abholen": ask the app container for an import cycle now (D-041)."""
     require_csrf(request, csrf)
     svc.request_sync(session, now_utc())
-    return RedirectResponse("/", status_code=303)
+    return RedirectResponse("/recordings", status_code=303)
 
 
 @app.get("/sync/status")
@@ -293,7 +300,7 @@ def discard_one(request: Request, recording_id: Annotated[int, PathParam(ge=1, l
     require_csrf(request, csrf)
     if not svc.discard(session, recording_id, now_utc()):
         raise HTTPException(status_code=404, detail="recording not found")
-    return RedirectResponse("/", status_code=303)
+    return RedirectResponse("/recordings", status_code=303)
 
 
 @app.get("/cleanup", response_class=HTMLResponse)
@@ -316,7 +323,7 @@ def cleanup_run(request: Request, days: int = Form(..., ge=1, le=3650), expected
         return render(request, cfg, "cleanup.html", status_code=409, days=days, count=len(ids),
                       fingerprint=svc.ids_fingerprint(ids), changed=True)
     svc.discard_ids(session, ids, now)
-    return RedirectResponse("/", status_code=303)
+    return RedirectResponse("/recordings", status_code=303)
 
 
 def _stability(cfg: Config) -> int:
@@ -324,6 +331,9 @@ def _stability(cfg: Config) -> int:
 
 
 # --- tasks, topics and overviews (REQ-006, D-013) -------------------------------------------
+TODO_VIEWS = ("board", "table")  # how the owner's own unfinished tasks show (REQ-008)
+
+
 def _todo_error(exc: todos.TodoError) -> HTTPException:
     return HTTPException(status_code=400, detail=str(exc))
 
@@ -331,11 +341,24 @@ def _todo_error(exc: todos.TodoError) -> HTTPException:
 @app.get("/todos", response_class=HTMLResponse)
 def todo_list(request: Request, status: str = Query("open", max_length=12), topic: str = Query("", max_length=120),
               person: str = Query("", max_length=todos.PERSON_MAX), kind: str = Query("mine", max_length=10),
-              sort: str = Query("priority", max_length=10), session: Session = Depends(get_session), cfg: Config = Depends(get_config)):
-    if status not in todos.STATUSES or sort not in todos.SORTS or kind not in todos.KINDS:
-        raise HTTPException(status_code=400, detail="invalid status, sort or kind")
-    rows, truncated = todos.list_todos(session, now_utc(), status=status, topic=topic or None, person=person or None,
-                                       kind=kind, limit=todos.LIST_LIMIT_MAX, sort=sort)
+              sort: str = Query("priority", max_length=10), view: str = Query("board", max_length=10),
+              group: str = Query("priority", max_length=10), only: str = Query("", max_length=10),
+              session: Session = Depends(get_session), cfg: Config = Depends(get_config)):
+    if status not in todos.STATUSES or sort not in todos.SORTS or kind not in todos.KINDS or view not in TODO_VIEWS:
+        raise HTTPException(status_code=400, detail="invalid status, sort, kind or view")
+    today = now_utc().astimezone(LOCAL_TZ).date()
+    # The owner's own unfinished tasks show as a board or as a table; every other list is the list (REQ-008).
+    view = view if kind == "mine" and status == "open" else "list"
+    board = None
+    if view == "board":
+        try:
+            board = task_board.board(session, now_utc(), today, group=group, only=only, topic=topic or None, person=person or None)
+        except task_board.BoardError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        rows, truncated = board.rows, board.truncated
+    else:
+        rows, truncated = todos.list_todos(session, now_utc(), status=status, topic=topic or None, person=person or None,
+                                           kind=kind, limit=todos.LIST_LIMIT_MAX, sort=sort)
     # What others owe the owner is not started or put back, so that list has no "in progress" tab (D-038).
     statuses = [s for s in todos.STATUSES if kind == "mine" or s != "in_progress"]
     # "Wartet auf": who owes how much, as a bar of people to filter by (D-039).
@@ -348,9 +371,12 @@ def todo_list(request: Request, status: str = Query("open", max_length=12), topi
     shown_people = {row.id: [n for n in row.people if n.lower() not in hidden] for row in rows}
     known = glossary.mapping(session)  # titles with a name that could mean several people get a mark (D-062)
     unclear = {row.id: glossary.ambiguous_words(known, "\n".join([row.title] + shown_people[row.id])) for row in rows}
-    return render(request, cfg, "todos.html", rows=rows, unclear=unclear, truncated=truncated, status=status, topic=topic, person=person,
+    return render(request, cfg, "board.html" if board else "todos.html", rows=rows, unclear=unclear, truncated=truncated,
+                  status=status, topic=topic, person=person, view=view, views=TODO_VIEWS, board=board, group=group, only=only,
+                  groups=task_board.GROUPS, filters=task_board.FILTERS, columns=task_board.COLUMNS,
+                  done_days=task_board.DONE_DAYS, fresh={row.id for row in rows if task_board.is_new(row, now_utc())},
                   kind=kind, kinds=todos.KINDS, kind_counts={k: todos.counts(session, k)["open"] for k in todos.KINDS},
-                  sort=sort, sorts=todos.SORTS, today=now_utc().astimezone(LOCAL_TZ).date(),
+                  sort=sort, sorts=todos.SORTS, today=today,
                   counts=todos.counts(session, kind), statuses=statuses, priorities=todos.PRIORITIES,
                   known_people=todos.known_people(session) if kind == "waiting" else [],
                   links=task_links.link_map(session, [r.id for r in rows]), shown_people=shown_people,
@@ -551,19 +577,22 @@ def todo_people(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX
 
 @app.post("/todos/{todo_id}/status")
 def todo_status(request: Request, todo_id: Annotated[int, PathParam(ge=1, le=MAX_ID)], status: str = Form("", max_length=12), csrf: str = Form(""),
-                back: str = Form("", max_length=20), session: Session = Depends(get_session)):
-    """One-click check-off from the list. The page script asks for JSON and updates the list in place."""
+                back: str = Form("", max_length=20), priority: Optional[int] = Form(None), session: Session = Depends(get_session)):
+    """One-click check-off from the list. The page script asks for JSON and updates the list in place.
+    A card dragged into another row of the board sends the row's priority along: one change, one undo (D-074)."""
     require_csrf(request, csrf)
     found = todos.get_todo(session, now_utc(), todo_id)
     previous = found[0].status if found else None
     try:
-        todos.update_todo(session, now_utc(), todo_id, actor="owner", status=status)
+        todos.update_todo(session, now_utc(), todo_id, actor="owner", status=status,
+                          priority=todos.UNSET if priority is None else priority)
     except todos.TodoError as exc:
         if "no task" in str(exc):
             raise HTTPException(status_code=404, detail=str(exc))
         raise _todo_error(exc)
     if "application/json" in request.headers.get("accept", ""):
         return JSONResponse({"ok": True, "id": todo_id, "status": status, "previous": previous,
+                             "previous_priority": found[0].priority,
                              "counts": todos.counts(session, found[0].kind), "wip": todos.counts(session)["in_progress"],
                              "in_progress": _in_progress(session)})
     if back == "page" and request.headers.get("referer", "").startswith(f"{request.url.scheme}://{request.headers.get('host')}/"):

@@ -315,6 +315,80 @@
   .tag:hover span { border-color: var(--accent); color: var(--accent); }
   .tag input:checked + span { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 600; }
   .tag input:checked + span::before { content: "✓"; }
+  /* task board (REQ-008, D-074): status columns, rows that fold, cells that wrap compact cards */
+  body.wide .wrap { max-width: 94rem; }
+  .board-tools .tools-gap { width: .5rem; } .board-tools a.chip b { font-weight: 650; margin-left: .15rem; }
+  .board-tools a.only-overdue:not(.current) b { color: var(--danger); }
+  .board-add { margin-left: auto; } .board-add[open] { flex-basis: 100%; }
+  .board-add summary { list-style: none; cursor: pointer; text-align: right; color: var(--accent); font-weight: 600; }
+  .board-add summary::-webkit-details-marker, .lane > summary::-webkit-details-marker { display: none; }
+  .board-add form { margin: .6rem 0 0; }
+  .col-pick { position: absolute; opacity: 0; pointer-events: none; }
+  .board-cols, .lane-cells { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 5fr) minmax(0, 2.6fr); }
+  .board-cols { position: sticky; top: 3.4rem; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
+  .col-h { display: flex; align-items: baseline; gap: .45rem; padding: .5rem .6rem; font-weight: 650; min-width: 0; }
+  .col-h b { color: var(--muted); font-weight: 500; } .col-h small { color: var(--faint); font-weight: 400; }
+  .col-h a { margin-left: auto; font-size: .85rem; font-weight: 500; text-decoration: none; }
+  .col-h[for="col-in_progress"] span { box-shadow: inset 0 -.45em 0 color-mix(in srgb, var(--progress) 45%, transparent); }
+  .lane > summary { display: flex; align-items: center; gap: .5rem; padding: .7rem .2rem .35rem; cursor: pointer; list-style: none; }
+  .lane > summary::before { content: "▾"; color: var(--faint); width: .8rem; transition: transform .12s; }
+  .lane:not([open]) > summary::before { transform: rotate(-90deg); }
+  .lane > summary strong { font-size: .8rem; text-transform: uppercase; letter-spacing: .07em; font-weight: 650; }
+  .lane > summary .sum { font-size: .82rem; color: var(--muted); }
+  .lane-cells { border-top: 1px solid var(--line); }
+  .cell { display: grid; grid-template-columns: repeat(auto-fill, minmax(13.5rem, 1fr)); gap: .45rem; align-content: start; padding: .5rem; min-height: 3rem; min-width: 0; }
+  .cell + .cell { border-left: 1px solid var(--line); }
+  .cell[data-status="in_progress"] { background: color-mix(in srgb, var(--progress) 8%, transparent); }
+  .cell.drop, .lane > summary.drop { outline: 2px dashed var(--accent); outline-offset: -3px; background: var(--accent-soft); }
+  .bcard { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .1rem .5rem; align-content: start; padding: .45rem .6rem .5rem .45rem;
+    background: var(--surface); border: 1px solid var(--line); border-radius: .6rem; box-shadow: var(--shadow); cursor: grab; transition: opacity .12s, border-color .12s; }
+  .bcard:hover, .bcard.link-peer { border-color: var(--accent); } .bcard.link-peer { background: var(--accent-soft); }
+  .bcard.dragging { opacity: .35; } .bcard.leaving { opacity: 0; }
+  .board.linking .bcard:not(.link-peer):not(.link-src) { opacity: .4; }
+  .bcard button.check { width: 1.25rem; height: 1.25rem; font-size: .7rem; margin-top: .1rem; }
+  .bcard.finished button.check { color: var(--ok); border-color: var(--ok); }
+  .bcard-main { line-height: 1.3; } .bcard .task-title { font-size: .92rem; overflow-wrap: anywhere; }
+  .bcard .task-title .dot { margin-right: .4rem; vertical-align: .08em; }
+  .bcard.finished .task-title { text-decoration: line-through; color: var(--muted); }
+  .bcard .task-meta { grid-column: 2; gap: .1rem .6rem; font-size: .78rem; margin-top: 0; }
+  .pill.new { background: var(--accent-soft); color: var(--accent); }
+  .inis { display: inline-flex; margin-left: auto; }
+  .task-meta a.ini { width: 1.4rem; height: 1.4rem; margin-left: -.25rem; border-radius: 50%; display: grid; place-items: center; font-size: .62rem; font-weight: 650;
+    background: var(--hover); border: 1px solid var(--line); }
+  .bcard-actions { grid-column: 2; display: flex; flex-wrap: wrap; gap: .1rem; }
+  .bcard[data-status="in_progress"] .btn-start, .bcard[data-status="open"] .btn-pause, .bcard[data-status="done"] .bcard-actions { display: none; }
+  @media (hover: hover) {
+    .bcard-actions { position: absolute; right: .3rem; bottom: .3rem; background: var(--surface); border: 1px solid var(--line); border-radius: .5rem;
+      box-shadow: var(--shadow); opacity: 0; pointer-events: none; }
+    .bcard:hover .bcard-actions, .bcard:focus-within .bcard-actions { opacity: 1; pointer-events: auto; } }
+  @media (max-width: 46rem) {
+    .board-cols { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .2rem; padding: .3rem 0; position: static; }
+    .col-h { justify-content: center; cursor: pointer; border-radius: .5rem; padding: .35rem .3rem; } .col-h small, .col-h a { display: none; }
+    .lane-cells { grid-template-columns: minmax(0, 1fr); } .cell { display: none; } .cell + .cell { border-left: 0; }
+    #col-open:checked ~ .lane .cell[data-status="open"], #col-in_progress:checked ~ .lane .cell[data-status="in_progress"],
+    #col-done:checked ~ .lane .cell[data-status="done"] { display: grid; }
+    #col-open:checked ~ .board-cols [for="col-open"], #col-in_progress:checked ~ .board-cols [for="col-in_progress"],
+    #col-done:checked ~ .board-cols [for="col-done"] { background: var(--surface); box-shadow: 0 1px 3px rgba(20,24,40,.12); } }
+  /* table (REQ-008): the task list with one line per task; below this width it stays the list */
+  .dense-head, .m-links { display: none; }
+  @media (min-width: 62rem) {
+    .list.dense { display: grid; column-gap: .9rem;
+      grid-template-columns: auto minmax(14rem, 1fr) auto minmax(0, 11rem) fit-content(20rem) auto auto auto auto auto; }
+    .list.dense > li { display: grid; grid-template-columns: subgrid; grid-column: 1 / -1; align-items: center; padding: .3rem 1.1rem; position: relative; }
+    .dense .dense-head { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; font-weight: 600; color: var(--muted); background: var(--hover); padding-block: .4rem; }
+    .dense .dense-head a { color: inherit; text-decoration: none; } .dense .dense-head a:hover { color: var(--accent); }
+    .dense .task-main, .dense .task-meta { display: contents; }
+    .dense form.check, .dense .task-head, .dense .status-chip, .dense .m-topic, .dense .task-people, .dense .due, .dense .m-age, .dense .m-prio,
+    .dense .m-links, .dense .link-handle { grid-row: 1; }
+    .dense form.check { grid-column: 1; padding-top: 0; } .dense .task-head { grid-column: 2; } .dense .status-chip { grid-column: 3; justify-self: start; }
+    .dense .m-topic { grid-column: 4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dense .task-people { grid-column: 5; margin-top: 0; } .dense .due { grid-column: 6; } .dense .m-age { grid-column: 7; }
+    .dense .m-prio { grid-column: 8; white-space: nowrap; } .dense .m-links { grid-column: 9; display: inline; text-align: right; } .dense .link-handle { grid-column: 10; }
+    .dense .m-topic, .dense .due, .dense .m-age, .dense .m-prio, .dense .m-links { font-size: .82rem; color: var(--muted); white-space: nowrap; }
+    .dense .due.overdue { color: var(--danger); }
+    .dense .task-links { display: none; }
+    .dense .task-actions { position: absolute; right: 2.8rem; top: 50%; transform: translateY(-50%); background: var(--hover); border-radius: .5rem; }
+    .dense li.task:not(:hover):not(:focus-within) .task-actions { pointer-events: none; } }
   .tag input:checked + span:hover::before { content: "×"; }
   .tag input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
   .task.leaving { opacity: 0; transform: translateX(10px); transition: opacity .18s ease, transform .18s ease; }
@@ -328,16 +402,16 @@
     button.wip-badge { order: -1; } .wrap { padding: 0 1rem; } }
 </style>
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
 {% set path = request.url.path %}
 {% set nav = "todos" if path.startswith(("/todos", "/person")) else "topics" if path.startswith("/topics") else "digests" if path.startswith("/digests") else "stats" if path.startswith("/stats") else "admin" if path.startswith(("/admin", "/cleanup")) else "recordings" %}
 <header class="top"><div class="wrap">
   <a class="brand" href="/"><i></i><span>voice-vault</span></a>
-  <a class="nav {% if nav == 'recordings' %}current{% endif %}" href="/">{{ t("ui_nav_recordings") }}</a>
   <a class="nav {% if nav == 'todos' %}current{% endif %}" href="/todos">{{ t("ui_nav_todos") }}</a>
   <a class="nav {% if nav == 'topics' %}current{% endif %}" href="/topics">{{ t("ui_nav_topics") }}</a>
   <a class="nav {% if nav == 'digests' %}current{% endif %}" href="/digests">{{ t("ui_nav_digests") }}</a>
   <a class="nav {% if nav == 'stats' %}current{% endif %}" href="/stats">{{ t("ui_nav_stats") }}</a>
+  <a class="nav {% if nav == 'recordings' %}current{% endif %}" href="/recordings">{{ t("ui_nav_recordings") }}</a>
   <span class="spacer"></span>
   <button class="wip-badge" type="button" popovertarget="wip" data-wip-count {% if not in_progress %}hidden{% endif %}>{{ t("ui_wip") }} <b>{{ wip_count }}</b></button>
   <a class="nav {% if nav == 'admin' %}current{% endif %}" href="/admin">{{ t("ui_nav_admin") }}</a>

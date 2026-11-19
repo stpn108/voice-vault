@@ -86,7 +86,7 @@ Requirements: `requirements/`. Decisions: `DECISIONS.md` (D-001 to D-004).
 
 ## Tasks, topics and the daily routine (REQ-006, D-013)
 
-The UI (`/todos`, `/topics`, `/digests`) shows a prioritized task list you check off, the history
+The UI (`/todos`, `/topics`, `/digests`) opens with the task board (REQ-008: status as columns, priority as rows, cards you drag; the same tasks as a table under "Tabelle"; the recordings are at `/recordings`) and shows the history
 of each topic and the daily overviews. The analysis on the server (next section) gives Claude `list_todos`, `add_todo`,
 `update_todo` (status `in_progress`, `done`, `dropped` or `open`; `people` to talk to), `get_person`, `update_person`, `set_person_topic`, `get_glossary`, `suggest_spelling`, `list_topics`, `get_topic`, `add_topic_note`,
 `mark_recording_analyzed`, `save_digest` and `list_digests`. Every change is logged with who made

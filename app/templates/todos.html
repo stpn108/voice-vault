@@ -1,14 +1,10 @@
 {% extends "base.html" %}
 {% block title %}{{ t("ui_nav_todos") }}{% endblock %}
+{% block body_class %}{% if view == "table" %}wide{% endif %}{% endblock %}
 {% block content %}
-{% set keep = ("&topic=" ~ topic | urlencode if topic else "") ~ ("&person=" ~ person | urlencode if person else "") ~ ("&kind=waiting" if kind == "waiting" else "") %}
-<div class="kinds">{% for k in kinds %}<a href="/todos?kind={{ k }}" class="kind-link {% if k == kind %}current{% endif %}">{{ t("ui_kind_" ~ k) }}<small>{{ kind_counts[k] }}</small></a>{% endfor %}<a class="kind-link graph-link" href="/todos/graph" style="margin-left:auto">{{ t("ui_graph") }} →</a></div>
-<div class="head" style="margin-top:.6rem">
-  <h1>{{ t("ui_kind_" ~ kind) }}</h1>
-  <div class="seg">
-  {% for s in statuses %}<a href="/todos?status={{ s }}&amp;sort={{ sort }}{{ keep }}" {% if s == status %}class="current"{% endif %}>{{ t("todo_status_" ~ s) }}<small data-count="{{ s }}">{{ counts[s] }}</small></a>{% endfor %}
-  </div>
-</div>
+{% set keep = ("&topic=" ~ topic | urlencode if topic else "") ~ ("&person=" ~ person | urlencode if person else "") ~ ("&kind=waiting" if kind == "waiting" else "") ~ ("&view=table" if view == "table" else "") %}
+{% include "_todos_head.html" %}
+{% set dense = view == "table" %}
 <div class="pager" style="margin-top:-.2rem">
   <span class="muted" style="font-size:.85rem">{{ t("ui_sort") }}</span>
   {% for s in sorts %}<a class="chip {% if s == sort %}current{% endif %}" href="/todos?status={{ status }}&amp;sort={{ s }}{{ keep }}">{{ t("ui_sort_" ~ s) }}</a>{% endfor %}
@@ -18,7 +14,7 @@
   {% for name, count in owed %}<a class="owed-chip {% if person and name.lower() == person.lower() %}current{% endif %}" href="/todos?kind=waiting&amp;status={{ status }}&amp;sort={{ sort }}&amp;person={{ name | urlencode }}{{ '&topic=' ~ topic | urlencode if topic else '' }}">{{ name }}<small>{{ count }}</small></a>{% endfor %}
   {% if person %}<a class="owed-brief" href="/person?name={{ person | urlencode }}&amp;from=waiting">{{ t("ui_waiting_briefing") }} →</a>{% endif %}
 </div>{% endif %}
-{% if topic or (person and kind != "waiting") %}<p class="sub" style="margin:-.5rem 0 1rem">{% if topic %}{{ t("ui_topic") }}: <strong>{{ topic }}</strong> · {% endif %}{% if person and kind != "waiting" %}{{ t("ui_person") }}: <strong>{{ person }}</strong> · {% endif %}<a href="/todos?status={{ status }}&amp;sort={{ sort }}{{ '&kind=waiting' if kind == 'waiting' else '' }}">{{ t("ui_filter_clear") }}</a></p>{% endif %}
+{% if topic or (person and kind != "waiting") %}<p class="sub" style="margin:-.5rem 0 1rem">{% if topic %}{{ t("ui_topic") }}: <strong>{{ topic }}</strong> · {% endif %}{% if person and kind != "waiting" %}{{ t("ui_person") }}: <strong>{{ person }}</strong> · {% endif %}<a href="/todos?status={{ status }}&amp;sort={{ sort }}{{ '&kind=waiting' if kind == 'waiting' else '' }}{{ '&view=table' if dense else '' }}">{{ t("ui_filter_clear") }}</a></p>{% endif %}
 <form class="card quick" method="post" action="/todos">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <input type="hidden" name="kind" value="{{ kind }}">
@@ -31,11 +27,13 @@
 </form>
 {% if kind == "waiting" %}<datalist id="list-people">{% for name in known_people %}<option value="{{ name }}">{% endfor %}</datalist>{% endif %}
 {% if rows %}
-{% set grouped = status == "open" and sort == "priority" %}
+{# The table (REQ-008): the same rows in one line each, so it is not split into groups. #}
+{% set grouped = status == "open" and sort == "priority" and not dense %}
 {% set groups = rows | groupby("priority") if grouped else [("", rows)] %}
 {% for prio, items in groups %}
 {% if grouped %}<h2 class="group-title"><span class="dot p{{ prio }}"></span>{{ t("todo_prio_" ~ prio) }}<span class="count">{{ items | length }}</span></h2>{% endif %}
-<ul class="list">
+<ul class="list {% if dense %}dense{% endif %}">
+  {% if dense %}<li class="dense-head"><span></span><a href="/todos?sort=title{{ keep }}">{{ t("ui_col_task") }}</a><span>{{ t("ui_status") }}</span><a href="/todos?sort=topic{{ keep }}">{{ t("ui_topic") }}</a><span>{{ t("ui_admin_people") }}</span><a href="/todos?sort=due{{ keep }}">{{ t("ui_col_due") }}</a><a href="/todos?sort=oldest{{ keep }}">{{ t("ui_col_age") }}</a><a href="/todos?sort=priority{{ keep }}">{{ t("ui_col_prio") }}</a><span>🔗</span></li>{% endif %}
   {% for row in items %}
   <li class="task {% if row.status not in ('open', 'in_progress') %}finished{% endif %}" data-status="{{ row.status }}" data-id="{{ row.id }}" data-kind="{{ row.kind }}" data-links="{{ links.get(row.id, []) | map(attribute=0) | join(',') }}">
     <form class="check" data-quick method="post" action="/todos/{{ row.id }}/status">
@@ -44,17 +42,18 @@
       {% else %}<button class="check" type="submit" name="status" value="open" title="{{ t('ui_todo_reopen') }}" aria-label="{{ t('ui_todo_reopen') }}" style="color:var(--ok);border-color:var(--ok)">✓</button>{% endif %}
     </form>
     <div class="task-main">
-      <a class="task-title" href="/todos/{{ row.id }}{{ '?person=' ~ person | urlencode if person else '' }}">{{ row.title }}</a>
-      {% for word, names in unclear[row.id].items() %}<span class="pill unclear" title="{{ t('ui_glossary_ambiguous', names=names | join(', ')) }}">{{ word }}?</span>{% endfor %}
+      <span class="task-head"><a class="task-title" href="/todos/{{ row.id }}{{ '?person=' ~ person | urlencode if person else '' }}">{{ row.title }}</a>
+      {% for word, names in unclear[row.id].items() %}<span class="pill unclear" title="{{ t('ui_glossary_ambiguous', names=names | join(', ')) }}">{{ word }}?</span>{% endfor %}</span>
       {# Layout (D-037): title / status, topic, age (then due date, priority) / people #}
       <div class="task-meta">
         {% for s in statuses %}<span class="pill status-chip s-{{ s }}">{{ t("todo_status_" ~ s) }}</span>{% endfor %}
-        {% if row.topic %}<a href="/todos?status={{ status }}&amp;sort={{ sort }}&amp;topic={{ row.topic | urlencode }}">{{ row.topic }}</a>{% endif %}
-        <span>{{ row.age_days }} {{ t("ui_day") if row.age_days == 1 else t("ui_days") }}</span>
+        {% if row.topic %}<a class="m-topic" href="/todos?status={{ status }}&amp;sort={{ sort }}&amp;topic={{ row.topic | urlencode }}{{ '&view=table' if dense else '' }}">{{ row.topic }}</a>{% endif %}
+        <span class="m-age">{{ row.age_days }} {{ t("ui_day") if row.age_days == 1 else t("ui_days") }}</span>
         {% set active = row.status in ('open', 'in_progress') %}{% if row.due_date %}<span class="due {% if active and row.due_date < today %}overdue{% endif %}">{{ t("ui_overdue") if active and row.due_date < today else t("ui_due") }} {{ row.due_date.strftime("%d.%m.") }}</span>{% endif %}
-        {% if not grouped %}<span>{{ t("todo_prio_" ~ row.priority) }}</span>{% endif %}
+        {% if not grouped %}<span class="m-prio">{% if dense %}<span class="dot p{{ row.priority }}"></span> {% endif %}{{ t("todo_prio_" ~ row.priority) }}</span>{% endif %}
       </div>
       {% set linked = links.get(row.id, []) %}
+      {% if dense and linked %}<span class="m-links" title="{{ linked | map(attribute=1) | join(', ') }}">{{ linked | length }}</span>{% endif %}
       <div class="task-links" {% if not linked %}hidden{% endif %}>{% for other_id, other_title, other_status in linked[:3] %}<a href="/todos/{{ other_id }}" data-link-id="{{ other_id }}" class="{{ 'finished' if other_status not in ('open', 'in_progress') else '' }}">{{ other_title }}</a>{% endfor %}{% if linked | length > 3 %}<a class="more" href="/todos/{{ row.id }}#links">{{ t("ui_links_more", count=linked | length - 3) }}</a>{% endif %}</div>
       {% if shown_people[row.id] %}<div class="task-people">{% for name in shown_people[row.id] %}<a class="person" href="/person?name={{ name | urlencode }}{{ '&from=waiting' if kind == 'waiting' else '' }}">{{ name }}</a>{% endfor %}</div>{% endif %}
     </div>

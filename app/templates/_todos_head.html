@@ -1,0 +1,10 @@
+{# Head of every task list: the two kinds, the title, board or table, and the status tabs (REQ-008). #}
+{% set keep = ("&topic=" ~ topic | urlencode if topic else "") ~ ("&person=" ~ person | urlencode if person else "") ~ ("&kind=waiting" if kind == "waiting" else "") %}
+<div class="kinds">{% for k in kinds %}<a href="/todos?kind={{ k }}" class="kind-link {% if k == kind %}current{% endif %}">{{ t("ui_kind_" ~ k) }}<small>{{ kind_counts[k] }}</small></a>{% endfor %}<a class="kind-link graph-link" href="/todos/graph" style="margin-left:auto">{{ t("ui_graph") }} →</a></div>
+<div class="head" style="margin-top:.6rem">
+  <h1>{{ t("ui_kind_" ~ kind) }}</h1>
+  {% if view != "list" %}<div class="seg" style="margin-right:auto">{% for v in views %}<a href="/todos?view={{ v }}{{ keep }}" {% if v == view %}class="current"{% endif %}>{{ t("ui_view_" ~ v) }}</a>{% endfor %}</div>{% endif %}
+  <div class="seg">
+  {% for s in statuses %}<a href="/todos?status={{ s }}&amp;sort={{ sort }}{{ keep }}{{ '&view=table' if view == 'table' else '' }}" {% if s == status %}class="current"{% endif %}>{{ t("todo_status_" ~ s) }}<small data-count="{{ s }}">{{ counts[s] }}</small></a>{% endfor %}
+  </div>
+</div>

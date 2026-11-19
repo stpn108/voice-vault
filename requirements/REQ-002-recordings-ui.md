@@ -7,7 +7,7 @@
 | **Requested by** | Dennis Winter |
 | **Implemented in** | — (branch `claude/festive-bohr-31plpp`, not merged) |
 | **Related decisions** | D-004, D-008 |
-| **Supersedes / superseded by** | — |
+| **Supersedes / superseded by** | Amended by REQ-008: the list is at `/recordings`, the home page is the task board |
 
 ## Owner ask (verbatim)
 

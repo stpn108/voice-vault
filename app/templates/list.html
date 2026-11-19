@@ -2,7 +2,7 @@
 {% block content %}
 <div class="head" style="margin-top:1.6rem">
   <h1>{{ t("ui_nav_recordings") }}</h1>
-  <form class="searchbar" method="get" action="/">
+  <form class="searchbar" method="get" action="/recordings">
     <input type="text" name="q" value="{{ q }}" placeholder="{{ t('ui_search_placeholder') }}" maxlength="200">
     <button class="primary" type="submit">{{ t("ui_search") }}</button>
   </form>
@@ -27,7 +27,7 @@
   {% endfor %}
 </div>
 {% if page.next_cursor %}
-<p><a class="btn" href="/?cursor={{ page.next_cursor | urlencode }}{% if q %}&amp;q={{ q | urlencode }}{% endif %}">{{ t("ui_next") }}</a></p>
+<p><a class="btn" href="/recordings?cursor={{ page.next_cursor | urlencode }}{% if q %}&amp;q={{ q | urlencode }}{% endif %}">{{ t("ui_next") }}</a></p>
 {% endif %}
 {% else %}
 <div class="card empty">{{ t("ui_empty") }}</div>

@@ -48,7 +48,7 @@ def test_req_006_check_off_from_the_list_completes_and_logs_owner(client, make_t
     todo_id = make_todo(title="Pay invoice")
     response = post(client, f"/todos/{todo_id}/status", status="done", back="list")
     assert response.status_code == 303 and response.headers["location"] == "/todos"
-    assert "Pay invoice" not in client.get("/todos").text
+    assert "Pay invoice" not in client.get("/todos?view=table").text
     assert "Pay invoice" in client.get("/todos?status=done").text
     with session_factory() as s:
         event = s.scalars(select(TodoEvent).order_by(TodoEvent.id.desc())).first()
@@ -223,7 +223,7 @@ def test_d027_a_json_check_off_still_needs_the_csrf_token(client, make_todo):
 
 def test_d027_the_list_loads_the_script_from_this_server_only(client, make_todo):
     make_todo(title="Pay invoice")
-    response = client.get("/todos")
+    response = client.get("/todos?view=table")
     html, csp = response.text, response.headers["content-security-policy"]
     assert '<script src="/static/todos.js" defer></script>' in html and "data-quick" in html
     assert 'data-count="open"' in html and 'id="toast"' in html
@@ -249,7 +249,7 @@ def test_d028_starting_from_the_list_keeps_the_task_in_the_open_tab(client, make
     assert "Write offer" in client.get("/todos?status=in_progress").text
 
 
-@pytest.mark.parametrize("url", ["/", "/todos", "/topics", "/digests"])
+@pytest.mark.parametrize("url", ["/recordings", "/todos", "/topics", "/digests"])
 def test_d028_every_page_reminds_of_the_tasks_in_progress(client, make_todo, url):
     started = make_todo(title="Write offer")
     make_todo(title="Call Anna")
@@ -315,7 +315,7 @@ def test_d030_detail_offers_the_recording_speakers_and_saves_the_ticked_ones(cli
         "csrf": webapp.csrf_token(), "title": "Discuss budget", "priority": "3", "status": "open",
         "people": ["Jochen Rill"], "people_more": "Anna, , anna"})
     assert response.status_code == 303
-    html = client.get("/todos").text
+    html = client.get("/todos?view=table").text
     assert 'class="person" href="/person?name=Anna"' in html  # D-038: a name opens the briefing
     filtered = client.get("/todos?person=Jochen%20Rill").text
     assert "Discuss budget" in filtered and "Person: <strong>Jochen Rill</strong>" in filtered
@@ -481,7 +481,7 @@ def test_d036_a_typed_topic_wins_over_the_ticked_one_without_scripts(client, mak
 
 def test_d037_list_rows_show_status_topic_age_then_people_and_no_author(client, make_todo):
     make_todo(title="Discuss budget", topic="Budget", people=["Anna"], actor="claude")
-    html = client.get("/todos").text
+    html = client.get("/todos?view=table").text
     row = html[html.index("Discuss budget"):html.index("</li>", html.index("Discuss budget"))]
     assert '<span class="by">' not in row and ">Claude<" not in row
     assert row.index("s-open") < row.index(">Budget<") < row.index(" Tage") < row.index("task-people") < row.index(">Anna<")
@@ -595,12 +595,12 @@ def test_d044_people_page_excludes_and_allows_a_name(client, make_todo):
 # --- links and graph (D-047) ---------------------------------------------------------------------
 def test_d047_line_drawn_in_the_list_links_two_tasks(client, make_todo):
     a, b = make_todo(title="Alpha"), make_todo(title="Beta")
-    html = client.get("/todos").text
+    html = client.get("/todos?view=table").text
     assert 'class="link-handle"' in html and '<script src="/static/links.js" defer></script>' in html
     body = client.post("/todos/links", data={"csrf": webapp.csrf_token(), "a": a, "b": str(b)},
                        headers={"Accept": "application/json"}).json()
     assert body == {"ok": True, "created": True}
-    listed = client.get("/todos").text
+    listed = client.get("/todos?view=table").text
     assert f'data-links="{b}"' in listed and f'<a href="/todos/{b}" data-link-id="{b}" class="">Beta</a>' in listed
     detail = client.get(f"/todos/{a}").text
     assert 'id="links"' in detail and f'href="/todos/{b}"' in detail

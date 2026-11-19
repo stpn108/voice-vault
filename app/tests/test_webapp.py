@@ -40,16 +40,16 @@ def token():
 def test_req_002_list_shows_rows_and_a_next_link(client, seed):
     for i in range(60):
         seed(index=i, segments=0)
-    html = client.get("/").text
+    html = client.get("/recordings").text
     assert "Title 59" in html and "Title 10" in html and "Title 9<" not in html
     next_href = html.split('href="')[-1].split('"')[0] if "cursor=" in html else ""
-    assert next_href.startswith("/?cursor=")
+    assert next_href.startswith("/recordings?cursor=")
     second = client.get(next_href.replace("&amp;", "&"))
     assert second.status_code == 200 and "Title 9" in second.text and "Title 59" not in second.text
 
 
 def test_list_with_no_recordings_says_so(client):
-    assert "Keine Aufnahmen gefunden." in client.get("/").text
+    assert "Keine Aufnahmen gefunden." in client.get("/recordings").text
 
 
 def test_req_002_detail_shows_all_segments_in_order_with_speaker_and_time(client, seed):
@@ -79,7 +79,7 @@ def test_req_002_search_via_query_string(client, session_factory):
         s.add(Segment(recording_id=rec.id, idx=0, speaker="A", start_ms=0, text="Kündigungsfrist drei Monate"))
         add_recording(s, 2)
         s.commit()
-    html = client.get("/", params={"q": "kündigungsfrist"}).text
+    html = client.get("/recordings", params={"q": "kündigungsfrist"}).text
     assert "Title 1" in html and "Title 2" not in html
 
 
@@ -93,14 +93,14 @@ def test_req_002_host_header_is_checked(session_factory, host, status):
             yield session
     webapp.app.dependency_overrides[webapp.get_session] = override
     try:
-        response = TestClient(webapp.app, base_url="http://localhost").get("/", headers={"host": host})
+        response = TestClient(webapp.app, base_url="http://localhost").get("/recordings", headers={"host": host})
     finally:
         webapp.app.dependency_overrides.clear()
     assert response.status_code == status
 
 
 def test_security_headers_are_set(client):
-    headers = client.get("/").headers
+    headers = client.get("/recordings").headers
     assert "default-src 'none'" in headers["content-security-policy"]
     assert headers["x-content-type-options"] == "nosniff"
     assert headers["x-frame-options"] == "DENY"
@@ -123,7 +123,7 @@ def test_req_002_confirm_page_changes_nothing(client, seed, session_factory):
 def test_req_002_discard_post_with_token_removes_content_and_redirects(client, seed, session_factory):
     rec_id = seed(index=1, segments=3)
     response = client.post(f"/recordings/{rec_id}/discard", data={"csrf": token()}, follow_redirects=False)
-    assert response.status_code == 303 and response.headers["location"] == "/"
+    assert response.status_code == 303 and response.headers["location"] == "/recordings"
     with session_factory() as s:
         rec = s.get(Recording, rec_id)
         assert rec.discarded_at is not None and rec.summary == "" and s.query(Segment).count() == 0
@@ -227,7 +227,7 @@ def test_req_002_get_requests_never_change_rows(client, seed, session_factory, p
 
 
 def test_invalid_cursor_is_a_400(client):
-    assert client.get("/", params={"cursor": "garbage"}).status_code == 400
+    assert client.get("/recordings", params={"cursor": "garbage"}).status_code == 400
 
 
 def test_req_002_list_and_search_over_5000_recordings_respond_within_one_second(client, session_factory):
@@ -243,8 +243,8 @@ def test_req_002_list_and_search_over_5000_recordings_respond_within_one_second(
         )
         s.commit()
     began = time.perf_counter()
-    assert client.get("/").status_code == 200
-    assert client.get("/", params={"q": "Meeting 4999"}).status_code == 200
+    assert client.get("/recordings").status_code == 200
+    assert client.get("/recordings", params={"q": "Meeting 4999"}).status_code == 200
     assert time.perf_counter() - began < 1.0
 
 
@@ -300,7 +300,7 @@ def test_review_posts_with_huge_ids_are_a_clean_error(client, url, data):
 @pytest.mark.parametrize("cursor", ["!!!", "MjAyNi0wMS0wMVQwMDowMDowMCswMDowMHw5OTk5OTk5OTk5OTk5OTk5OTk5OTk5",
                                     "MDAwMS0wMS0wMVQwMDowMDowMCsxNDowMHwx", "OTk5OS0xMi0zMVQyMzo1OTo1OS0xNDowMHwx"])
 def test_review_odd_cursors_are_a_clean_error(client, cursor):
-    assert client.get("/", params={"cursor": cursor}).status_code == 400
+    assert client.get("/recordings", params={"cursor": cursor}).status_code == 400
 
 
 def test_review_an_unexpected_error_still_gets_the_security_headers(session_factory, monkeypatch):
@@ -310,7 +310,7 @@ def test_review_an_unexpected_error_still_gets_the_security_headers(session_fact
     webapp.app.dependency_overrides[webapp.get_session] = override
     monkeypatch.setattr(webapp.svc, "list_recordings", lambda *a, **k: 1 / 0)
     try:
-        response = TestClient(webapp.app, base_url="http://localhost", raise_server_exceptions=False).get("/")
+        response = TestClient(webapp.app, base_url="http://localhost", raise_server_exceptions=False).get("/recordings")
     finally:
         webapp.app.dependency_overrides.clear()
     assert response.status_code == 500 and "Internal Server Error" in response.text
@@ -336,7 +336,7 @@ def test_review_the_origin_must_match_exactly_and_cross_site_requests_are_refuse
 
 def test_review_the_pages_send_a_referrer_policy_that_keeps_form_origins_intact(client):
     # With "no-referrer" browsers post `Origin: null` and every form would be refused.
-    assert client.get("/").headers["referrer-policy"] == "same-origin"
+    assert client.get("/recordings").headers["referrer-policy"] == "same-origin"
 
 
 def test_d022_the_confirmation_says_so_when_plaud_deletes_right_away(client, seed):
@@ -355,15 +355,15 @@ def test_d045_fetch_now_shows_a_running_notice_that_the_script_hides_when_done(c
     import recording_service as rs
     from utils import now_utc
     first = client.post("/sync", data={"csrf": webapp.csrf_token()}, follow_redirects=False)
-    assert first.status_code == 303 and first.headers["location"] == "/"
-    html = client.get("/").text
+    assert first.status_code == 303 and first.headers["location"] == "/recordings"
+    html = client.get("/recordings").text
     assert 'id="sync-notice"' in html and '<script src="/static/sync.js" defer></script>' in html
     assert client.get("/sync/status").json() == {"state": "waiting", "new": 0}
     with session_factory() as s:
         rs.claim_sync_request(s, now_utc())
         rs.finish_sync_requests(s, now_utc(), 1)
     assert client.get("/sync/status").json() == {"state": "done", "new": 1}
-    assert 'id="sync-notice"' not in client.get("/").text
+    assert 'id="sync-notice"' not in client.get("/recordings").text
     assert client.post("/sync", data={"csrf": "bad"}).status_code == 403
     assert "/sync/status" in client.get("/static/sync.js").text
 

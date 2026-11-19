@@ -159,11 +159,12 @@ def test_req_006_topics_with_any_characters_have_working_pages(client, session_f
 
 def test_req_006_the_list_can_be_sorted_and_flattens_when_not_by_priority(client, session_factory):
     with session_factory() as s:
-        make(s, "banana", priority=3)
-        make(s, "Apple", priority=1)
-    by_priority = client.get("/todos").text
+        make(s, "banana", priority=3, kind="waiting", people=["Anna"])
+        make(s, "Apple", priority=1, kind="waiting", people=["Anna"])
+    # The owner's own unfinished tasks are a board or a table since REQ-008; the grouped list is "Zusagen an mich".
+    by_priority = client.get("/todos?kind=waiting").text
     assert "<h2 class=\"group-title\"" in by_priority
-    by_title = client.get("/todos?sort=title").text
+    by_title = client.get("/todos?kind=waiting&sort=title").text
     assert "<h2 class=\"group-title\"" not in by_title and by_title.index("Apple") < by_title.index("banana")
     assert client.get("/todos?sort=nonsense").status_code == 400
 
