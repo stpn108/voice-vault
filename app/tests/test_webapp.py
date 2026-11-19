@@ -1,5 +1,6 @@
 """Web UI (REQ-002): rendering, escaping, host check, CSRF, discard flows."""
 import datetime as dt
+import re
 import time
 
 import pytest
@@ -97,6 +98,14 @@ def test_req_002_host_header_is_checked(session_factory, host, status):
     finally:
         webapp.app.dependency_overrides.clear()
     assert response.status_code == status
+
+
+@pytest.mark.parametrize("url", ["/recordings", "/topics", "/digests", "/stats", "/admin", "/todos", "/people"])
+def test_d078_the_top_bar_is_as_wide_on_every_page_as_on_the_board(client, url):
+    html = client.get(url).text
+    bar = re.search(r"header\.top \.wrap \{[^}]*\}", html).group(0)
+    wide = re.search(r"body\.wide \.wrap \{ max-width: ([^;]+);", html).group(1)
+    assert f"max-width: {wide};" in bar and '<header class="top"><div class="wrap">' in html
 
 
 def test_security_headers_are_set(client):

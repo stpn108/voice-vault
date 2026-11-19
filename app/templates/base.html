@@ -29,7 +29,7 @@
   /* top bar */
   header.top { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--bg) 82%, transparent);
     backdrop-filter: saturate(1.4) blur(12px); -webkit-backdrop-filter: saturate(1.4) blur(12px); border-bottom: 1px solid var(--line); }
-  header.top .wrap { display: flex; align-items: center; gap: .15rem; height: 3.4rem; }
+  header.top .wrap { display: flex; align-items: center; gap: .15rem; height: 3.4rem; max-width: 94rem; }  /* the bar is as wide on every page as on the board (D-078) */
   a.brand { display: flex; align-items: center; gap: .5rem; font-weight: 700; letter-spacing: -.02em; color: var(--text);
     text-decoration: none; margin-right: .6rem; white-space: nowrap; }
   a.brand i { width: .8rem; height: .8rem; border-radius: 50%; background: linear-gradient(135deg, var(--accent), #9775fa); }
@@ -421,6 +421,7 @@
   .toast[hidden] { display: none; }
   .toast button { background: transparent; color: var(--bg); border-color: color-mix(in srgb, var(--bg) 40%, transparent); padding: .25rem .8rem; }
   .toast button:hover { background: color-mix(in srgb, var(--bg) 15%, transparent); }
+  @media (max-width: 58rem) { header.top .wrap { overflow-x: auto; } }  /* a window narrower than the menu: the bar scrolls, not the page */
   @media (max-width: 44rem) { .split { grid-template-columns: 1fr; } .segment { grid-template-columns: 1fr; gap: 0; } .hide-small { display: none; }
     header.top .wrap { overflow-x: auto; } a.brand span { display: none; } a.brand { margin-right: .4rem; order: -2; }
     button.wip-badge { order: -1; } .wrap { padding: 0 1rem; } }

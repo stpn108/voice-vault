@@ -914,3 +914,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Rejected alternatives** | (A) calling `briefing()` once per person for the dashboard: a dozen queries per person on every page view; (B) only the cards, without rows by person: shows numbers per status but not which tasks; (C) showing a task with several people under its first person only: it would be missing under the others; (D) changing people by dragging a card into another person's row: a drop would silently replace who is involved; (E) a search box in the top bar on every page: the bar is full, and the dashboard is one click away; (F) a full-text search over profiles and agreements: more than "simple", and names are what is typed. |
 | **Status** | **FINAL** |
 
+### D-078: The top bar has the wide width on every page (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-11-19 |
+| **Decision** | Amends D-074 and D-077. `header.top .wrap` gets `max-width: 94rem`, the width `body.wide` gives the board, the table and the people dashboard, on every page. The page content keeps its own width (56rem, or 94rem on the wide pages). The tighter spacing of the bar from D-077 stays. |
+| **In plain words** | The bar at the top is now as wide on all pages as on "Aufgaben" and "Personen", so the menu no longer jumps when you change pages. |
+| **Reasoning** | Owner request. With two widths the brand and the menu moved sideways on every change between a wide and a normal page. |
+| **Rejected alternatives** | (A) making every page wide: lists and texts become hard to read at 94rem; (B) the narrow bar everywhere: the menu with "Personen" only just fits 56rem. |
+| **Status** | **FINAL** |
+

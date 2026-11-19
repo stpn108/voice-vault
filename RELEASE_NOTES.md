@@ -2,6 +2,11 @@
 
 User-facing changes, newest first. Rules: `.claude/release-notes.md`.
 
+## v0.57 — 2026-11-19
+
+- **DE:** Die Kopfleiste ist jetzt auf allen Seiten so breit wie bei „Aufgaben“ und „Personen“; das Menü springt beim Seitenwechsel nicht mehr.
+- **EN:** The top bar is now as wide on every page as on "Tasks" and "People"; the menu no longer jumps when changing pages.
+
 ## v0.56 — 2026-11-19
 
 - **DE:** Jede Person hat jetzt eine kurze Liste „Absprachen“: was Ihr vereinbart oder geklärt habt, auch wenn keine Aufgabe daraus entsteht. Die Auswertung hält sie nach jedem Gespräch aktuell, höchstens 15 Punkte, und Du kannst sie auf der Seite der Person korrigieren.
