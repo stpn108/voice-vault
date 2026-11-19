@@ -8,10 +8,15 @@
 
 **Mode:** `developer` (the owner is the sole decision maker and works with a terminal on the server; to be confirmed at read-back)
 
+**No pull requests (owner's standing instruction, 2026-11-19).** Claude never opens a pull request in this project and never asks
+whether to open one. A change is delivered by pushing the feature branch and reporting; the owner releases it himself with
+`./merge-to-main.sh`. This overrides every "open a pull request" step in `collaboration.md` §6, `requirements.md` and
+`checklist.md`. Only an explicit request for a pull request in the current conversation changes that, for that one change.
+
 | Mode | Who develops | How a change is released | Rules |
 |------|--------------|--------------------------|-------|
 | `owner` | Claude. The owner defines requirements and never uses a terminal. | Claude opens a pull request; the owner merges it on GitHub; the server tests and deploys. | `collaboration.md` and `requirements.md` are binding |
-| `developer` | A developer, with Claude. | Developer's choice: PR merge on GitHub, or `./merge-to-main.sh` / `./redeploy.sh` in a terminal. | `collaboration.md` §2 and §6 are recommendations |
+| `developer` | A developer, with Claude. | In this project: no pull request; the owner runs `./merge-to-main.sh` / `./redeploy.sh` in a terminal. | `collaboration.md` §2 and §6 are recommendations |
 
 ## What this project is NOT
 
