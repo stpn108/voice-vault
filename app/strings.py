@@ -384,6 +384,7 @@ TEXTS = {
     "ui_board_no_topic": {"de": "Ohne Thema", "en": "No topic"},
     "ui_board_n_open": {"de": "offen", "en": "open"},
     "ui_board_n_wip": {"de": "in Arbeit", "en": "in progress"},
+    "ui_board_pin": {"de": "Verknüpft mit: {titles}. Ein Klick hält die Linien fest.", "en": "Linked to: {titles}. A click keeps the lines."},
     "ui_todo_pause": {"de": "Zurückstellen", "en": "Put back"},
     "ui_cleanup_confirm": {"de": "{count} Aufnahme(n) endgültig verwerfen", "en": "Discard {count} recording(s) for good"},
 }

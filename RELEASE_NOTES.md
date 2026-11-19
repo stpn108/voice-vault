@@ -2,6 +2,11 @@
 
 User-facing changes, newest first. Rules: `.claude/release-notes.md`.
 
+## v0.55 — 2026-11-19
+
+- **DE:** Liegt eine verknüpfte Aufgabe im Board außerhalb des Bildschirms oder in einer eingeklappten Zeile, zeigt ein Etikett am Bildrand ihren Namen, und die Linie führt dorthin. Ein Klick auf die 🔗-Zahl einer Karte hält die Linien beim Scrollen fest, ein Klick auf ein Etikett springt zur Aufgabe.
+- **EN:** If a linked task on the board is off screen or in a folded row, a label at the edge of the screen shows its name and the line leads there. A click on the 🔗 number of a card keeps the lines while scrolling, a click on a label jumps to the task.
+
 ## v0.54 — 2026-11-19
 
 - **DE:** Die App öffnet jetzt mit den Aufgaben als Board: Spalten für Offen, In Arbeit und Erledigt, Zeilen für die Priorität, kompakte Karten zum Ziehen. Zeilen lassen sich einklappen oder nach Thema bilden, Filter zeigen Überfälliges, diese Woche Fälliges und Neues.

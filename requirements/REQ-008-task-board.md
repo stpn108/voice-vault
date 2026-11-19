@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| **Status** | APPROVED (owner's decisions in chat, 2026-11-19, developer mode) |
+| **Status** | IMPLEMENTED (v0.54; criterion 9 extended in v0.55) |
 | **Date** | 2026-11-19 |
 | **Requested by** | Dennis Winter |
-| **Implemented in** | — (branch `claude/hopeful-franklin-8ao6oz`) |
-| **Related decisions** | D-028, D-037, D-047, D-048, D-074 |
+| **Implemented in** | v0.54, branch `claude/hopeful-franklin-8ao6oz`, merged with `./merge-to-main.sh` |
+| **Related decisions** | D-028, D-037, D-047, D-048, D-074, D-075 |
 | **Supersedes / superseded by** | Amends REQ-002 (the recordings list is no longer the home page) |
 
 ## Owner ask (verbatim)
@@ -47,6 +47,8 @@ The owner sees his unfinished tasks on one or two screens instead of seven: stat
    Example: 5 overdue tasks → "Überfällig 5"; a click shows these 5.
 9. **Links are visible.**
    Given a task with linked tasks, then pointing at its card highlights the linked cards that are on the board and draws lines to them.
+   A linked card that is not on screen (scrolled away, in a folded row, in a hidden column) gets a label with its title at the nearest edge, and the line ends there. A click on the link count of a card keeps its lines while scrolling; a click on a label then leads to that card, unfolding its row (owner, 2026-11-19: "die Connections weiter anzeigen lassen, wenn die […] connected items außerhalb des Screens weiter unten liegen").
+   Example: an urgent task linked to a task in the folded row "Niedrig" → a label "↓ <title>" at the bottom edge; a click on it opens "Niedrig" and scrolls there.
 10. **Table view.**
     Given `view=table`, then the unfinished tasks show as one line each in columns: check, title, status, topic, people, due, age, priority, links. Everything the list could do stays: check off, start, put back, drop, sort, draw a link. On a narrow screen the table falls back to the list layout.
     Example: 58 unfinished tasks → 58 lines.
@@ -74,7 +76,22 @@ Not a database number: the height of the page. With 58 unfinished tasks at 1440�
 | 2026-11-19 | Board with table, or table only? | Board with table. |
 | 2026-11-19 | Details at the side of the board? | Later. |
 | 2026-11-19 | Board as the home page? | Yes. |
+| 2026-11-19 | Links to cards outside the screen? | Labels at the edge; a click on the link count keeps the lines (D-075). |
 
 ## Tests
 
-<Filled in at IMPLEMENTED: test file and test names per criterion.>
+`app/tests/test_task_board.py` (the service) and `app/tests/test_webapp_board.py` (the pages), all named `test_req_008_…`:
+
+| Criterion | Tests |
+|-----------|-------|
+| 1 | `tasks_are_the_home_page_and_recordings_are_one_click_away`; the recordings tests in `test_webapp.py` use `/recordings` |
+| 2 | `columns_are_the_status_and_done_only_of_the_last_seven_days`, `columns_are_the_status_and_rows_the_priority` |
+| 3 | `rows_are_the_four_priorities_with_due_dates_first`, `rows_fold_and_low_starts_folded` |
+| 4 | `rows_by_topic_are_alphabetical_with_no_topic_last`, `rows_by_topic_or_none` |
+| 5 | `a_card_shows_what_matters`, `a_card_marks_an_unclear_name` |
+| 6 | `a_card_moves_with_its_buttons_without_a_script` |
+| 7 | `a_drag_into_another_row_is_one_change_and_one_undo`, `a_drag_within_a_column_changes_only_the_priority`; the dragging itself was checked by hand in a browser |
+| 8 | `quick_filters_narrow_the_board_and_keep_their_counts`, `quick_filters_show_their_counts_and_narrow_the_board`, `topic_and_person_narrow_the_board…` |
+| 9 | `a_card_shows_what_matters` (link data and button), `the_board_loads_its_script_from_this_server_only`; lines, labels and jumping were checked by hand in a browser |
+| 10 | `the_table_is_the_list_with_one_line_per_task` |
+| 11 | `board_and_table_switch_and_the_other_lists_stay_lists` |

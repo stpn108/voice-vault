@@ -881,3 +881,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Rejected alternatives** | (A) table only: denser, but priority and status are again one sort order, not two axes; (B) a drag-and-drop library: the native API is enough for moving a card between cells, and no dependency is served; (C) a new JSON API and client-side rendering: a second way to read and change tasks; (D) a side panel for the details now: the largest part, the owner moved it to later; (E) keeping the old list as a third view: the table is that list in one line, with all its functions. |
 | **Status** | **FINAL** |
 
+### D-075: Links to cards that are not on screen get a label at the edge; a click keeps the lines (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-11-19 |
+| **Decision** | Amends D-074 (board) and applies D-048 to it. For every linked card `board.js` picks where its line ends: the card itself while it is on screen; otherwise a label (`button.link-label`, the task title, "↑" or "↓" when it lies above or below) placed at the nearest point of the visible area, for a card in a folded row beside that row's head, for a card in a hidden column (narrow screen) at that column's head. Labels do not cover each other. The lines are redrawn while the page scrolls, on resize, and when a row folds or a card moves, instead of being hidden. The link count on a card is a button (`.link-pin`): a click keeps this card's lines until the next click, Escape or a drag; while kept, hovering other cards changes nothing, the card itself gets a label when it leaves the screen, and a click on a label unfolds the row, shows the column and scrolls to the card. The buttons that appear on hover hang below the card's corner so they do not cover its line with due date, links and people. Whether a card is laid out is decided from the row and the column, not from `offsetParent`: content of a closed `<details>` keeps a box in current browsers. |
+| **In plain words** | If a linked task is further down or in a folded row, a small label with its name shows at the edge of the screen and the line leads there. Click the 🔗 number on a card and the lines stay while you scroll; a click on a label takes you to that task. |
+| **Reasoning** | Owner request: with a board two screens long, the line of a link simply ran out of the picture and the linked task stayed unknown. A label tells which task it is without scrolling; keeping the lines is needed because moving the mouse to a label, or scrolling, would otherwise end the hover. |
+| **Rejected alternatives** | (A) only keep the lines while scrolling: the hover ends as soon as another card is under the pointer; (B) a list of the linked tasks in a popup on the card: names them, but shows neither where they are nor leads there in the picture; (C) scrolling to the linked card on hover: the page would jump while the pointer only passes. |
+| **Status** | **FINAL** |
+

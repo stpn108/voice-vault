@@ -115,7 +115,8 @@ def test_req_008_a_card_shows_what_matters(client, make_todo, session_factory):
     shown = card(html, "Vertragsentwurf an Anwalt weiterleiten")
     assert f'href="/todos/{contract}"' in shown and '<span class="dot p1" title="Dringend">' in shown
     assert ">Mietvertrag</a>" in shown and f'class="due overdue">Überfällig {late.strftime("%d.%m.")}' in shown
-    assert "🔗 1" in shown and 'title="Übergabeprotokoll abstimmen"' in shown and f'data-links="{other}"' in shown
+    assert f'data-links="{other}"' in shown and '<button type="button" class="link-pin" aria-pressed="false"' in shown
+    assert 'title="Verknüpft mit: Übergabeprotokoll abstimmen. Ein Klick hält die Linien fest.">🔗 1</button>' in shown
     assert 'title="Miriam Vogt">MV</a>' in shown and "Dennis Winter" not in shown  # excluded people stay out (D-055)
     assert 'class="pill new"' not in shown and "12 Tage" not in shown  # the due date takes the place of the age
     assert "12 Tage" in card(html, "Übergabeprotokoll abstimmen")
@@ -214,6 +215,7 @@ def test_req_008_the_board_loads_its_script_from_this_server_only(client, make_t
     assert 'id="toast"' in html and 'data-count="open"' in html and 'draggable="true"' in html
     script = client.get("/static/board.js")
     assert script.status_code == 200 and "/status" in script.text and "todo:changed" in script.text
+    assert "link-label" in script.text and "link-label" in html  # labels for linked cards that are not on screen (D-075)
 
 
 def test_req_008_the_table_is_the_list_with_one_line_per_task(client, make_todo):

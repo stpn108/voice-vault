@@ -26,7 +26,7 @@
         {% set active = row.status != "done" %}
         {% if row.due_date %}<span class="due {% if active and row.due_date < today %}overdue{% endif %}">{{ t("ui_overdue") if active and row.due_date < today else t("ui_due") }} {{ row.due_date.strftime("%d.%m.") }}</span>
         {% else %}<span>{{ row.age_days }} {{ t("ui_day") if row.age_days == 1 else t("ui_days") }}</span>{% endif %}
-        {% if linked %}<span title="{{ linked | map(attribute=1) | join(', ') }}">🔗 {{ linked | length }}</span>{% endif %}
+        {% if linked %}<button type="button" class="link-pin" aria-pressed="false" title="{{ t('ui_board_pin', titles=linked | map(attribute=1) | join(', ')) }}">🔗 {{ linked | length }}</button>{% endif %}
         {% if shown_people[row.id] %}<span class="inis">{% for name in shown_people[row.id] %}<a class="ini" draggable="false" href="/person?name={{ name | urlencode }}" title="{{ name }}">{{ (name.split() | map("first") | join)[:2] }}</a>{% endfor %}</span>{% endif %}
       </div>
       <form class="bcard-actions" data-move method="post" action="/todos/{{ row.id }}/status">
