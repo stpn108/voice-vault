@@ -24,8 +24,17 @@
     });
   }
 
+  // Tasks, not cards: with rows by person a task has one card per person (REQ-010).
   function count(scope, status) {
-    return scope.querySelectorAll('.bcard[data-status="' + status + '"]:not([hidden])').length;
+    var ids = {};
+    scope.querySelectorAll('.bcard[data-status="' + status + '"]:not([hidden])').forEach(function (card) {
+      ids[card.getAttribute("data-id")] = true;
+    });
+    return Object.keys(ids).length;
+  }
+
+  function copies(card) {
+    return board.querySelectorAll('.bcard[data-id="' + card.getAttribute("data-id") + '"]');
   }
 
   function recount() {
@@ -76,8 +85,10 @@
 
   function settle(card, status, priority, result) {
     setCounts(result.counts);
-    card.hidden = status === "dropped";
-    if (status !== "dropped") { place(card, status, priority); }
+    copies(card).forEach(function (one) {
+      one.hidden = status === "dropped";
+      if (status !== "dropped") { place(one, status, priority); }
+    });
     recount();
     drawLinks();
     announce(result);
@@ -113,8 +124,10 @@
     var card = board.querySelector('.bcard[data-id="' + result.id + '"]');
     setCounts(result.counts);
     if (!card) { return; }
-    card.hidden = result.status === "dropped";
-    if (!card.hidden) { place(card, result.status, null); }
+    copies(card).forEach(function (one) {
+      one.hidden = result.status === "dropped";
+      if (!one.hidden) { place(one, result.status, null); }
+    });
     recount();
     drawLinks();
   });

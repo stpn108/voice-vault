@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}{{ t("ui_nav_people") }}{% endblock %}
+{% block body_class %}wide{% endblock %}
+{% block content %}
+{# All people at a glance (REQ-010, D-077): one card each, read only; everything is edited on the person's page. #}
+<div class="head" style="margin-top:1.4rem">
+  <h1>{{ t("ui_nav_people") }}</h1>
+  <form class="searchbar" method="get" action="/people">
+    <input type="text" name="q" value="{{ q }}" maxlength="80" list="list-people" placeholder="{{ t('ui_persons_search') }}" aria-label="{{ t('ui_persons_search') }}">
+    <input type="hidden" name="sort" value="{{ sort }}">
+    <button type="submit">{{ t("ui_search") }}</button>
+    <datalist id="list-people">{% for name in names %}<option value="{{ name }}">{% endfor %}</datalist>
+  </form>
+</div>
+<div class="pager" style="margin-top:-.2rem">
+  <span class="muted" style="font-size:.85rem">{{ t("ui_sort") }}</span>
+  {% for s in sorts %}<a class="chip {% if s == sort %}current{% endif %}" href="/people?sort={{ s }}{{ '&q=' ~ q | urlencode if q else '' }}">{{ t("ui_persons_sort_" ~ s) }}</a>{% endfor %}
+  <span class="spacer"></span><a href="/todos?group=person">{{ t("ui_persons_board") }} →</a>
+</div>
+{% if q and cards %}<p class="sub" style="margin:-.5rem 0 1rem">{{ t("ui_persons_search") }}: <strong>{{ q }}</strong> · <a href="/people?sort={{ sort }}">{{ t("ui_filter_clear") }}</a></p>{% endif %}
+{% if cards %}
+<div class="pgrid">
+  {% for card in cards %}
+  {% set who = card.name | urlencode %}
+  <article class="card pcard">
+    <div class="pcard-head"><a href="/person?name={{ who }}&amp;from=people">{{ card.name }}</a>{% if card.role %}<span class="muted">{{ card.role }}</span>{% endif %}</div>
+    <div class="pcard-sub">{% if card.last_talk %}{{ t("ui_brief_last_talk_today") if card.days_since == 0 else t("ui_brief_last_talk_yesterday") if card.days_since == 1 else t("ui_brief_last_talk", days=card.days_since) }} · {{ t("ui_brief_conversation_one") if card.conversations == 1 else t("ui_brief_conversations", count=card.conversations) }}{% else %}{{ t("ui_persons_no_talk") }}{% endif %}</div>
+    <div class="pstats">
+      <a class="{{ 'zero' if not card.open }}" href="/todos?person={{ who }}" title="{{ t('ui_persons_mine') }}"><b>{{ card.open }}</b>{{ t("todo_status_open") }}</a>
+      <a class="{{ 'zero' if not card.in_progress }}" href="/todos?person={{ who }}" title="{{ t('ui_persons_mine') }}"><b>{{ card.in_progress }}</b>{{ t("todo_status_in_progress") }}</a>
+      <a class="{{ 'zero' if not card.waiting }}" href="/todos?kind=waiting&amp;person={{ who }}"><b>{{ card.waiting }}</b>{{ t("ui_persons_waiting") }}</a>
+      <span class="pstat {{ 'late' if card.overdue else 'zero' }}"><b>{{ card.overdue }}</b>{{ t("ui_persons_overdue") }}</span>
+    </div>
+    {% if card.next_points %}<div class="field"><span>{{ t("ui_profile_next") }}</span><p>{{ card.next_points }}</p></div>{% endif %}
+    {% if card.agreements %}<div class="field"><span>{{ t("ui_profile_agreements") }}</span>
+      <ul class="agreements">{% for point in card.agreements[:shown] %}<li>{{ point }}</li>{% endfor %}</ul>
+      {% if card.agreements | length > shown %}<a class="more" href="/person?name={{ who }}&amp;from=people">{{ t("ui_persons_more", count=card.agreements | length - shown) }}</a>{% endif %}</div>{% endif %}
+  </article>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card empty">{% if q %}{{ t("ui_persons_none_found", q=q) }} <a href="/people?sort={{ sort }}">{{ t("ui_filter_clear") }}</a>{% else %}{{ t("ui_persons_empty") }}{% endif %}</div>
+{% endif %}
+{% endblock %}

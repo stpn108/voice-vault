@@ -68,7 +68,7 @@
   {% for lane in board.lanes %}
   {% if group == "none" %}<div class="lane" data-lane="{{ lane.key }}">{{ cells(lane) }}</div>
   {% else %}<details class="lane" data-lane="{{ lane.key }}" {% if lane.priority != 4 %}open{% endif %}>
-    <summary>{% if lane.priority %}<span class="dot p{{ lane.priority }}"></span><strong>{{ t("todo_prio_" ~ lane.priority) }}</strong>{% else %}<strong>{{ lane.label or t("ui_board_no_topic") }}</strong>{% endif %}
+    <summary>{% if lane.priority %}<span class="dot p{{ lane.priority }}"></span><strong>{{ t("todo_prio_" ~ lane.priority) }}</strong>{% elif group == "person" %}<strong>{% if lane.label %}<a href="/person?name={{ lane.label | urlencode }}&amp;from=people">{{ lane.label }}</a>{% else %}{{ t("ui_board_no_person") }}{% endif %}</strong>{% else %}<strong>{{ lane.label or t("ui_board_no_topic") }}</strong>{% endif %}
       <span class="sum"><span data-n="open">{{ lane.cells["open"] | length }}</span> {{ t("ui_board_n_open") }} · <span data-n="in_progress">{{ lane.cells["in_progress"] | length }}</span> {{ t("ui_board_n_wip") }}</span></summary>
     {{ cells(lane) }}
   </details>{% endif %}

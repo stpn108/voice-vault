@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ b.name }}{% endblock %}
 {% block crumbs %}
-<nav class="crumbs" aria-label="breadcrumb"><a href="/todos">{{ t("ui_nav_todos") }}</a><span class="sep">/</span>
+<nav class="crumbs" aria-label="breadcrumb">{% if via_people %}<a href="/people">{{ t("ui_nav_people") }}</a>{% else %}<a href="/todos">{{ t("ui_nav_todos") }}</a>{% endif %}<span class="sep">/</span>
 {%- if via_waiting %}<a href="/todos?kind=waiting">{{ t("ui_kind_waiting") }}</a><span class="sep">/</span>{% endif -%}
 <span aria-current="page">{{ b.name }}</span></nav>
 {% endblock %}

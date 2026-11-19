@@ -331,6 +331,7 @@ def _stability(cfg: Config) -> int:
 
 
 # --- tasks, topics and overviews (REQ-006, D-013) -------------------------------------------
+PEOPLE_AGREEMENTS_SHOWN = 3  # agreements on a card of the people dashboard; the person's page has all (REQ-010)
 TODO_VIEWS = ("board", "table")  # how the owner's own unfinished tasks show (REQ-008)
 
 
@@ -612,6 +613,20 @@ def todo_undo(request: Request, event_id: Annotated[int, PathParam(ge=1, le=MAX_
     return RedirectResponse(f"/todos/{todo.id}", status_code=303)
 
 
+@app.get("/people", response_class=HTMLResponse)
+def people_dashboard(request: Request, sort: str = Query("recent", max_length=10), q: str = Query("", max_length=todos.PERSON_MAX),
+                     session: Session = Depends(get_session), cfg: Config = Depends(get_config)):
+    """All people at a glance, one card each (REQ-010, D-077). A search that finds exactly one person opens that person."""
+    if sort not in briefing_service.OVERVIEW_SORTS:
+        raise HTTPException(status_code=400, detail="invalid sort")
+    today = now_utc().astimezone(LOCAL_TZ).date()
+    cards = briefing_service.overview(session, now_utc(), today, sort, q)
+    if q.strip() and len(cards) == 1:
+        return RedirectResponse(f"/person?name={quote(cards[0].name)}&from=people", status_code=303)
+    return render(request, cfg, "persons.html", cards=cards, q=q.strip(), sort=sort, sorts=briefing_service.OVERVIEW_SORTS,
+                  shown=PEOPLE_AGREEMENTS_SHOWN, names=todos.known_people(session))
+
+
 @app.get("/person", response_class=HTMLResponse)
 def person_page(request: Request, name: str = Query(..., max_length=todos.PERSON_MAX), session: Session = Depends(get_session),
                 came_from: str = Query("", alias="from", max_length=10), cfg: Config = Depends(get_config)):
@@ -626,7 +641,7 @@ def person_page(request: Request, name: str = Query(..., max_length=todos.PERSON
         for node in graph["nodes"]:
             if node["id"].startswith("t"):
                 node["url"] += "&from=waiting"
-    return render(request, cfg, "person.html", via_waiting=via_waiting, b=found, today=now_utc().astimezone(LOCAL_TZ).date(),
+    return render(request, cfg, "person.html", via_waiting=via_waiting, via_people=came_from == "people", b=found, today=now_utc().astimezone(LOCAL_TZ).date(),
                   days_since=(now_utc() - found.last_talk).days if found.last_talk else None, excluded=excluded,
                   profile=None if excluded else person_service.profile(session, found.name),
                   agreements=[] if excluded else person_service.agreement_list(person_service.profile(session, found.name)),

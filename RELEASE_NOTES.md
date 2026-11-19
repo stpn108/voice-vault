@@ -6,6 +6,10 @@ User-facing changes, newest first. Rules: `.claude/release-notes.md`.
 
 - **DE:** Jede Person hat jetzt eine kurze Liste „Absprachen“: was Ihr vereinbart oder geklärt habt, auch wenn keine Aufgabe daraus entsteht. Die Auswertung hält sie nach jedem Gespräch aktuell, höchstens 15 Punkte, und Du kannst sie auf der Seite der Person korrigieren.
 - **EN:** Every person now has a short list "Agreements": what you two agreed on or settled, even if no task comes out of it. The analysis keeps it current after every conversation, at most 15 points, and you can correct it on the person's page.
+- **DE:** Neue Seite „Personen“: eine Karte je Person mit letztem Gespräch, Deinen Aufgaben mit ihr (offen und in Arbeit), ihren Zusagen, Überfälligem, den nächsten Punkten und den neuesten Absprachen. Ein Suchfeld findet eine Person über den Namen.
+- **EN:** New page "People": one card per person with the last conversation, your tasks with them (open and in progress), their promises, what is overdue, the next points and the latest agreements. A search field finds a person by name.
+- **DE:** Das Board kann die Zeilen jetzt auch nach Person bilden. So siehst Du je Person, in welchem Zustand die Aufgaben sind.
+- **EN:** The board can now form its rows by person, so you see per person what state the tasks are in.
 
 ## v0.55 — 2026-11-19
 

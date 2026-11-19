@@ -96,3 +96,18 @@ def test_req_008_unknown_grouping_or_filter_is_rejected(db_session, kwargs):
     with pytest.raises(tb.BoardError):
         tb.board(db_session, NOW, TODAY, **kwargs)
 
+
+def test_req_010_rows_by_person_show_a_task_under_each_of_its_people_and_count_it_once(db_session):
+    import people_admin
+    make(db_session, "With both", people=["Jochen Rill", "anna"], status="in_progress")
+    make(db_session, "With Anna", people=["Anna"])
+    make(db_session, "Alone")
+    make(db_session, "With the excluded", people=["Secret Person"])
+    people_admin.set_person_excluded(db_session, "Secret Person", True)
+    board = tb.board(db_session, NOW, TODAY, group="person")
+    assert [(lane.key, lane.label) for lane in board.lanes] == [("n:anna", "Anna"), ("n:jochen rill", "Jochen Rill"), ("n0", "")]
+    anna, jochen, nobody = board.lanes
+    assert titles(anna.cells["open"]) == ["With Anna"] and titles(anna.cells["in_progress"]) == ["With both"]
+    assert titles(jochen.cells["in_progress"]) == ["With both"] and not jochen.cells["open"]
+    assert titles(nobody.cells["open"]) == ["Alone", "With the excluded"]
+    assert board.counts == {"open": 3, "in_progress": 1, "done": 0} and len(board.rows) == 4

@@ -251,3 +251,17 @@ def test_req_008_board_and_table_switch_and_the_other_lists_stay_lists(client, m
         assert "data-board" not in html and "dense" not in html.split("</style>")[1] and "?view=board" not in html
         assert '<body class="">' in html
     assert "Finished" in client.get("/todos?status=done").text and "Change ticket" in client.get("/todos?kind=waiting").text
+
+
+def test_req_010_rows_by_person_show_the_state_of_the_tasks_per_person(client, make_todo):
+    both = make_todo(title="With both", people=["Anna Becker", "Jochen Rill"], status="in_progress")
+    make_todo(title="With Anna", people=["Anna Becker"])
+    make_todo(title="Alone")
+    html = client.get("/todos?group=person").text
+    assert '<a class="chip current" href="/todos?group=person">Person</a>' in html
+    assert "With Anna" in cell(html, "n:anna becker", "open") and "With both" in cell(html, "n:anna becker", "in_progress")
+    assert "With both" in cell(html, "n:jochen rill", "in_progress") and "Alone" in cell(html, "n0", "open")
+    assert '<strong><a href="/person?name=Anna%20Becker&amp;from=people">Anna Becker</a></strong>' in html
+    assert "<strong>Ohne Person</strong>" in html
+    assert html.count(f'data-id="{both}"') == 2 and '<b data-col="in_progress">1</b>' in html  # two cards, one task
+    assert "copies(card)" in client.get("/static/board.js").text  # a move takes both cards along
