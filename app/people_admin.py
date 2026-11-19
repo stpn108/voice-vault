@@ -188,7 +188,7 @@ def _move_profile(session: Session, old: str, new: str) -> None:
     if source is not None and (target is None or target is source):
         source.name = new
     elif source is not None:
-        for field in ("role", "current_work", "next_points"):
+        for field in ("role", "current_work", "next_points", "agreements"):
             if not getattr(target, field):
                 setattr(target, field, getattr(source, field))
         session.delete(source)

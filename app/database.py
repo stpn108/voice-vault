@@ -191,6 +191,8 @@ class PersonProfile(Base):
     role: Mapped[str] = mapped_column(String(200), default="", server_default="")
     current_work: Mapped[str] = mapped_column(Text, default="", server_default="")
     next_points: Mapped[str] = mapped_column(Text, default="", server_default="")
+    # What the owner and this person agreed on (REQ-009, D-076): at most 15 short points, one per line.
+    agreements: Mapped[str] = mapped_column(Text, default="", server_default="")
     updated_by: Mapped[str] = mapped_column(String(10), default="claude", server_default="claude")
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -425,6 +427,11 @@ def _migrate_008_plaud_sessions_rejected(conn):
         conn.execute(sqltext("ALTER TABLE IF EXISTS plaud_sessions ADD COLUMN IF NOT EXISTS rejected_at TIMESTAMP WITH TIME ZONE;"))
 
 
+def _migrate_009_person_profiles_agreements(conn):
+    if conn.dialect.name == "postgresql":
+        conn.execute(sqltext("ALTER TABLE IF EXISTS person_profiles ADD COLUMN IF NOT EXISTS agreements TEXT NOT NULL DEFAULT '';"))
+
+
 MIGRATIONS: list = [
     ("001_recordings_discarded_at", _migrate_001_recordings_discarded_at),
     ("002_recordings_analyzed_at", _migrate_002_recordings_analyzed_at),
@@ -434,6 +441,7 @@ MIGRATIONS: list = [
     ("006_todos_kind", _migrate_006_todos_kind),
     ("007_sync_requests_finished", _migrate_007_sync_requests_finished),
     ("008_plaud_sessions_rejected", _migrate_008_plaud_sessions_rejected),
+    ("009_person_profiles_agreements", _migrate_009_person_profiles_agreements),
 ]
 
 # Advisory lock key: serialises schema setup when several replicas start at

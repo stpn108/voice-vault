@@ -324,8 +324,8 @@ def list_digests_tool(session, arguments, now, stability_minutes):
 
 
 # --- living person profiles (D-057) ------------------------------------------------------------------
-PROFILE_RULES = (" Work only: role and unit, what the person works on, where shared topics stand, what to raise "
-                 "next time. This only limits what goes into the profile, the recordings stay as they are: leave out "
+PROFILE_RULES = (" Work only: role and unit, what the person works on, where shared topics stand, what was agreed, "
+                 "what to raise next time. This only limits what goes into the profile, the recordings stay as they are: leave out "
                  "private life, health, and judgments about the person's own pay, performance or career moves. When "
                  "in doubt, leave it out; the owner adds it on the page. If a tool says the person is excluded, "
                  "record nothing about them.")
@@ -334,7 +334,8 @@ TOOLS += [
     {
         "name": "get_person",
         "description": "A person's living profile: role and unit, current work, points for the next conversation, "
-                       "the topic clusters with the owner, and the owner's open tasks and what the person owes him."
+                       "the agreements with the owner, the topic clusters with the owner, and the owner's open tasks "
+                       "and what the person owes him."
                        + UNTRUSTED,
         "inputSchema": {**_props(name={"type": "string", "maxLength": svc.PERSON_MAX}), "required": ["name"]},
         "annotations": READ,
@@ -343,13 +344,19 @@ TOOLS += [
         "name": "update_person",
         "description": "Change a person's profile; only the given fields change, the old text is kept for the "
                        "owner. role: role and unit in one line. current_work: what the person is working on now. "
-                       "next_points: what the owner should raise in the next conversation (replace the whole text)."
+                       "next_points: what the owner should raise in the next conversation (replace the whole text). "
+                       "agreements: what the owner and this person agreed on or settled, also where no task follows; "
+                       f"the whole list each time, newest first, at most {people.AGREEMENTS_MAX} points of one short "
+                       "sentence, each ending with the date of the conversation like (18.11.). More is refused: merge "
+                       "related points or leave out the oldest that are settled."
                        + PROFILE_RULES,
         "inputSchema": {**_props(
             name={"type": "string", "maxLength": svc.PERSON_MAX},
             role={"type": "string", "maxLength": 200},
             current_work={"type": "string", "maxLength": 800},
-            next_points={"type": "string", "maxLength": 1000}), "required": ["name"]},
+            next_points={"type": "string", "maxLength": 1000},
+            agreements={"type": "array", "maxItems": people.AGREEMENTS_MAX,
+                        "items": {"type": "string", "maxLength": people.AGREEMENT_MAX}}), "required": ["name"]},
         "annotations": WRITE,
     },
     {
@@ -388,7 +395,9 @@ def get_person_tool(session, arguments, now, stability_minutes):
              f"Role and unit: {found.role if found and found.role else '(unknown)'}",
              f"Current work: {found.current_work if found and found.current_work else '(unknown)'}",
              f"Next conversation: {found.next_points if found and found.next_points else '(nothing noted)'}",
-             "", "Topics with the owner:"]
+             "", "Agreements with the owner:"]
+    lines += [f"- {point}" for point in people.agreement_list(found)] or ["(none)"]
+    lines += ["", "Topics with the owner:"]
     lines += [f"- {topic.name} ({_day(note.updated_at)}): {note.note}" for topic, note in people.clusters(session, name)] \
         or ["(none)"]
     if brief is not None:
@@ -401,6 +410,8 @@ def update_person_tool(session, arguments, now, stability_minutes):
     name = str_arg(arguments, "name", svc.PERSON_MAX)
     fields = {key: str_arg(arguments, key, limit) for key, limit in
               (("role", 200), ("current_work", 800), ("next_points", 1000)) if key in arguments}
+    if "agreements" in arguments:
+        fields["agreements"] = arguments["agreements"]  # checked by the service: a list of short sentences
     return _person_guard(lambda: (people.update_profile(session, now, name, actor="claude", **fields),
                                   text_result(f"Profile of {name.strip()} updated."))[1])
 
@@ -459,7 +470,7 @@ def suggest_spelling_tool(session, arguments, now, stability_minutes):
 SPELLED = {
     "add_todo": ("title", "detail", "note", "people"), "update_todo": ("title", "detail", "note", "people"),
     "add_topic_note": ("note",), "save_digest": ("body",),
-    "update_person": ("name", "role", "current_work", "next_points"), "set_person_topic": ("name", "note"),
+    "update_person": ("name", "role", "current_work", "next_points", "agreements"), "set_person_topic": ("name", "note"),
 }
 
 

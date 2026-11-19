@@ -115,3 +115,61 @@ def test_d059_a_conversation_ties_a_person_to_its_topics_only_with_a_20_percent_
     db_session.commit()
     svc.add_topic_note(db_session, NOW, topic="Budget", recording_id=rec.id, note="a")
     assert bool(people.person_topics(db_session, "Anna")) is counts
+
+
+# --- agreements per person (REQ-009, D-076) ------------------------------------------------------------
+def test_req_009_agreements_are_one_list_per_person_replaced_as_a_whole_with_the_old_text_kept(db_session):
+    people.update_profile(db_session, NOW, "Anna Becker", actor="claude", role="CFO",
+                          agreements=["Budgetfreigabe über Anna (12.11.)", "Jour fixe alle 14 Tage (12.11.)"])
+    found = people.profile(db_session, "anna becker")
+    assert people.agreement_list(found) == ["Budgetfreigabe über Anna (12.11.)", "Jour fixe alle 14 Tage (12.11.)"]
+    people.update_profile(db_session, NOW, "Anna Becker", actor="claude",
+                          agreements=["Budgetfreigabe entscheidet Sven (19.11.)", "Jour fixe alle 14 Tage (12.11.)"])
+    found = people.profile(db_session, "Anna Becker")
+    assert people.agreement_list(found)[0] == "Budgetfreigabe entscheidet Sven (19.11.)" and found.role == "CFO"
+    kept = [v.body for v in db_session.scalars(select(TextVersion).where(TextVersion.ref.like("%:agreements")))]
+    assert kept == ["Budgetfreigabe über Anna (12.11.)\nJour fixe alle 14 Tage (12.11.)"]
+
+
+def test_req_009_a_person_without_agreements_has_an_empty_list(db_session):
+    assert people.agreement_list(None) == []
+    people.update_profile(db_session, NOW, "Anna Becker", actor="claude", role="CFO")
+    assert people.agreement_list(people.profile(db_session, "Anna Becker")) == []
+    people.update_profile(db_session, NOW, "Anna Becker", actor="owner", agreements=["Punkt"])
+    people.update_profile(db_session, NOW, "Anna Becker", actor="owner", agreements=[])
+    assert people.agreement_list(people.profile(db_session, "Anna Becker")) == []
+
+
+def test_req_009_the_owners_text_is_one_point_per_line_without_the_bullets_he_typed(db_session):
+    typed = "- Jour fixe alle 14 Tage\n\n•  Wir duzen den Lieferanten   nicht in Mails\n* Angebote gehen über Anna\n3. Quartal wird nicht angefasst\n"
+    people.update_profile(db_session, NOW, "Anna Becker", actor="owner", agreements=typed)
+    assert people.agreement_list(people.profile(db_session, "Anna Becker")) == [
+        "Jour fixe alle 14 Tage", "Wir duzen den Lieferanten nicht in Mails", "Angebote gehen über Anna",
+        "3. Quartal wird nicht angefasst"]
+
+
+@pytest.mark.parametrize("value, message", [
+    ([f"Punkt {n}" for n in range(16)], "at most 15 agreements"),
+    (["x" * 241], "at most 240 characters"),
+    (["ok", 7], "list of short sentences"),
+    (7, "list of short sentences"),
+])
+def test_req_009_too_many_or_too_long_is_refused_and_nothing_is_cut_off(db_session, value, message):
+    people.update_profile(db_session, NOW, "Anna Becker", actor="claude", agreements=["Bleibt (12.11.)"])
+    with pytest.raises(people.PersonError, match=message):
+        people.update_profile(db_session, NOW, "Anna Becker", actor="claude", role="CFO", agreements=value)
+    found = people.profile(db_session, "Anna Becker")
+    assert people.agreement_list(found) == ["Bleibt (12.11.)"] and found.role == ""  # the whole write is refused
+
+
+def test_req_009_fifteen_points_of_full_length_fit(db_session):
+    points = [("%02d " % n) + "x" * 237 for n in range(15)]
+    people.update_profile(db_session, NOW, "Anna Becker", actor="claude", agreements=points)
+    assert people.agreement_list(people.profile(db_session, "Anna Becker")) == points
+
+
+def test_req_009_an_excluded_person_gets_no_agreements(db_session):
+    people_admin.set_person_excluded(db_session, "Secret Person", True)
+    with pytest.raises(people.PersonError, match="excluded"):
+        people.update_profile(db_session, NOW, "Secret Person", actor="claude", agreements=["Punkt"])
+    assert people.profile(db_session, "Secret Person") is None

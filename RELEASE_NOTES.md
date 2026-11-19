@@ -2,6 +2,11 @@
 
 User-facing changes, newest first. Rules: `.claude/release-notes.md`.
 
+## v0.56 — 2026-11-19
+
+- **DE:** Jede Person hat jetzt eine kurze Liste „Absprachen“: was Ihr vereinbart oder geklärt habt, auch wenn keine Aufgabe daraus entsteht. Die Auswertung hält sie nach jedem Gespräch aktuell, höchstens 15 Punkte, und Du kannst sie auf der Seite der Person korrigieren.
+- **EN:** Every person now has a short list "Agreements": what you two agreed on or settled, even if no task comes out of it. The analysis keeps it current after every conversation, at most 15 points, and you can correct it on the person's page.
+
 ## v0.55 — 2026-11-19
 
 - **DE:** Liegt eine verknüpfte Aufgabe im Board außerhalb des Bildschirms oder in einer eingeklappten Zeile, zeigt ein Etikett am Bildrand ihren Namen, und die Linie führt dorthin. Ein Klick auf die 🔗-Zahl einer Karte hält die Linien beim Scrollen fest, ein Klick auf ein Etikett springt zur Aufgabe.

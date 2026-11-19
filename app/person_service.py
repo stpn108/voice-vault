@@ -6,6 +6,7 @@ excluded topics get nothing. Nothing in this module deletes.
 """
 import datetime as dt
 import logging
+import re
 from collections import Counter
 from itertools import combinations
 from typing import Optional
@@ -20,6 +21,8 @@ from database import PersonMapNode, PersonProfile, PersonTopicHidden, PersonTopi
 log = logging.getLogger(__name__)
 
 ROLE_MAX, WORK_MAX, POINTS_MAX, CLUSTER_MAX = 200, 800, 1000, 800
+AGREEMENTS_MAX, AGREEMENT_MAX = 15, 240  # points per person and characters per point (REQ-009)
+BULLET = re.compile(r"^\s*[-*•–]\s+")  # a bullet the owner typed; numbers stay, a point may start with one
 TALK_SHARE_MIN = 0.2  # share of a conversation's passages before it ties the person to its topics (D-059)
 RELATION_MIN_SCORE = 2
 
@@ -45,18 +48,44 @@ def profile(session: Session, name: str) -> Optional[PersonProfile]:
     return session.scalar(select(PersonProfile).where(func.lower(PersonProfile.name) == _key(name)))
 
 
+def _agreements(value) -> str:
+    """The list of agreements as stored: one point per line. Takes a list, or a text with one point per line;
+    typed bullets and empty lines go. Too many or too long is refused, never cut off (D-076)."""
+    lines = value.splitlines() if isinstance(value, str) else value
+    if not isinstance(lines, (list, tuple)) or not all(isinstance(line, str) for line in lines):
+        raise PersonError("agreements must be a list of short sentences")
+    points = [" ".join(BULLET.sub("", line).split()) for line in lines]
+    points = [point for point in points if point]
+    if len(points) > AGREEMENTS_MAX:
+        raise PersonError(f"at most {AGREEMENTS_MAX} agreements per person, got {len(points)}: merge related points "
+                          "or leave out the oldest that are settled")
+    long = [point for point in points if len(point) > AGREEMENT_MAX]
+    if long:
+        raise PersonError(f"an agreement must have at most {AGREEMENT_MAX} characters: '{long[0][:40]}…'")
+    return "\n".join(points)
+
+
+def agreement_list(found: Optional[PersonProfile]) -> list:
+    """The agreements with a person as a list of points, the newest first as they were written."""
+    return [line for line in (found.agreements or "").split("\n") if line] if found else []
+
+
 def update_profile(session: Session, now: dt.datetime, name: str, *, actor: str, role=None, current_work=None,
-                   next_points=None) -> PersonProfile:
-    """Change the given fields of a profile (None leaves a field as it is). Old texts are kept."""
+                   next_points=None, agreements=None) -> PersonProfile:
+    """Change the given fields of a profile (None leaves a field as it is). Old texts are kept.
+    `agreements` replaces the whole list (REQ-009)."""
     actor = todos._actor(actor)
     name = _writable_person(session, name)
+    if agreements is not None:
+        agreements = _agreements(agreements)
     found = profile(session, name)
     if found is None:
-        found = PersonProfile(name=name, role="", current_work="", next_points="", updated_at=now)
+        found = PersonProfile(name=name, role="", current_work="", next_points="", agreements="", updated_at=now)
         session.add(found)
         session.flush()
     for field, value, limit in (("role", role, ROLE_MAX), ("current_work", current_work, WORK_MAX),
-                                ("next_points", next_points, POINTS_MAX)):
+                                ("next_points", next_points, POINTS_MAX),
+                                ("agreements", agreements, AGREEMENTS_MAX * (AGREEMENT_MAX + 1))):
         if value is None:
             continue
         value = todos._text(value, field, limit)

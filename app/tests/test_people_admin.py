@@ -162,3 +162,15 @@ def test_d057_the_profile_follows_a_renamed_name_and_goes_with_a_deleted_one(db_
     assert ps.profile(db_session, "Jochen") is None and ps.clusters(db_session, "Jochen") == []
     assert db_session.scalars(select(PersonMapNode)).all() == []
     assert db_session.scalars(select(PersonTopicHidden)).all() == []
+
+
+def test_req_009_on_a_merge_the_targets_agreements_win_and_an_empty_list_takes_the_other(db_session, world):
+    import person_service as ps
+    svc.create_todo(db_session, NOW, title="Ask Eve", actor="owner", people=["Eve"])
+    ps.update_profile(db_session, NOW, "Anna", actor="owner", agreements=["von Anna"])
+    ps.update_profile(db_session, NOW, "Eve", actor="owner", agreements=["von Eve"])
+    ps.update_profile(db_session, NOW, "Jochen Rill", actor="owner", role="CISO")
+    admin.rename_person(db_session, NOW, "Anna", "Jochen Rill")
+    assert ps.agreement_list(ps.profile(db_session, "Jochen Rill")) == ["von Anna"]
+    admin.rename_person(db_session, NOW, "Eve", "Jochen Rill")
+    assert ps.agreement_list(ps.profile(db_session, "Jochen Rill")) == ["von Anna"]

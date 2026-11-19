@@ -829,3 +829,36 @@ def test_d063_task_page_jumps_into_the_mindmap_with_the_task_visible(client, mak
     assert f'href="/todos/graph?focus={todo}&amp;{params}"' in client.get(f"/todos/{todo}").text
     page = client.get(f"/todos/graph?focus={todo}&" + params.replace("&amp;", "&")).text
     assert f'"focus": {todo}' in page and "Focus me" in page
+
+
+# --- agreements per person (REQ-009, D-076) ------------------------------------------------------------
+def test_req_009_the_person_page_shows_the_agreements_as_a_list(client, make_todo, session_factory):
+    import person_service
+    make_todo(title="Write offer", people=["Jochen Rill"])
+    empty = client.get("/person?name=Jochen%20Rill").text
+    assert "Noch keine Absprachen notiert." in empty and '<ul class="agreements" data-agreements hidden>' in empty
+    with session_factory() as s:
+        person_service.update_profile(s, now_utc(), "Jochen Rill", actor="claude",
+                                      agreements=["Budgetfreigabe über <Anna> (12.11.)", "Jour fixe alle 14 Tage (12.11.)"])
+    html = client.get("/person?name=Jochen%20Rill").text
+    assert "<li>Budgetfreigabe über &lt;Anna&gt; (12.11.)</li><li>Jour fixe alle 14 Tage (12.11.)</li>" in html
+    assert ">Absprachen</span>" in html and 'data-field="agreements"' in html and "höchstens 15" in html
+    assert "Budgetfreigabe über &lt;Anna&gt; (12.11.)\nJour fixe alle 14 Tage (12.11.)</textarea>" in html
+
+
+def test_req_009_the_owner_corrects_the_agreements_and_gets_the_stored_list_back(client, make_todo, session_factory):
+    import person_service
+    make_todo(title="Write offer", people=["Jochen Rill"])
+    saved = client.post("/person/profile", data={"csrf": webapp.csrf_token(), "name": "Jochen Rill", "field": "agreements",
+                                                 "value": "- Jour fixe alle 14 Tage\r\n\r\n- Angebote gehen über Anna"},
+                        headers={"Accept": "application/json"})
+    assert saved.json() == {"ok": True, "agreements": ["Jour fixe alle 14 Tage", "Angebote gehen über Anna"]}
+    with session_factory() as s:
+        found = person_service.profile(s, "Jochen Rill")
+        assert person_service.agreement_list(found) == ["Jour fixe alle 14 Tage", "Angebote gehen über Anna"]
+        assert found.updated_by == "owner"
+    too_many = post(client, "/person/profile", name="Jochen Rill", field="agreements",
+                    value="\n".join(f"Punkt {n}" for n in range(16)))
+    assert too_many.status_code == 400
+    assert post(client, "/person/profile", name="Jochen Rill", field="agreements", value="x", csrf="bad").status_code == 403
+    assert "result.agreements" in client.get("/static/profile.js").text

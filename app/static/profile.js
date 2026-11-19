@@ -23,6 +23,20 @@
         if (!response.ok) { throw new Error("HTTP " + response.status); }
         state.textContent = box.getAttribute("data-saved");
         state.classList.remove("failed");
+        return response.json();
+      })
+      .then(function (result) {
+        // The list of agreements follows what was saved (REQ-009); text goes in as text only.
+        if (field !== "agreements") { return; }
+        var list = box.querySelector("[data-agreements]");
+        list.replaceChildren.apply(list, result.agreements.map(function (point) {
+          var item = document.createElement("li");
+          item.textContent = point;
+          return item;
+        }));
+        list.hidden = result.agreements.length === 0;
+        box.querySelector("[data-agreements-none]").hidden = result.agreements.length > 0;
+        event.target.value = result.agreements.join("\n");
       })
       .catch(function () {
         state.textContent = box.getAttribute("data-failed");

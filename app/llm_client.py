@@ -65,7 +65,12 @@ skipping generic labels like "Speaker 2" or "Unbekannt 1": call get_person first
 excluded, skip that person. Then call update_person with only the fields this recording adds to or changes, each \
 rewritten as a whole in German: role (role and unit in one line, only if said or clearly evident), current_work (what \
 the person is working on now, one or two sentences), next_points (what the owner should raise in the next \
-conversation with them: open questions, promises that are due, decisions to get; drop points that are settled). For \
+conversation with them: open questions, promises that are due, decisions to get; drop points that are settled), \
+agreements (what the owner and this person agreed on or settled, also when no task follows from it: decisions, \
+arrangements, agreed ways of working, who is responsible for what; not mere discussion without an outcome. Send the \
+whole list each time: keep the points get_person shows that still hold, replace a point this recording changed, put \
+new points first; one short sentence per point, ending with the date of the conversation like (18.11.); at most 15 \
+points, so when the list gets longer merge related points and leave out the oldest that are settled or outdated). For \
 each topic the owner and this person really discussed, call set_person_topic with two or three sentences on where the \
 topic stands with this person (decisions, open questions, who drives what), recording_id set, rewritten as a whole, \
 not appended. If a tool refuses a person or a topic (excluded, or taken off the person by the owner), do not retry \

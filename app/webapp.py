@@ -629,20 +629,22 @@ def person_page(request: Request, name: str = Query(..., max_length=todos.PERSON
     return render(request, cfg, "person.html", via_waiting=via_waiting, b=found, today=now_utc().astimezone(LOCAL_TZ).date(),
                   days_since=(now_utc() - found.last_talk).days if found.last_talk else None, excluded=excluded,
                   profile=None if excluded else person_service.profile(session, found.name),
+                  agreements=[] if excluded else person_service.agreement_list(person_service.profile(session, found.name)),
+                  agreements_max=person_service.AGREEMENTS_MAX,
                   clusters=[] if excluded else person_service.clusters(session, found.name),
                   graph=graph)
 
 
 @app.post("/person/profile")
 def person_profile_save(request: Request, name: str = Form(..., max_length=todos.PERSON_MAX),
-                        field: str = Form(..., max_length=20), value: str = Form("", max_length=2000),
+                        field: str = Form(..., max_length=20), value: str = Form("", max_length=4000),
                         csrf: str = Form(""), session: Session = Depends(get_session)):
     """One field of the living profile, saved when the owner leaves it (D-057). `field` is a profile field
     or "topic:<id>" for the note on a shared topic."""
     require_csrf(request, csrf)
     old = ""
     try:
-        if field in ("role", "current_work", "next_points"):
+        if field in ("role", "current_work", "next_points", "agreements"):
             found = person_service.profile(session, name)
             old = getattr(found, field) if found else ""
             person_service.update_profile(session, now_utc(), name, actor="owner", **{field: value})
@@ -657,6 +659,9 @@ def person_profile_save(request: Request, name: str = Form(..., max_length=todos
     except (person_service.PersonError, todos.TodoError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     glossary.learn(session, old, value, source="person")
+    # The list of agreements comes back as stored, so the page can show it without a reload (REQ-009).
+    if field == "agreements":
+        return JSONResponse({"ok": True, "agreements": person_service.agreement_list(person_service.profile(session, name))})
     return JSONResponse({"ok": True})
 
 

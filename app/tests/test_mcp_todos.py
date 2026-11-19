@@ -251,6 +251,35 @@ def test_d057_claude_keeps_the_profile_and_reads_it_back(client):
         assert part in text, part
 
 
+def test_req_009_claude_keeps_the_agreements_as_a_whole_list_and_reads_them_back(client):
+    add(client, title="Write offer", people=["Jochen Rill"], topic="Budget")
+    assert "Agreements with the owner:\n(none)" in text_of(call(client, "get_person", {"name": "Jochen Rill"}))
+    first = ["Budgetfreigabe über Anna (12.11.)", "Jour fixe alle 14 Tage (12.11.)"]
+    assert not is_error(call(client, "update_person", {"name": "Jochen Rill", "agreements": first}))
+    text = text_of(call(client, "get_person", {"name": "Jochen Rill"}))
+    assert "Agreements with the owner:\n- Budgetfreigabe über Anna (12.11.)\n- Jour fixe alle 14 Tage (12.11.)\n" in text
+    assert not is_error(call(client, "update_person", {"name": "Jochen Rill", "agreements": [
+        "Budgetfreigabe entscheidet Sven (19.11.)", "Jour fixe alle 14 Tage (12.11.)"]}))
+    text = text_of(call(client, "get_person", {"name": "Jochen Rill"}))
+    assert "entscheidet Sven (19.11.)" in text and "über Anna" not in text
+    assert not is_error(call(client, "update_person", {"name": "Jochen Rill", "role": "Head of SOC"}))  # other fields leave it
+    assert "entscheidet Sven (19.11.)" in text_of(call(client, "get_person", {"name": "Jochen Rill"}))
+
+
+def test_req_009_too_many_agreements_come_back_as_a_tool_error_that_says_what_to_do(client):
+    result = call(client, "update_person", {"name": "Jochen Rill", "agreements": [f"Punkt {n}" for n in range(16)]})
+    assert is_error(result) and "at most 15 agreements" in text_of(result) and "merge related points" in text_of(result)
+    assert is_error(call(client, "update_person", {"name": "Jochen Rill", "agreements": "one text, not a list of points" * 20}))
+
+
+def test_req_009_agreements_get_the_glossary_spellings(client, session_factory):
+    import glossary_admin
+    with session_factory() as s:
+        glossary_admin.add_term(s, "Glucania", "", "Glukania")
+    call(client, "update_person", {"name": "Jochen Rill", "agreements": ["Glukania wird nicht verlängert (19.11.)"]})
+    assert "- Glucania wird nicht verlängert (19.11.)" in text_of(call(client, "get_person", {"name": "Jochen Rill"}))
+
+
 def test_d057_claude_cannot_profile_an_excluded_person(client, session_factory):
     import people_admin
     with session_factory() as s:

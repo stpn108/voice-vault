@@ -137,3 +137,8 @@ def test_d070_the_start_gives_up_after_the_timeout():
     ticks = iter([0, 30, 61])
     with pytest.raises(OperationalError):
         database.wait_for_database(_FlakyEngine(10), sleep=lambda s: None, clock=lambda: next(ticks))
+
+
+def test_req_009_agreements_column_has_its_migration():
+    from database import MIGRATIONS, PersonProfile
+    assert "009_person_profiles_agreements" in [name for name, _ in MIGRATIONS] and "agreements" in PersonProfile.__table__.c
