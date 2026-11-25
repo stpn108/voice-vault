@@ -2,6 +2,11 @@
 
 User-facing changes, newest first. Rules: `.claude/release-notes.md`.
 
+## v0.58 — 2026-11-25
+
+- **DE:** Unter „Verwaltung“ gibt es jetzt „Alle Daten löschen“. Die Seite zeigt vorher, was alles gelöscht wird, und fragt noch einmal nach. Die Plaud-Anmeldung bleibt, neue Aufnahmen kommen weiter herein.
+- **EN:** "Administration" now has "Delete all data". The page first shows everything that goes and asks once more. The Plaud login stays, new recordings keep coming in.
+
 ## v0.57 — 2026-11-19
 
 - **DE:** Die Kopfleiste ist jetzt auf allen Seiten so breit wie bei „Aufgaben“ und „Personen“; das Menü springt beim Seitenwechsel nicht mehr.

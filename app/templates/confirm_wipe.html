@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}{{ t("ui_wipe") }}{% endblock %}
+{% block crumbs %}
+<nav class="crumbs" aria-label="breadcrumb"><a href="/admin">{{ t("ui_nav_admin") }}</a><span class="sep">/</span><span aria-current="page">{{ t("ui_wipe") }}</span></nav>
+{% endblock %}
+{% block content %}
+<div class="card">
+{% if empty %}
+<h1 style="margin-bottom:.6rem">{{ t("ui_wipe") }}</h1>
+<p>{{ t("ui_wipe_empty") }}</p>
+{% else %}
+<h1 style="margin-bottom:.6rem">{{ t("ui_wipe_title") }}</h1>
+{% if changed %}<p class="notice">{{ t("ui_wipe_changed") }}</p>{% endif %}
+<p>{{ t("ui_wipe_text") }}</p>
+<ul>
+  <li>{{ t("ui_wipe_recordings", count=found.recordings) }}</li>
+  <li>{{ t("ui_wipe_tasks", count=found.todos) }}</li>
+  <li>{{ t("ui_wipe_topics", count=found.topics) }}</li>
+  <li>{{ t("ui_wipe_people", count=found.person_profiles) }}</li>
+  <li>{{ t("ui_wipe_digests", count=found.digests) }}</li>
+  <li>{{ t("ui_wipe_glossary", count=found.glossary_terms) }}</li>
+</ul>
+<p>{{ t("ui_wipe_more") }}</p>
+<p>{{ t("ui_wipe_keeps") }}</p>
+<p class="notice">{{ plaud_note }}</p>
+<form method="post" action="/admin/wipe">
+  <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="fingerprint" value="{{ fingerprint }}">
+  <div class="actions">
+    <button class="danger" type="submit">{{ t("ui_wipe_confirm") }}</button>
+    <a class="btn" href="/admin">{{ t("ui_cancel") }}</a>
+  </div>
+</form>
+{% endif %}
+</div>
+{% endblock %}

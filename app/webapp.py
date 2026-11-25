@@ -43,6 +43,7 @@ import person_service
 import stats_service
 import task_links
 import topic_admin
+import wipe_service
 from config import Config, load_config
 import plaud_auth
 from database import PlaudSession, Topic, engine, migrate_schema
@@ -724,6 +725,7 @@ ADMIN_TOOLS = [
     {"path": "/admin/plaud", "title": "ui_admin_plaud", "text": "ui_admin_plaud_text"},
     {"path": "/admin/glossary", "title": "ui_admin_glossary", "text": "ui_admin_glossary_text"},
     {"path": "/cleanup", "title": "ui_cleanup", "text": "ui_admin_cleanup_text"},
+    {"path": "/admin/wipe", "title": "ui_wipe", "text": "ui_admin_wipe_text"},
 ]
 GLOSSARY_MESSAGES = ("added", "accepted", "rejected", "saved", "deleted")
 
@@ -836,6 +838,29 @@ def _people_error(exc: people_admin.PeopleError) -> HTTPException:
 @app.get("/admin", response_class=HTMLResponse)
 def admin_index(request: Request, cfg: Config = Depends(get_config)):
     return render(request, cfg, "admin.html", tools=ADMIN_TOOLS)
+
+
+def _wipe_page(request: Request, cfg: Config, session: Session, changed: bool) -> HTMLResponse:
+    found = wipe_service.counts(session)
+    return render(request, cfg, "confirm_wipe.html", status_code=409 if changed else 200, found=found,
+                  fingerprint=wipe_service.fingerprint(found), empty=not any(found.values()), changed=changed)
+
+
+@app.get("/admin/wipe", response_class=HTMLResponse)
+def admin_wipe_confirm(request: Request, session: Session = Depends(get_session), cfg: Config = Depends(get_config)):
+    """Ask before deleting all data (REQ-011); this page deletes nothing."""
+    return _wipe_page(request, cfg, session, changed=False)
+
+
+@app.post("/admin/wipe")
+def admin_wipe(request: Request, fingerprint: str = Form(..., max_length=32, pattern="^[0-9a-f]+$"), csrf: str = Form(""),
+               session: Session = Depends(get_session), cfg: Config = Depends(get_config)):
+    require_csrf(request, csrf)
+    if not hmac.compare_digest(wipe_service.fingerprint(wipe_service.counts(session)), fingerprint):
+        # Something changed since the owner looked at the numbers: show them again, delete nothing (D-079).
+        return _wipe_page(request, cfg, session, changed=True)
+    wipe_service.wipe_all(session, now_utc())
+    return RedirectResponse("/admin/wipe", status_code=303)
 
 
 @app.get("/admin/people", response_class=HTMLResponse)
