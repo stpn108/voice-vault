@@ -45,7 +45,7 @@ Requirements: `requirements/`. Decisions: `DECISIONS.md` (D-001 to D-004).
    (table `plaud_sessions`); `.env` is only the seed.
 2. Run the live check with a throwaway test recording:
    `docker compose run --rm app python plaud_live_check.py` (read-only), then
-   `--trash <id>` and `--delete <id>`. This settles whether `DELETE /file/`
+   `--trash <id>` and `--delete <id>`. This settles whether the permanent delete
    only works on trashed recordings and which `task_status` values occur
    (open questions in REQ-001).
 3. Decide the backup. After permanent deletion the database holds the only

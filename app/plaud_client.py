@@ -2,8 +2,9 @@
 Minimal client for Plaud's unofficial web API (D-001).
 
 Only what voice-vault needs: list, detail (transcript + summary), trash and
-permanent delete. Endpoints and payload shapes were taken from reading the
-plaud-tools and plaud-api sources; they are not documented by Plaud.
+permanent delete, all on the Plaud 4.0 routes under `/file-app/v4/` (D-080).
+Endpoints and payload shapes were taken from reading the plaud-tools, chatterbox
+and OpenAudioHub sources; they are not documented by Plaud.
 """
 import ipaddress
 import json
@@ -25,10 +26,15 @@ from plaud_auth import (
 
 log = logging.getLogger(__name__)
 
-TRANSCRIPT_TYPE = "transaction"
-POLISHED_TYPE = "transaction_polish"
-SUMMARY_TYPE = "auto_sum_note"
-TASK_DONE = 1
+V4 = "/file-app/v4"
+TRANSCRIPT_TYPE = "TRANSCRIPT"
+POLISHED_TYPE = "POLISHED_TRANSCRIPT"
+SUMMARY_TYPE = "SUMMARY"
+# A migrated object reports task_status null once done, a generated one 1.
+DONE_TASK_STATUSES = (None, 1)
+# Plaud 4.0 names a recording made before the move `of_<old id>`, its container folder `on_w_<old id>`.
+LEGACY_FILE_PREFIX = "of_"
+LEGACY_CONTAINER_PREFIX = "on_w_"
 PAGE_SIZE = 50
 MAX_PAGES = 100
 MAX_ATTEMPTS = 3
@@ -74,11 +80,20 @@ def _segments(value: Any) -> list[dict]:
     return [s for s in value if isinstance(s, dict)]
 
 
-def _content_item(raw: dict, data_type: str) -> Optional[dict]:
-    for item in raw.get("content_list") or []:
-        if isinstance(item, dict) and item.get("data_type") == data_type:
+def _object(raw: dict, object_type: str) -> Optional[dict]:
+    for item in raw.get("objects") or []:
+        if isinstance(item, dict) and item.get("object_type") == object_type:
             return item
     return None
+
+
+def _object_done(item: Optional[dict]) -> bool:
+    """A content object is finished when it has a download link and its task is done."""
+    return bool(item and item.get("content_url") and item.get("task_status") in DONE_TASK_STATUSES)
+
+
+def _dict(value: Any) -> dict:
+    return value if isinstance(value, dict) else {}
 
 
 def _summary_from_obj(obj: Any) -> Optional[str]:
@@ -103,6 +118,17 @@ def _summary_from_obj(obj: Any) -> Optional[str]:
 def _check_id(plaud_id: str) -> None:
     if not isinstance(plaud_id, str) or not ID_RE.fullmatch(plaud_id):
         raise PlaudError("a Plaud id has an unusable form")
+
+
+def _local_id(file_id: str) -> str:
+    """The id voice-vault stores: a recording from before Plaud 4.0 keeps its old id (D-080)."""
+    return file_id[len(LEGACY_FILE_PREFIX):] if file_id.startswith(LEGACY_FILE_PREFIX) else file_id
+
+
+def _file_id(plaud_id: str) -> str:
+    """The Plaud 4.0 file id of a stored id. Old ids are plain hex and get `of_`; 4.0 ids already have a prefix."""
+    _check_id(plaud_id)
+    return plaud_id if "_" in plaud_id else LEGACY_FILE_PREFIX + plaud_id
 
 
 def _check_download_url(url: str) -> None:
@@ -269,65 +295,90 @@ class PlaudClient:
             return text
 
     # -- endpoints ----------------------------------------------------
+    def _walk(self, path: str, params: dict) -> list[dict]:
+        """Every item of a Plaud 4.0 list endpoint, following `next_cursor`."""
+        items: list[dict] = []
+        cursor = None
+        for _ in range(MAX_PAGES):
+            query = {**params, "page_size": PAGE_SIZE, **({"cursor": cursor} if cursor else {})}
+            data = _dict(self._request("GET", f"{V4}{path}", params=query).get("data"))
+            page = data.get("items")
+            if not isinstance(page, list):
+                # A changed shape must not read as "no recordings".
+                raise PlaudError(f"GET {V4}{path} returned no item list")
+            items.extend(item for item in page if isinstance(item, dict))
+            cursor = data.get("next_cursor") or None
+            if not cursor:
+                break
+        return items
+
+    def _trash_entries(self) -> dict[str, dict]:
+        """Recordings in the Plaud trash: stored id -> the node a permanent delete names (D-042, D-080).
+
+        The trash holds a recording's container folder. One from before 4.0 (`on_w_<old id>`) names
+        its recording; a newer one is opened once to find it. Trashed folders of the owner are skipped.
+        """
+        entries: dict[str, dict] = {}
+        for item in self._walk("/folders/content", {"scope": "trash"}):
+            node_id = str(item.get("node_id") or "")
+            if item.get("type") == 2 and item.get("file_id"):
+                plaud_id = _local_id(str(item["file_id"]))
+            elif item.get("type") == 1 and not item.get("icon") and not item.get("system_folder_type"):
+                if node_id.startswith(LEGACY_CONTAINER_PREFIX):
+                    plaud_id = node_id[len(LEGACY_CONTAINER_PREFIX):]
+                else:
+                    plaud_id = _local_id(self._container_file_id(node_id))
+            else:
+                continue
+            if node_id and ID_RE.fullmatch(plaud_id):
+                entries[plaud_id] = {"node_id": node_id, "origin_version": item.get("version_ms")}
+        return entries
+
+    def _container_file_id(self, container_id: str) -> str:
+        """File id of the recording in a container folder; it may also hold notes (`MD`). '' if none."""
+        files = [f for f in self._walk("/folders/children", {"node_id": container_id}) if f.get("file_id")]
+        recordings = [f for f in files if f.get("file_type") == "REC"]
+        not_notes = [f for f in files if f.get("file_type") != "MD"]
+        return str((recordings or not_notes or [{}])[0].get("file_id") or "")
+
     def list_trash_ids(self) -> set[str]:
         """Ids of the recordings in the Plaud trash (D-042)."""
-        ids: set[str] = set()
-        for page in range(MAX_PAGES):
-            data = self._request("GET", "/file/simple/web", params={
-                "skip": page * PAGE_SIZE, "limit": PAGE_SIZE, "is_trash": 1,
-                "sort_by": "start_time", "is_desc": "true",
-            })
-            items = data.get("data_file_list") or data.get("data") or []
-            for item in items:
-                plaud_id = str(item.get("id") or item.get("file_id") or "") if isinstance(item, dict) else ""
-                if ID_RE.fullmatch(plaud_id):
-                    ids.add(plaud_id)
-            if len(items) < PAGE_SIZE:
-                break
-        return ids
+        return set(self._trash_entries())
 
     def list_recordings(self) -> list[PlaudRecording]:
         """All recordings outside the Plaud trash, newest first."""
         result: list[PlaudRecording] = []
-        for page in range(MAX_PAGES):
-            data = self._request("GET", "/file/simple/web", params={
-                "skip": page * PAGE_SIZE, "limit": PAGE_SIZE, "is_trash": 0,
-                "sort_by": "start_time", "is_desc": "true",
-            })
-            items = data.get("data_file_list") or data.get("data") or []
-            for item in items:
-                try:
-                    if item.get("is_trash"):
-                        continue
-                    plaud_id = str(item.get("id") or item.get("file_id") or "")
-                    if not ID_RE.fullmatch(plaud_id):
-                        log.warning("Skipping a listed recording with an unusable id")
-                        continue
-                    result.append(PlaudRecording(
-                        plaud_id=plaud_id,
-                        title=str(item.get("filename") or item.get("file_name") or ""),
-                        start_ms=int(item.get("start_time") or 0),
-                        duration_ms=int(item.get("duration") or 0),
-                    ))
-                except (AttributeError, TypeError, ValueError, OverflowError):
-                    log.warning("Skipping a listed recording with an unexpected shape")
-            if len(items) < PAGE_SIZE:
-                break
-        return [r for r in result if r.plaud_id]
+        for item in self._walk("/recordings/all", {"sort_by": "created", "sort_order": "desc"}):
+            try:
+                if item.get("is_trash") or item.get("trash_info"):
+                    continue
+                plaud_id = _local_id(str(item.get("file_id") or ""))
+                if not ID_RE.fullmatch(plaud_id):
+                    log.warning("Skipping a listed recording with an unusable id")
+                    continue
+                result.append(PlaudRecording(
+                    plaud_id=plaud_id,
+                    title=str(item.get("name") or ""),
+                    start_ms=int(item.get("created_at_show_ms") or 0),
+                    duration_ms=int(item.get("duration_ms") or 0),
+                ))
+            except (AttributeError, TypeError, ValueError, OverflowError):
+                log.warning("Skipping a listed recording with an unexpected shape")
+        return result
 
     def get_detail(self, plaud_id: str) -> PlaudDetail:
-        _check_id(plaud_id)
-        payload = self._request("GET", f"/file/detail/{quote(plaud_id, safe='')}")
-        raw = payload.get("data", payload)
+        payload = self._request("GET", f"{V4}/files/detail/{quote(_file_id(plaud_id), safe='')}")
+        raw = payload.get("data")
         if not isinstance(raw, dict):
             raise PlaudError(f"detail for {plaud_id} has an unexpected shape")
+        meta = _dict(raw.get("meta"))
         try:
-            start_ms, duration_ms = int(raw.get("start_time") or 0), int(raw.get("duration") or 0)
+            start_ms, duration_ms = int(meta.get("start_time") or 0), int(meta.get("duration") or 0)
         except (TypeError, ValueError, OverflowError) as exc:
             raise PlaudError(f"detail for {plaud_id} has an unreadable start time or duration") from exc
         return PlaudDetail(
             plaud_id=plaud_id,
-            title=str(raw.get("file_name") or raw.get("filename") or ""),
+            title=str(_dict(raw.get("node")).get("name") or ""),
             start_ms=start_ms,
             duration_ms=duration_ms,
             is_processed=self.is_processed(raw),
@@ -336,96 +387,91 @@ class PlaudClient:
 
     @staticmethod
     def is_processed(raw: dict) -> bool:
-        """Transcript and summary both finished (`task_status == 1`); otherwise False."""
-        transcript = _content_item(raw, TRANSCRIPT_TYPE)
-        summary = _content_item(raw, SUMMARY_TYPE)
-        if not transcript or transcript.get("task_status") != TASK_DONE or not transcript.get("data_link"):
-            return False
-        return bool(summary and summary.get("task_status") == TASK_DONE)
+        """Transcript and summary both finished; otherwise False."""
+        return _object_done(_object(raw, TRANSCRIPT_TYPE)) and _object_done(_object(raw, SUMMARY_TYPE))
 
     def fetch_segments(self, detail: PlaudDetail) -> list[dict]:
         """Transcript utterances: speaker, content, start_time/end_time in ms.
 
-        Plaud keeps two transcripts. The cleaned one ("Transkript bereinigt", block `transaction_polish`)
-        carries the speaker names the owner gave; the original one (`transaction`) keeps "Speaker 1" (D-026).
-        Order: the cleaned transcript from `POST /file/list`, then its download link, then the current
-        original transcript from `/file/list` (D-025), then the original's download link.
+        Plaud keeps two transcripts. The cleaned one ("Transkript bereinigt", `POLISHED_TRANSCRIPT`)
+        is read first (D-026); the original one (`TRANSCRIPT`) is the logged fallback (D-080).
         """
-        entry = self._file_entry(detail.plaud_id)
-        polished = _segments(entry.get(POLISHED_TYPE)) if entry else []
-        if not polished:
-            polished = self._download_block(detail, POLISHED_TYPE)
+        polished = self._download_block(detail, POLISHED_TYPE)
         if polished:
             return polished
         log.warning("Cleaned transcript not available, using the original one plaud_id=%s", detail.plaud_id)
-        current = _segments(entry.get("trans_result")) if entry else []
-        if current:
-            return current
-        item = _content_item(detail.raw, TRANSCRIPT_TYPE)
-        if not item or not item.get("data_link"):
+        item = _object(detail.raw, TRANSCRIPT_TYPE)
+        if not _object_done(item):
             raise PlaudError(f"recording {detail.plaud_id} has no readable transcript")
-        body = self._download(str(item["data_link"]))
+        body = self._download(str(item["content_url"]))
         if isinstance(body, dict):
             body = body.get("trans_result")
         if not isinstance(body, list):
             raise PlaudError(f"transcript of {detail.plaud_id} has an unexpected shape")
         return [s for s in body if isinstance(s, dict)]
 
-    def _file_entry(self, plaud_id: str) -> Optional[dict]:
-        """The recording's entry of `POST /file/list`, or None if Plaud does not send one."""
-        _check_id(plaud_id)
-        try:
-            payload = self._request("POST", "/file/list", body=[plaud_id])
-        except PlaudAuthError:
-            raise
-        except PlaudError as exc:
-            log.warning("File list not available plaud_id=%s reason=%s", plaud_id, exc)
-            return None
-        files = payload.get("data_file_list")
-        if not isinstance(files, list):
-            return None
-        return next((f for f in files if isinstance(f, dict)
-                     and str(f.get("id") or f.get("file_id") or plaud_id) == plaud_id), None)
-
-    def _download_block(self, detail: PlaudDetail, data_type: str) -> list[dict]:
-        """Segments of a finished transcript block from its download link; [] if there is none."""
-        item = _content_item(detail.raw, data_type)
-        if not item or item.get("task_status") != TASK_DONE or not item.get("data_link"):
+    def _download_block(self, detail: PlaudDetail, object_type: str) -> list[dict]:
+        """Segments of a finished transcript object from its download link; [] if it is not finished."""
+        item = _object(detail.raw, object_type)
+        if not _object_done(item):
             return []
-        return _segments(self._download(str(item["data_link"])))
+        return _segments(self._download(str(item["content_url"])))
 
     def fetch_summary(self, detail: PlaudDetail) -> str:
         """AI summary as markdown text. Empty string if Plaud sent none."""
-        item = _content_item(detail.raw, SUMMARY_TYPE)
-        if not item:
+        item = _object(detail.raw, SUMMARY_TYPE)
+        if not _object_done(item):
             return ""
-        for pre in detail.raw.get("pre_download_content_list") or []:
-            if isinstance(pre, dict) and (
-                pre.get("data_id") == item.get("data_id") or pre.get("data_type") == SUMMARY_TYPE
-            ):
-                found = _summary_from_obj(pre.get("data_content"))
-                if found:
-                    return found
-        if item.get("data_link"):
-            try:
-                return _summary_from_obj(self._download(str(item["data_link"]))) or ""
-            except RecursionError as exc:
-                raise PlaudError("summary is nested too deeply") from exc
-        return ""
+        try:
+            return _summary_from_obj(self._download(str(item["content_url"]))) or ""
+        except RecursionError as exc:
+            raise PlaudError("summary is nested too deeply") from exc
+
+    def _movable_node(self, plaud_id: str) -> dict:
+        """`{node_id, origin_version}` of what moves as the recording: its container folder, else its file node."""
+        node = _dict(self.get_detail(plaud_id).raw.get("node"))
+        container = _dict(node.get("folder")).get("folder_id")
+        shown_in = _dict(node.get("display_folder")).get("folder_id")
+        if not container or container == shown_in:
+            if not node.get("node_id"):
+                raise PlaudError(f"detail for {plaud_id} names no node")
+            return {"node_id": node["node_id"], "origin_version": node.get("version_ms")}
+        params = {"file_id": _file_id(plaud_id)}
+        data = _dict(self._request("GET", f"{V4}/nodes/ancestor-items", params=params).get("data"))
+        siblings = [i for i in data.get("flat_items") or [] if isinstance(i, dict)]
+        if not any(i.get("node_id") == container for i in siblings) and shown_in:
+            siblings = self._walk("/folders/children", {"node_id": shown_in})
+        for item in siblings:
+            if item.get("node_id") == container:
+                return {"node_id": container, "origin_version": item.get("version_ms")}
+        raise PlaudError(f"container folder of {plaud_id} not found")
+
+    def _node_batch(self, path: str, items: list[dict]) -> None:
+        """A 4.0 node write. It answers status 0 even when an item failed and lists those in `data.failed`."""
+        data = _dict(self._request("DELETE", f"{V4}{path}", body={"items": items}).get("data"))
+        failed = [_dict(f) for f in data.get("failed") or []]
+        if failed:
+            reasons = "; ".join(f"{f.get('node_id')}: {f.get('error_message') or f.get('error_code')}" for f in failed)
+            raise PlaudError(f"DELETE {V4}{path} failed for {len(failed)} item(s): {reasons}")
 
     def trash(self, plaud_ids: list[str]) -> None:
         if not plaud_ids:
             raise ValueError("plaud_ids must not be empty")
         for plaud_id in plaud_ids:
             _check_id(plaud_id)
-        self._request("POST", "/file/trash/", body=plaud_ids)
+        self._node_batch("/nodes/trash", [self._movable_node(plaud_id) for plaud_id in plaud_ids])
 
     def delete_permanently(self, plaud_ids: list[str]) -> None:
+        """Delete recordings from the Plaud trash for good. One that is not in the trash is refused (D-080)."""
         if not plaud_ids:
             raise ValueError("plaud_ids must not be empty")
         for plaud_id in plaud_ids:
             _check_id(plaud_id)
-        self._request("DELETE", "/file/", body=plaud_ids)
+        trashed = self._trash_entries()
+        missing = [plaud_id for plaud_id in plaud_ids if plaud_id not in trashed]
+        if missing:
+            raise PlaudError(f"not in the Plaud trash, not deleted: {', '.join(missing)}")
+        self._node_batch("/nodes/delete", [trashed[plaud_id] for plaud_id in plaud_ids])
 
 
 def build_client(cfg, session_factory: Callable[[], Session]) -> PlaudClient:

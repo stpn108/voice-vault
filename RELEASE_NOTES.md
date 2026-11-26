@@ -2,6 +2,11 @@
 
 User-facing changes, newest first. Rules: `.claude/release-notes.md`.
 
+## v0.59 — 2026-11-26
+
+- **DE:** Plaud hat Dein Konto auf seine Version 4.0 umgestellt, seitdem kamen keine Aufnahmen mehr an. voice-vault spricht jetzt mit der neuen Plaud-Schnittstelle, gespeicherte Aufnahmen bleiben ihren Gegenstücken bei Plaud zugeordnet.
+- **EN:** Plaud moved your account to its version 4.0, and since then no recordings came in. voice-vault now talks to the new Plaud interface; stored recordings stay matched to their counterparts at Plaud.
+
 ## v0.58 — 2026-11-25
 
 - **DE:** Unter „Verwaltung“ gibt es jetzt „Alle Daten löschen“. Die Seite zeigt vorher, was alles gelöscht wird, und fragt noch einmal nach. Die Plaud-Anmeldung bleibt, neue Aufnahmen kommen weiter herein.

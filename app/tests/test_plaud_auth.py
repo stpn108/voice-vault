@@ -132,7 +132,7 @@ def test_rejected_refresh_token_that_works_as_bearer_is_reported_as_access_token
     message = str(exc.value)
     assert "ACCEPTED as bearer" in message and "put it into PLAUD_TOKEN" in message
     assert token not in message
-    assert ("GET", "/file/simple/web") in calls
+    assert ("GET", "/file-app/v4/recordings/all") in calls
 
 
 def test_rejected_refresh_token_that_is_no_bearer_either_says_so():
@@ -148,7 +148,7 @@ def test_bearer_probe_runs_only_once_per_process():
     for _ in range(3):
         with pytest.raises(PlaudAuthError):
             auth.refresh(BASE)
-    assert [c for c in calls if c[0] == "GET"] == [("GET", "/file/simple/web")]
+    assert [c for c in calls if c[0] == "GET"] == [("GET", "/file-app/v4/recordings/all")]
     assert len([c for c in calls if c[0] == "POST"]) == 3
 
 

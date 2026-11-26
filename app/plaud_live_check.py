@@ -12,14 +12,15 @@ one recording id, so use a throwaway test recording:
     docker compose run --rm app python plaud_live_check.py --speakers <id>
 
 `--speakers` changes nothing. It shows where Plaud keeps the speaker names of one recording: the
-labels in the current transcript (/file/list), in the file behind the download link, and every
-field whose name mentions a speaker. It prints names and keys, never transcript text.
+labels in the cleaned and in the original transcript, and every field of the detail whose name
+mentions a speaker. It prints names and keys, never transcript text.
 
 It also exercises the automatic token renewal (REQ-004) and stores the
 rotated tokens in the database, exactly as the app does.
 
-The check answers REQ-001 open questions: does DELETE /file/ work on a
-trashed recording only, and which task_status values occur.
+The check answers REQ-001 open questions: does the permanent delete work on a
+trashed recording only, and which task_status values occur. Since Plaud 4.0
+(D-080) it is also the first check of the new endpoints.
 """
 import argparse
 import json
@@ -31,7 +32,7 @@ from sqlalchemy.orm import Session
 
 from config import load_config
 from database import engine
-from plaud_client import PlaudError, _segments, build_client
+from plaud_client import POLISHED_TYPE, TRANSCRIPT_TYPE, PlaudError, _object, _segments, build_client
 from utils import now_utc
 
 
@@ -60,7 +61,7 @@ def main(argv=None) -> int:
         for item in client.list_recordings():
             detail = client.get_detail(item.plaud_id)
             statuses = {
-                c.get("data_type"): c.get("task_status") for c in detail.raw.get("content_list") or []
+                o.get("object_type"): o.get("task_status") for o in detail.raw.get("objects") or []
             }
             print(item.plaud_id, repr(detail.title), "processed" if detail.is_processed else "not processed", statuses)
     except PlaudError as exc:
@@ -99,29 +100,16 @@ def show_speakers(client, plaud_id: str) -> None:
     detail = client.get_detail(plaud_id)
     raw = detail.raw
     print("detail keys:", sorted(raw))
-    print("content_list:", [(c.get("data_type"), c.get("task_status")) for c in raw.get("content_list") or []])
-    print("pre_download_content_list:", [(p.get("data_type"), "speaker" in str(p.get("data_content", "")))
-                                         for p in raw.get("pre_download_content_list") or []])
+    print("objects:", [(o.get("object_type"), o.get("task_status"), bool(o.get("content_url")))
+                       for o in raw.get("objects") or [] if isinstance(o, dict)])
     for where, value in _speaker_fields(raw):
         print("detail field:", where, "=", value)
-    try:
-        payload = client._request("POST", "/file/list", body=[plaud_id])
-        files = payload.get("data_file_list") or []
-        print("/file/list entries:", len(files))
-        for entry in files:
-            if isinstance(entry, dict):
-                print("  keys:", sorted(entry))
-                print("  trans_result labels:", _labels(entry.get("trans_result") or []))
-                print("  transaction_polish labels:", _labels(_segments(entry.get("transaction_polish"))))
-                for where, value in _speaker_fields(entry):
-                    print("  field:", where, "=", value)
-    except PlaudError as exc:
-        print("/file/list failed:", exc)
-    link = next((c.get("data_link") for c in raw.get("content_list") or [] if c.get("data_type") == "transaction"), None)
-    if link:
-        body = client._download(str(link))
-        segments = body.get("trans_result") if isinstance(body, dict) else body
-        print("download link labels:", _labels(segments if isinstance(segments, list) else []))
+    for object_type in (POLISHED_TYPE, TRANSCRIPT_TYPE):
+        item = _object(raw, object_type)
+        if not item or not item.get("content_url"):
+            print(object_type, "labels: (no download link)")
+            continue
+        print(object_type, "labels:", _labels(_segments(client._download(str(item["content_url"])))))
     print("used by the import:", _labels(client.fetch_segments(detail)))
 
 

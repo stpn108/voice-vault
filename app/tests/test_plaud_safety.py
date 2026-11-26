@@ -297,15 +297,15 @@ def test_review_ids_that_could_change_the_path_never_reach_plaud(plaud_id):
 
 
 def test_review_listed_items_with_odd_shapes_are_skipped_not_fatal():
-    items = [{"id": "ok1", "start_time": 1, "duration": 2}, {"id": "bad/../id"}, "not a dict",
-             {"id": "ok2", "start_time": "soon"}, {"id": "ok3", "start_time": 5, "duration": 6}]
-    recs = client_for(lambda request: ok(data_file_list=items)).list_recordings()
-    assert [r.plaud_id for r in recs] == ["ok1", "ok3"]
+    items = [{"file_id": "f_ok1", "created_at_show_ms": 1, "duration_ms": 2}, {"file_id": "bad/../id"}, "not a dict",
+             {"file_id": "f_ok2", "created_at_show_ms": "soon"}, {"file_id": "f_ok3", "created_at_show_ms": 5}]
+    recs = client_for(lambda request: ok({"items": items})).list_recordings()
+    assert [r.plaud_id for r in recs] == ["f_ok1", "f_ok3"]
 
 
 def test_review_unreadable_detail_numbers_are_a_plaud_error():
     raw = detail_raw()
-    raw["start_time"] = "yesterday"
+    raw["meta"]["start_time"] = "yesterday"
     client = client_for(lambda request: ok(raw))
     with pytest.raises(PlaudError, match="unreadable"):
         client.get_detail("r1")

@@ -97,8 +97,8 @@ def probe_bearer(http: httpx.Client, base_url: str, token: str) -> str:
     """One read-only call that tells whether a token works as a bearer. Never returns the token."""
     try:
         resp = http.get(
-            f"{base_url}/file/simple/web",
-            params={"skip": 0, "limit": 1, "is_trash": 0},
+            f"{base_url}/file-app/v4/recordings/all",
+            params={"page_size": 1},
             headers={"Authorization": f"Bearer {token}", "User-Agent": USER_AGENT,
                      "app-platform": "web", "edit-from": "web"},
         )
