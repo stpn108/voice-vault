@@ -233,9 +233,10 @@ def test_req_014_the_script_is_served_from_this_server(client):
         assert part in script.text
 
 
-def test_d_086_every_page_has_the_vault_favicon_from_this_server(client):
+def test_d_086_every_page_has_the_vault_icon_in_the_tab_and_the_top_bar(client):
     page = client.get("/report")
     assert '<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">' in page.text
+    assert '<a class="brand" href="/"><img src="/static/favicon.svg" alt="" width="21" height="21"><span>voice-vault</span></a>' in page.text
     assert "img-src 'self'" in page.headers["content-security-policy"]
     icon = client.get("/static/favicon.svg")
     assert icon.status_code == 200 and icon.headers["content-type"].startswith("image/svg+xml") and "<circle" in icon.text

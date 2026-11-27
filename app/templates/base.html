@@ -33,7 +33,7 @@
   header.top .wrap { display: flex; align-items: center; gap: .15rem; height: 3.4rem; max-width: 94rem; }  /* the bar is as wide on every page as on the board (D-078) */
   a.brand { display: flex; align-items: center; gap: .5rem; font-weight: 700; letter-spacing: -.02em; color: var(--text);
     text-decoration: none; margin-right: .6rem; white-space: nowrap; }
-  a.brand i { width: .8rem; height: .8rem; border-radius: 50%; background: linear-gradient(135deg, var(--accent), #9775fa); }
+  a.brand img { width: 1.3rem; height: 1.3rem; }
   a.nav { color: var(--muted); text-decoration: none; font-weight: 500; font-size: .93rem; padding: .4rem .42rem; border-radius: .55rem; white-space: nowrap; transition: background .12s, color .12s; }
   a.nav:hover { color: var(--text); background: var(--hover); }
   a.nav.current { color: var(--text); background: var(--hover); box-shadow: inset 0 -2px 0 var(--accent); border-radius: .55rem .55rem 0 0; }
@@ -438,7 +438,7 @@
 {% set path = request.url.path %}
 {% set nav = "report" if path == "/report" else "people" if path == "/people" or (path == "/person" and request.query_params.get("from") == "people") else "todos" if path.startswith(("/todos", "/person")) else "topics" if path.startswith("/topics") else "digests" if path.startswith("/digests") else "stats" if path.startswith("/stats") else "admin" if path.startswith(("/admin", "/cleanup")) else "recordings" %}
 <header class="top"><div class="wrap">
-  <a class="brand" href="/"><i></i><span>voice-vault</span></a>
+  <a class="brand" href="/"><img src="/static/favicon.svg" alt="" width="21" height="21"><span>voice-vault</span></a>
   <a class="nav {% if nav == 'todos' %}current{% endif %}" href="/todos">{{ t("ui_nav_todos") }}</a>
   <a class="nav {% if nav == 'people' %}current{% endif %}" href="/people">{{ t("ui_nav_people") }}</a>
   <a class="nav {% if nav == 'report' %}current{% endif %}" href="/report">{{ t("ui_nav_report") }}</a>

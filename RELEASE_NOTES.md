@@ -2,6 +2,11 @@
 
 User-facing changes, newest first. Rules: `.claude/release-notes.md`.
 
+## v0.64 — 2026-11-27
+
+- **DE:** Links oben in der Kopfleiste steht jetzt auch das Tresor-Symbol statt des Punkts.
+- **EN:** The top bar now shows the vault icon at the left instead of the dot.
+
 ## v0.63 — 2026-11-27
 
 - **DE:** Im „Report“ zeigt die Auswahl einer Person ihren Report sofort, ohne Klick auf „Anzeigen“. Kopiert wird über ein kleines Symbol oben rechts in der Liste.

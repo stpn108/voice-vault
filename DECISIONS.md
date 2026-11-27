@@ -1013,3 +1013,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner request; the owner picked option C out of three (dot, wave, vault). `img-src 'self'` allows only files from this server, which already serves the scripts. |
 | **Rejected alternatives** | (A) the dot from the top bar: hard to tell apart in a row of tabs; (B) the wave alone: the owner chose the vault; (C) a PNG/ICO set: one SVG covers every size in current browsers; (D) a `data:` URI favicon: would need `img-src data:`, wider than needed. |
 | **Status** | **FINAL** |
+
+### D-087: The top bar shows the vault icon instead of the dot (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-11-27 |
+| **Decision** | Amends D-086. The brand link in `base.html` shows `static/favicon.svg` as an `<img>` (1.3rem, empty `alt`, since the name follows) in place of the gradient dot; the rule `a.brand i` is removed. On narrow screens, where the name is hidden, the icon alone is the link to the start page. |
+| **In plain words** | The symbol at the top left is now the same vault as in the browser tab. |
+| **Reasoning** | Owner request: tab and top bar should show the same mark. One file for both keeps them the same. |
+| **Rejected alternatives** | (A) the SVG inline in the template: a second copy of the drawing; (B) keeping the dot: owner rejected it. |
+| **Status** | **FINAL** |
