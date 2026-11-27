@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 import todo_service as todos
 from database import PersonProfile, Recording, Segment, Todo, Topic, TopicNote
+from task_board import DONE_DAYS
 from utils import as_utc
 
 RECORDINGS_SHOWN = 3
@@ -138,21 +139,31 @@ def overview(session: Session, now: dt.datetime, today: dt.date, sort: str = "re
     return rows
 
 
-# --- report for a status update (REQ-013, D-083) --------------------------------------------------------
+# --- report for a status update (REQ-013, D-083; finished tasks REQ-014, D-084) -------------------------
 @dataclass
 class StatusReport:
     person: Optional[str]                              # None: the owner himself
     in_progress: list = field(default_factory=list)    # titles
     open: list = field(default_factory=list)           # titles
+    done: list = field(default_factory=list)           # titles finished in the last `done_days` days, newest first
+    done_days: int = DONE_DAYS
     truncated: bool = False
+
+    def groups(self) -> list:
+        """(status, titles) in the order a status update reads them, empty groups left out."""
+        return [(key, titles) for key, titles in (("done", self.done), ("in_progress", self.in_progress),
+                                                  ("open", self.open)) if titles]
 
 
 def status_report(session: Session, now: dt.datetime, person: Optional[str] = None) -> StatusReport:
-    """Titles of the unfinished tasks of one person, as the task list orders them: the owner's own tasks, or
-    for anyone else what they promised him (D-038). Tasks of excluded topics are left out."""
-    if person:
-        rows, truncated = todos.list_todos(session, now, kind="waiting", person=person, limit=todos.LIST_LIMIT_MAX)
-    else:
-        rows, truncated = todos.list_todos(session, now, kind="mine", limit=todos.LIST_LIMIT_MAX)
+    """Titles of the tasks of one person, as the task list orders them: the owner's own tasks, or for anyone
+    else what they promised him (D-038). Unfinished ones, and the ones finished as long as the board shows
+    them (DONE_DAYS). Tasks of excluded topics are left out."""
+    kind = "waiting" if person else "mine"
+    rows, truncated = todos.list_todos(session, now, kind=kind, person=person, limit=todos.LIST_LIMIT_MAX)
+    done, done_cut = todos.list_todos(session, now, status="done", kind=kind, person=person, limit=todos.LIST_LIMIT_MAX,
+                                      done_since=now - dt.timedelta(days=DONE_DAYS))
+    done = sorted(done, key=lambda row: row.done_at, reverse=True)
     return StatusReport(person or None, [r.title for r in rows if r.status == "in_progress"],
-                        [r.title for r in rows if r.status != "in_progress"], truncated)
+                        [r.title for r in rows if r.status != "in_progress"], [r.title for r in done],
+                        truncated=truncated or done_cut)

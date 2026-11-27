@@ -2,12 +2,12 @@
 
 | | |
 |---|---|
-| **Status** | APPROVED (owner's request in chat, 2026-11-27, developer mode; the reading of "assigned to a person" and the other choices under "Open questions" were made by Claude and reported) |
+| **Status** | IMPLEMENTED (owner's request in chat, 2026-11-27, developer mode; the reading of "assigned to a person" and the other choices under "Open questions" were made by Claude and reported) |
 | **Date** | 2026-11-27 |
 | **Requested by** | Dennis Winter |
-| **Implemented in** | — (branch `claude/req-013-status-report`) |
+| **Implemented in** | v0.61 (branch `claude/req-013-status-report`) |
 | **Related decisions** | D-015, D-028, D-038, D-044, D-077, D-083 |
-| **Supersedes / superseded by** | — |
+| **Supersedes / superseded by** | Changed by REQ-014: finished tasks are listed (criterion 2) and there is a copy button (both were out of scope here). |
 
 ## Owner ask (verbatim)
 
@@ -72,4 +72,14 @@ task list shows.
 
 ## Tests
 
-<Filled in at IMPLEMENTED: test file and test names per criterion.>
+All in `app/tests/test_report.py`.
+
+| Criterion | Tests |
+|-----------|-------|
+| 1 Navigation | `test_req_013_report_is_in_the_navigation_after_people` |
+| 2 "Ich" by default | `test_req_013_by_default_the_report_lists_the_owners_unfinished_tasks_by_priority`, `test_req_013_the_page_shows_me_by_default_with_my_tasks_as_bullets` |
+| 3 Another person | `test_req_013_for_another_person_the_report_lists_what_they_promised`, `test_req_013_picking_a_person_shows_what_they_promised` |
+| 4 Dropdown | `test_req_013_the_dropdown_lists_me_then_the_known_people_without_excluded_and_unnamed`, `test_req_013_a_name_that_is_not_a_known_person_is_a_404` |
+| 5 Titles only | `test_req_013_titles_are_plain_escaped_text_without_links` |
+| 6 Nothing open | `test_req_013_nothing_open_says_so` |
+| 7 Long lists | `test_req_013_a_long_report_is_cut_and_says_so`, `test_req_013_a_long_page_says_that_there_are_more` |

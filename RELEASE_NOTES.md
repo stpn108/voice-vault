@@ -2,6 +2,11 @@
 
 User-facing changes, newest first. Rules: `.claude/release-notes.md`.
 
+## v0.62 — 2026-11-27
+
+- **DE:** Der „Report“ zeigt jetzt zuerst, was in den letzten 7 Tagen erledigt wurde. Ein Knopf „Kopieren“ legt die ganze Liste als Text in die Zwischenablage, fertig zum Einfügen in Chat oder Mail.
+- **EN:** The "Report" now starts with what was finished in the last 7 days. A "Copy" button puts the whole list into the clipboard as text, ready to paste into a chat or a mail.
+
 ## v0.61 — 2026-11-27
 
 - **DE:** Neue Seite „Report“: eine schlichte Liste der Titel Deiner offenen Aufgaben, getrennt nach „In Arbeit“ und „Offen“, zum Vorlesen oder Kopieren im Meeting. Über die Auswahl oben siehst Du dasselbe für eine andere Person, dort mit dem, was sie Dir zugesagt hat.

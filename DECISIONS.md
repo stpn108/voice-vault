@@ -980,3 +980,14 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner request: a quick status update in a meeting. For other people, what they promised the owner is the only list of their work the app keeps; the owner's own tasks that name a person are his work with them, not theirs. Reusing `list_todos` keeps the order and the filters the task list has. Plain text without links copies cleanly into a chat or a mail. |
 | **Rejected alternatives** | (A) the owner's tasks that name the person: they are the owner's work; (B) a view on the task page: the task page is about the owner's own tasks and their state, the report is a different reading for a different moment; (C) one flat list: "In Arbeit" is what a status update starts with; (D) a copy button: not asked for, selecting and copying works. |
 | **Status** | **FINAL** |
+
+### D-084: The report lists the tasks finished in the board's window first, and copies itself as plain text (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-11-27 |
+| **Decision** | REQ-014, amends D-083. `briefing_service.status_report()` also reads the tasks finished within `task_board.DONE_DAYS` (7 days), same `kind` and person rules, newest first; `StatusReport.groups()` gives the order "done", "in_progress", "open" and leaves out empty groups. The page heads the first group "Erledigt, letzte 7 Tage". A button "Kopieren" carries the report as plain text in `data-copy` (headings, "- " bullets, blank lines between groups), built by the template from the same groups; `static/report.js` writes it with `navigator.clipboard.writeText` and, where that is missing or refused, selects the list on the page. The button is `hidden` until the script runs, so without JavaScript there is no dead button. |
+| **In plain words** | The report now starts with what you finished in the last week, and one click copies the whole list for a chat or a mail. |
+| **Reasoning** | Owner request. The board's window keeps one meaning of "finished lately" in the app. Done first is the order a status update is told in. The text in an attribute keeps the script tiny and the content testable on the server; the clipboard API works on the SSH tunnel's `localhost`, which browsers count as secure. |
+| **Rejected alternatives** | (A) a window to choose on the page: not asked for; (B) the finished group last: a status update starts with what is done; (C) the script reading the text from the page: the CSS upper-cases the headings and the script would have to know the layout; (D) `document.execCommand("copy")`: deprecated; selecting the list does the same job without it. |
+| **Status** | **FINAL** |
