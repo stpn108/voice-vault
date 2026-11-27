@@ -70,14 +70,7 @@ When a module passes ~500 lines, split it by domain, not by layer.
 - Standard library before a package; a small package before a big one.
 - Prefer a table and a scheduled job over a new service.
 
-## 6. Feature flags and shadow mode
-
-Any change that alters what users see for existing behaviour ships
-behind a flag or in shadow mode first (compute, log, do not act), then is
-switched on after the log shows it decides correctly. This is cheap; a
-surprise for users is not.
-
-## 7. Forbidden
+## 6. Forbidden
 
 - `datetime.now()` / `date.today()` outside `utils.py`
 - Business logic in templates, handlers, jobs or migrations

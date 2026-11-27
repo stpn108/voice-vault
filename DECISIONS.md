@@ -947,3 +947,25 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | The account is migrated, so the legacy routes will not come back for it. One protocol keeps the client small; plaud-tools dropped the old one for the same reason. Keeping the old id avoids rewriting stored data: rows with the old id are still at Plaud (waiting for speaker names, in the trash before the permanent delete) or are tombstones of discarded recordings (D-079), and both must keep matching, otherwise they would be imported a second time and never deleted at Plaud. chatterbox and OpenAudioHub strip `of_` for the same reason. Whether the owner's speaker names sit in the cleaned or the original transcript in 4.0 is not known: plaud-tools writes renames into `TRANSCRIPT`; `plaud_live_check.py --speakers <id>` shows the labels of both. |
 | **Rejected alternatives** | (A) keep the legacy routes and switch to 4.0 only on `-1800907`: two protocols for an account that will not go back; (B) a migration that rewrites stored ids to `of_<id>`: rewrites stored data for no gain, and a failed run leaves a mix; (C) trashing a recording inside `delete_permanently` when it is not in the trash: that would undo a restore by the owner (D-042). |
 | **Status** | **TENTATIVE** |
+
+### D-081: Shadow mode is no longer an architecture rule (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-11-27 |
+| **Decision** | `.claude/architecture.md` §6 "Feature flags and shadow mode" is removed; "Forbidden" moves up to §6. A change that alters existing behaviour no longer has to ship behind a flag or in shadow mode first. Not changed: the deletion switch `PLAUD_DELETE_ENABLED` (D-003), which is a feature of the product, and the separate shadow rules in `.claude/llm.md` §9 and `.claude/machine-learning.md` §18. |
+| **In plain words** | New behaviour goes live when you release it, without a phase in which it only writes to the log. |
+| **Reasoning** | Owner's instruction on 2026-11-27 ("kein Schattenmodus. Nimm das mal aus architecture.md raus"). The owner decides when a change goes live; REQ-007 already went without a shadow phase. |
+| **Rejected alternatives** | (A) keeping the flag half of the rule: the same staged rollout under another name; (B) also removing the rules in `llm.md` and `machine-learning.md`: not asked for. |
+| **Status** | **FINAL** |
+
+### D-082: The company name is replaced by "[Firma]" at the import and on every write of Claude; the list lives in `.env` only (TENTATIVE)
+
+| | |
+|---|---|
+| **Date** | 2026-11-27 |
+| **Decision** | REQ-012. `REDACT_TERMS` in `.env` (entries separated by `;`) lists the names; it is read in `config.py` and never written to the database, to git or to a log (the log gives the number of entries only). One module builds one case-insensitive whole-word pattern from it, longest entry first, with spaces/hyphens/nothing between words, an optional trailing "s" or "'s", umlauts also as two letters or plain, and dots or spaces between the letters of a short entry in capitals. It replaces every match with `[Firma]`. It runs (1) in `import_service.import_recording()` after the `#secret` check (D-046) and before the content hash, on title, summary and segment text, so the hash, the read-back and the deletion at Plaud see the replaced text (D-003); (2) on every text argument of Claude's write tools, before the glossary (D-062); (3) if the owner agrees, on the owner's edits in the UI and once over the data already stored. `SYSTEM_PROMPT` tells Claude that "[Firma]" is a placeholder to keep as it is. D-062 is not changed: the glossary still never touches transcripts. This is a separate step at the import boundary, for security, and the owner accepted that a wrong replacement is permanent once Plaud has deleted the original. |
+| **In plain words** | You list the names of your company in `.env`. From then on title, summary and transcript are stored with "[Firma]" in their place, and Claude writes "[Firma]" as well. |
+| **Reasoning** | Owner request: the company name must not appear in the database. Replacing before the hash keeps the verified import and the deletion unchanged. Keeping the list out of the database keeps it out of the backups too. One placeholder is the owner's choice. |
+| **Rejected alternatives** | (A) the list in a database table with a page in the UI: the names would be in the database and its backups; (B) fuzzy matching for misheard forms: it replaces words nobody listed, and permanently; (C) hiding the name only when it is shown: it stays in the database; (D) one placeholder per unit: the owner chose one; (E) a shadow phase first: the owner declined (D-081). |
+| **Status** | **TENTATIVE** (FINAL when REQ-012 is approved) |
