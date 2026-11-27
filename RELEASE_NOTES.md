@@ -2,6 +2,11 @@
 
 User-facing changes, newest first. Rules: `.claude/release-notes.md`.
 
+## v0.61 — 2026-11-27
+
+- **DE:** Neue Seite „Report“: eine schlichte Liste der Titel Deiner offenen Aufgaben, getrennt nach „In Arbeit“ und „Offen“, zum Vorlesen oder Kopieren im Meeting. Über die Auswahl oben siehst Du dasselbe für eine andere Person, dort mit dem, was sie Dir zugesagt hat.
+- **EN:** New page "Report": a plain list of the titles of your unfinished tasks, split into "In progress" and "Open", to read out or copy in a meeting. The selection at the top shows the same for another person, with what they promised you.
+
 ## v0.59 — 2026-11-26
 
 - **DE:** Plaud hat Dein Konto auf seine Version 4.0 umgestellt, seitdem kamen keine Aufnahmen mehr an. voice-vault spricht jetzt mit der neuen Plaud-Schnittstelle, gespeicherte Aufnahmen bleiben ihren Gegenstücken bei Plaud zugeordnet.

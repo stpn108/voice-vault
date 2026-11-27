@@ -628,6 +628,19 @@ def people_dashboard(request: Request, sort: str = Query("recent", max_length=10
                   shown=PEOPLE_AGREEMENTS_SHOWN, names=todos.known_people(session))
 
 
+@app.get("/report", response_class=HTMLResponse)
+def report_page(request: Request, person: str = Query("", max_length=todos.PERSON_MAX), session: Session = Depends(get_session),
+                cfg: Config = Depends(get_config)):
+    """Titles of what the owner, or someone else, is working on, for a status update (REQ-013, D-083)."""
+    names = todos.known_people(session)
+    wanted = " ".join(person.split()).lower()
+    found = next((n for n in names if n.lower() == wanted), None)
+    if wanted and found is None:
+        raise HTTPException(status_code=404, detail="unknown person")
+    return render(request, cfg, "report.html", report=briefing_service.status_report(session, now_utc(), found),
+                  names=names)
+
+
 @app.get("/person", response_class=HTMLResponse)
 def person_page(request: Request, name: str = Query(..., max_length=todos.PERSON_MAX), session: Session = Depends(get_session),
                 came_from: str = Query("", alias="from", max_length=10), cfg: Config = Depends(get_config)):

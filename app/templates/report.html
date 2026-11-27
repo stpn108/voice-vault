@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}{{ t("ui_nav_report") }}{% endblock %}
+{% block content %}
+{# What someone is working on, titles only, for a status update (REQ-013, D-083). Plain text so it copies as it is. #}
+<div class="head" style="margin-top:1.4rem">
+  <h1>{{ t("ui_nav_report") }}</h1>
+  <form class="searchbar" method="get" action="/report">
+    <select name="person" aria-label="{{ t('ui_report_who') }}">
+      <option value="">{{ t("ui_report_me") }}</option>
+      {% for name in names %}<option value="{{ name }}"{% if name == report.person %} selected{% endif %}>{{ name }}</option>{% endfor %}
+    </select>
+    <button type="submit">{{ t("ui_report_show") }}</button>
+  </form>
+</div>
+<p class="sub">{{ t("ui_report_theirs", name=report.person) if report.person else t("ui_report_mine") }}</p>
+{% if report.in_progress or report.open %}
+<div class="card report">
+  {% if report.in_progress %}<h2>{{ t("todo_status_in_progress") }}</h2>
+  <ul>{% for title in report.in_progress %}<li>{{ title }}</li>{% endfor %}</ul>{% endif %}
+  {% if report.open %}<h2>{{ t("todo_status_open") }}</h2>
+  <ul>{% for title in report.open %}<li>{{ title }}</li>{% endfor %}</ul>{% endif %}
+  {% if report.truncated %}<p class="muted">{{ t("ui_report_more") }}</p>{% endif %}
+</div>
+{% else %}
+<div class="card empty">{{ t("ui_report_empty") }}</div>
+{% endif %}
+{% endblock %}

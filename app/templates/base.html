@@ -91,7 +91,7 @@
   button.small { padding: .25rem .7rem; font-size: .82rem; }
   button:focus-visible, a.btn:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .searchbar { display: flex; gap: .5rem; flex: 1 1 18rem; max-width: 28rem; }
-  .searchbar input { flex: 1; }
+  .searchbar input, .searchbar select { flex: 1; }
 
   /* segmented control */
   .seg { display: inline-flex; background: var(--hover); border-radius: .7rem; padding: .2rem; gap: .1rem; }
@@ -207,6 +207,7 @@
   .briefing-head h1 { margin: 0; }
   .briefing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr)); gap: 1rem; }
   .briefing-grid .card { padding: 1rem 1.1rem; } .briefing-grid h2 { margin: 0 0 .6rem; }
+  .report { padding: 1rem 1.3rem; } .report h2:first-child { margin-top: 0; } .report ul { margin: 0; padding-left: 1.2rem; } .report li { margin: .25rem 0; }
   .brief-list { list-style: none; margin: 0; padding: 0; } .brief-list li { padding: .45rem 0; border-top: 1px solid var(--line); }
   .brief-list li:first-child { border-top: 0; } .brief-list a { color: var(--text); text-decoration: none; font-weight: 500; }
   .brief-list a:hover { color: var(--accent); } .brief-list .muted { font-size: .85rem; }
@@ -429,11 +430,12 @@
 </head>
 <body class="{% block body_class %}{% endblock %}">
 {% set path = request.url.path %}
-{% set nav = "people" if path == "/people" or (path == "/person" and request.query_params.get("from") == "people") else "todos" if path.startswith(("/todos", "/person")) else "topics" if path.startswith("/topics") else "digests" if path.startswith("/digests") else "stats" if path.startswith("/stats") else "admin" if path.startswith(("/admin", "/cleanup")) else "recordings" %}
+{% set nav = "report" if path == "/report" else "people" if path == "/people" or (path == "/person" and request.query_params.get("from") == "people") else "todos" if path.startswith(("/todos", "/person")) else "topics" if path.startswith("/topics") else "digests" if path.startswith("/digests") else "stats" if path.startswith("/stats") else "admin" if path.startswith(("/admin", "/cleanup")) else "recordings" %}
 <header class="top"><div class="wrap">
   <a class="brand" href="/"><i></i><span>voice-vault</span></a>
   <a class="nav {% if nav == 'todos' %}current{% endif %}" href="/todos">{{ t("ui_nav_todos") }}</a>
   <a class="nav {% if nav == 'people' %}current{% endif %}" href="/people">{{ t("ui_nav_people") }}</a>
+  <a class="nav {% if nav == 'report' %}current{% endif %}" href="/report">{{ t("ui_nav_report") }}</a>
   <a class="nav {% if nav == 'topics' %}current{% endif %}" href="/topics">{{ t("ui_nav_topics") }}</a>
   <a class="nav {% if nav == 'digests' %}current{% endif %}" href="/digests">{{ t("ui_nav_digests") }}</a>
   <a class="nav {% if nav == 'stats' %}current{% endif %}" href="/stats">{{ t("ui_nav_stats") }}</a>

@@ -136,3 +136,23 @@ def overview(session: Session, now: dt.datetime, today: dt.date, sort: str = "re
     elif sort == "recent":
         rows.sort(key=lambda card: card.last_talk.timestamp() if card.last_talk else float("-inf"), reverse=True)
     return rows
+
+
+# --- report for a status update (REQ-013, D-083) --------------------------------------------------------
+@dataclass
+class StatusReport:
+    person: Optional[str]                              # None: the owner himself
+    in_progress: list = field(default_factory=list)    # titles
+    open: list = field(default_factory=list)           # titles
+    truncated: bool = False
+
+
+def status_report(session: Session, now: dt.datetime, person: Optional[str] = None) -> StatusReport:
+    """Titles of the unfinished tasks of one person, as the task list orders them: the owner's own tasks, or
+    for anyone else what they promised him (D-038). Tasks of excluded topics are left out."""
+    if person:
+        rows, truncated = todos.list_todos(session, now, kind="waiting", person=person, limit=todos.LIST_LIMIT_MAX)
+    else:
+        rows, truncated = todos.list_todos(session, now, kind="mine", limit=todos.LIST_LIMIT_MAX)
+    return StatusReport(person or None, [r.title for r in rows if r.status == "in_progress"],
+                        [r.title for r in rows if r.status != "in_progress"], truncated)
