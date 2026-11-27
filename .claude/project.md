@@ -13,6 +13,11 @@ whether to open one. A change is delivered by pushing the feature branch and rep
 `./merge-to-main.sh`. This overrides every "open a pull request" step in `collaboration.md` §6, `requirements.md` and
 `checklist.md`. Only an explicit request for a pull request in the current conversation changes that, for that one change.
 
+**One branch, no new branch per change (owner's standing instruction, 2026-11-27).** Claude keeps committing to the
+branch it is working on, also for a new requirement, and never creates a new branch per requirement or per change.
+This overrides "Work on a branch named `claude/<req-id>-<slug>`" in `collaboration.md` §6 and "One requirement per
+feature branch" in `requirements.md`. Only an explicit request for a new branch in the current conversation changes that.
+
 | Mode | Who develops | How a change is released | Rules |
 |------|--------------|--------------------------|-------|
 | `owner` | Claude. The owner defines requirements and never uses a terminal. | Claude opens a pull request; the owner merges it on GitHub; the server tests and deploys. | `collaboration.md` and `requirements.md` are binding |
