@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}{{ t("ui_title") }}{% endblock %}</title>
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
 <style>
   :root { color-scheme: light dark;
     --bg: #f7f8fa; --surface: #ffffff; --text: #181b23; --muted: #6a7285; --faint: #9aa1b2;
@@ -207,8 +208,12 @@
   .briefing-head h1 { margin: 0; }
   .briefing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr)); gap: 1rem; }
   .briefing-grid .card { padding: 1rem 1.1rem; } .briefing-grid h2 { margin: 0 0 .6rem; }
-  .report-bar { display: flex; align-items: center; justify-content: space-between; gap: .8rem; margin-bottom: .6rem; } .report-bar p.sub { margin: 0; }
-  .report { padding: 1rem 1.3rem; } .report h2:first-child { margin-top: 0; } .report ul { margin: 0; padding-left: 1.2rem; } .report li { margin: .25rem 0; }
+  .report { position: relative; padding: 1rem 1.3rem; } .report h2:first-of-type { margin-top: 0; } .report ul { margin: 0; padding-left: 1.2rem; } .report li { margin: .25rem 0; }
+  .report .copy { position: absolute; top: .55rem; right: .55rem; display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; padding: 0; border: 0; border-radius: .5rem; background: transparent; color: var(--muted); cursor: pointer; }
+  .report .copy:hover { background: var(--hover); color: var(--text); }
+  .report .copy svg { width: 1.05rem; height: 1.05rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .report .copy .icon-done, .report .copy.done .icon-copy { display: none; } .report .copy.done .icon-done { display: block; } .report .copy.done { color: var(--ok); }
+  .report .copy-note { position: absolute; top: 1.05rem; right: 3rem; font-size: .8rem; color: var(--muted); }
   .brief-list { list-style: none; margin: 0; padding: 0; } .brief-list li { padding: .45rem 0; border-top: 1px solid var(--line); }
   .brief-list li:first-child { border-top: 0; } .brief-list a { color: var(--text); text-decoration: none; font-weight: 500; }
   .brief-list a:hover { color: var(--accent); } .brief-list .muted { font-size: .85rem; }

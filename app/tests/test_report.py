@@ -205,16 +205,37 @@ def test_req_014_finished_tasks_come_first_under_their_own_heading(client, world
     assert "<h2>Erledigt, letzte 7 Tage</h2>\n  <ul><li>Schon geliefert</li></ul>" in anna
 
 
-def test_req_014_the_copy_button_holds_the_report_as_plain_text(client, world):
+def test_req_014_the_copy_icon_sits_in_the_card_and_holds_the_report_as_plain_text(client, world):
     html = client.get("/report").text
-    bar = html[html.index('<div class="report-bar">'):html.index("</div>", html.index('<div class="report-bar">'))]
-    assert 'data-done="Kopiert"' in bar and 'data-failed="Markiert, jetzt Strg+C"' in bar and " hidden>Kopieren</button>" in bar
+    card = report_card(html)
+    button = card[card.index('<button type="button" class="copy"'):card.index("</button>")]
+    assert card.index("</button>") < card.index("<h2>")
+    assert 'title="Kopieren" aria-label="Kopieren" hidden>' in button and '<svg class="icon-copy"' in button
+    assert 'data-done="Kopiert"' in button and 'data-failed="Markiert, jetzt Strg+C"' in button
+    assert '<span class="copy-note" aria-live="polite"></span>' in card
     assert copy_text(html) == ("Erledigt, letzte 7 Tage\n- Mit Anna fertig\n- Rechnung geprüft\n- Altes Thema\n\n"
                                "In Arbeit\n- Angebot schreiben\n\n"
                                "Offen\n- Budget prüfen\n- Folien bauen\n- Anna anrufen\n- Ask Eve")
     assert '<script src="/static/report.js" defer></script>' in html
 
 
-def test_req_014_the_copy_script_is_served_from_this_server(client):
+def test_req_014_the_dropdown_sends_itself_and_the_button_is_only_a_fallback_without_script(client, world):
+    html = client.get("/report").text
+    start = html.index('<form class="searchbar" method="get" action="/report" data-report>')
+    form = html[start:html.index("</form>", start)]
+    assert form.count("<button") == 1 and '<noscript><button type="submit">Anzeigen</button></noscript>' in form
+
+
+def test_req_014_the_script_is_served_from_this_server(client):
     script = client.get("/static/report.js")
-    assert script.status_code == 200 and "navigator.clipboard.writeText" in script.text and "button.hidden = false" in script.text
+    assert script.status_code == 200
+    for part in ("form.requestSubmit()", "navigator.clipboard.writeText", "button.hidden = false"):
+        assert part in script.text
+
+
+def test_d_086_every_page_has_the_vault_favicon_from_this_server(client):
+    page = client.get("/report")
+    assert '<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">' in page.text
+    assert "img-src 'self'" in page.headers["content-security-policy"]
+    icon = client.get("/static/favicon.svg")
+    assert icon.status_code == 200 and icon.headers["content-type"].startswith("image/svg+xml") and "<circle" in icon.text

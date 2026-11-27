@@ -991,3 +991,25 @@ Referenced from `CLAUDE.md` — Claude Code must know and maintain this log.
 | **Reasoning** | Owner request. The board's window keeps one meaning of "finished lately" in the app. Done first is the order a status update is told in. The text in an attribute keeps the script tiny and the content testable on the server; the clipboard API works on the SSH tunnel's `localhost`, which browsers count as secure. |
 | **Rejected alternatives** | (A) a window to choose on the page: not asked for; (B) the finished group last: a status update starts with what is done; (C) the script reading the text from the page: the CSS upper-cases the headings and the script would have to know the layout; (D) `document.execCommand("copy")`: deprecated; selecting the list does the same job without it. |
 | **Status** | **FINAL** |
+
+### D-085: The report's dropdown sends itself on change; copying is an icon in the card (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-11-27 |
+| **Decision** | REQ-014, amends D-083 and D-084. `static/report.js` sends the report form with `requestSubmit()` when the dropdown changes; the "Anzeigen" button stays only inside `<noscript>`. The copy button is an icon (inline SVG, `currentColor`) placed absolutely at the top right inside `.card.report`, before the first heading in the markup, with `title` and `aria-label` "Kopieren"; after copying it shows a check mark in `--ok` and a short note "Kopiert" next to it (`aria-live`) for two seconds. The fallback selects only the headings and lists, from the first `h2` to the card's last element, so the icon and the note are not part of the selection. |
+| **In plain words** | Picking a person shows their report right away, and the copy symbol sits at the top right of the list. |
+| **Reasoning** | Owner request. One click less per person; an icon inside the card is where a copy action is expected. |
+| **Rejected alternatives** | (A) keeping the visible button next to the dropdown: owner rejected it; (B) a generic "submit on change" attribute for every form: no other form needs it today; (C) the note replacing the icon: an icon-only button keeps its place and size. |
+| **Status** | **FINAL** |
+
+### D-086: Favicon "Tresor" as an SVG from this server; the CSP allows images from this server (FINAL)
+
+| | |
+|---|---|
+| **Date** | 2026-11-27 |
+| **Decision** | `static/favicon.svg`, a vault door (white ring) with three bars of a voice wave on a circle in the brand gradient (#4263eb to #9775fa, as the dot in the top bar), is linked in `base.html` as `<link rel="icon" type="image/svg+xml">`. The web UI's Content-Security-Policy gets `img-src 'self'`, since `default-src 'none'` blocked every image and Firefox applies it to the favicon. The OAuth pages of the no longer deployed `mcp` service are left as they are. |
+| **In plain words** | voice-vault has its own icon in the browser tab. |
+| **Reasoning** | Owner request; the owner picked option C out of three (dot, wave, vault). `img-src 'self'` allows only files from this server, which already serves the scripts. |
+| **Rejected alternatives** | (A) the dot from the top bar: hard to tell apart in a row of tabs; (B) the wave alone: the owner chose the vault; (C) a PNG/ICO set: one SVG covers every size in current browsers; (D) a `data:` URI favicon: would need `img-src data:`, wider than needed. |
+| **Status** | **FINAL** |

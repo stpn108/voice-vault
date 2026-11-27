@@ -57,8 +57,9 @@ log = logging.getLogger(__name__)
 # Per process unless UI_SECRET is set: forms from before a restart are rejected.
 CSRF_SECRET = (os.getenv("UI_SECRET") or secrets.token_hex(32)).encode()
 LOCAL_HOSTS = ["localhost", "127.0.0.1", "[::1]"]
-# Scripts only from this server's own /static files (no inline code, D-027); fetch only to this server.
-CSP = ("default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; "
+# Scripts only from this server's own /static files (no inline code, D-027); fetch only to this server; images (the
+# favicon) only from this server (D-086).
+CSP = ("default-src 'none'; script-src 'self'; connect-src 'self'; img-src 'self'; style-src 'unsafe-inline'; "
        "form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"

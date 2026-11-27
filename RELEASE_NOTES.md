@@ -2,6 +2,13 @@
 
 User-facing changes, newest first. Rules: `.claude/release-notes.md`.
 
+## v0.63 — 2026-11-27
+
+- **DE:** Im „Report“ zeigt die Auswahl einer Person ihren Report sofort, ohne Klick auf „Anzeigen“. Kopiert wird über ein kleines Symbol oben rechts in der Liste.
+- **EN:** In the "Report", picking a person shows their report at once, without clicking "Show". Copying is a small icon at the top right of the list.
+- **DE:** voice-vault hat jetzt ein eigenes Symbol im Browser-Tab: eine Tresortür mit Sprachwelle.
+- **EN:** voice-vault now has its own icon in the browser tab: a vault door with a voice wave.
+
 ## v0.62 — 2026-11-27
 
 - **DE:** Der „Report“ zeigt jetzt zuerst, was in den letzten 7 Tagen erledigt wurde. Ein Knopf „Kopieren“ legt die ganze Liste als Text in die Zwischenablage, fertig zum Einfügen in Chat oder Mail.

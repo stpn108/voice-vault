@@ -2,7 +2,8 @@
 {% block title %}{{ t("ui_nav_report") }}{% endblock %}
 {% block content %}
 {# What someone finished, is working on and has open, titles only, for a status update (REQ-013, REQ-014).
-   Plain text so it copies as it is; the copy button takes the same lines from data-copy. #}
+   Plain text so it copies as it is; the copy icon takes the same lines from data-copy. The dropdown sends the
+   form on change (report.js); without JavaScript the button in <noscript> does it. #}
 {% set groups = report.groups() %}
 {% set ns = namespace(lines=[]) %}
 {% for key, titles in groups %}
@@ -13,20 +14,22 @@
 {% if report.truncated %}{% set ns.lines = ns.lines + ["", t("ui_report_more")] %}{% endif %}
 <div class="head" style="margin-top:1.4rem">
   <h1>{{ t("ui_nav_report") }}</h1>
-  <form class="searchbar" method="get" action="/report">
+  <form class="searchbar" method="get" action="/report" data-report>
     <select name="person" aria-label="{{ t('ui_report_who') }}">
       <option value="">{{ t("ui_report_me") }}</option>
       {% for name in names %}<option value="{{ name }}"{% if name == report.person %} selected{% endif %}>{{ name }}</option>{% endfor %}
     </select>
-    <button type="submit">{{ t("ui_report_show") }}</button>
+    <noscript><button type="submit">{{ t("ui_report_show") }}</button></noscript>
   </form>
 </div>
-<div class="report-bar">
-  <p class="sub">{{ t("ui_report_theirs", name=report.person) if report.person else t("ui_report_mine") }}</p>
-  {% if groups %}<button type="button" data-copy="{{ ns.lines | join('\n') }}" data-done="{{ t('ui_report_copied') }}" data-failed="{{ t('ui_report_selected') }}" hidden>{{ t("ui_report_copy") }}</button>{% endif %}
-</div>
+<p class="sub">{{ t("ui_report_theirs", name=report.person) if report.person else t("ui_report_mine") }}</p>
 {% if groups %}
 <div class="card report">
+  <span class="copy-note" aria-live="polite"></span>
+  <button type="button" class="copy" data-copy="{{ ns.lines | join('\n') }}" data-done="{{ t('ui_report_copied') }}" data-failed="{{ t('ui_report_selected') }}" title="{{ t('ui_report_copy') }}" aria-label="{{ t('ui_report_copy') }}" hidden>
+    <svg class="icon-copy" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3"/></svg>
+    <svg class="icon-done" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+  </button>
   {% for key, titles in groups %}
   <h2>{{ t("ui_report_done", days=report.done_days) if key == "done" else t("todo_status_" ~ key) }}</h2>
   <ul>{% for title in titles %}<li>{{ title }}</li>{% endfor %}</ul>
