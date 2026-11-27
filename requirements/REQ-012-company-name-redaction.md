@@ -118,6 +118,7 @@ On the server, for each listed name, typed by the owner in `psql` and not saved 
 | 2026-11-27 | One placeholder, or one per unit? | One: "[Firma]" (owner). |
 | 2026-11-27 | Shadow phase before switching on? | No (owner). |
 | 2026-11-27 | Titles too, or only summary and transcript? | Titles too (Claude's proposal, criterion 2). |
+| 2026-11-27 | The list in `.env`, or under "Verwaltung" with only keyed fingerprints in the database? | `.env` (owner, once the reason was clear). |
 | 2026-11-27 | 1. Clean the data already stored (criterion 9)? | open |
 | 2026-11-27 | 2. Replace what the owner types in the UI as well (criterion 8)? | open |
 
